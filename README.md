@@ -19,11 +19,38 @@
 ```
 planning-discipline  →  build-discipline  →  adversarial-review
    검증 가능한 기준        그 기준을 구현          그 기준 대비로 판정
+         │                       │                       │
+         ↓                    (읽음)                     ↓
+ .agent-work/plans/  ─────────────┘        .agent-work/reviews/
 ```
 
 축은 세 스킬이 공유하는 **"검증 가능한 성공 기준"** 하나다. 기준이 없으면 `build-discipline`은
 범위 이탈을 구분할 수 없고, `adversarial-review`는 판정 대상이 없어 일반 린팅으로 무너진다.
 각각 단독으로도 쓸 수 있지만, 기준 없이 시작하면 뒤의 둘이 약해진다는 점은 알고 쓸 것.
+
+## 산출물
+
+계획과 감사 리포트는 프로젝트 루트 기준으로 저장된다. 대화 안에만 남으면 세션이 끝날 때
+기준이 사라져 체인이 실제로는 이어지지 않기 때문이다.
+
+| 경로 | 내용 | 쓰는 주체 |
+|---|---|---|
+| `.agent-work/plans/` | 검증 가능한 성공 기준 | `planning-discipline` |
+| `.agent-work/reviews/` | 감사 리포트 | `adversarial-review` |
+
+파일명은 `<YYYYMMDD>-<slug>.md`. `<slug>`는 목표를 소문자화하고 문자·숫자가 아닌 연속을 `-`
+하나로 접은 것으로, **문자는 어느 문자 체계든 보존**한다(한글 목표가 통째로 소멸하지 않도록).
+경로가 이미 있으면 `-2`, `-3`을 붙이며, **감사는 판정 대상 계획의 슬러그를 재사용**하므로
+`plans/`와 `reviews/`를 나란히 놓으면 파일명만으로 짝이 맞고 `-2`는 재감사 라운드가 된다.
+
+```
+.agent-work/plans/20260825-로그인-재시도-로직-추가.md
+.agent-work/reviews/20260825-로그인-재시도-로직-추가.md      ← 1차 감사
+.agent-work/reviews/20260825-로그인-재시도-로직-추가-2.md    ← 수정 후 재감사
+```
+
+**`.gitignore`는 스킬이 건드리지 않는다.** 이 파일들을 추적할지는 프로젝트마다 다른 판단이라
+사용자가 직접 정한다.
 
 ## 설치
 
@@ -58,12 +85,17 @@ cp -R .agents/skills/<skill-name> <project>/.claude/skills/
 상류 `dev-pipeline`의 역할 프롬프트는 인시던트마다 규칙이 추가되며 계속 갱신된다. 상류가 바뀌면
 `PROVENANCE.md`의 대응표로 여기서 다시 볼 지점을 찾는다. **자동 생성이 아니므로 손으로 반영한다.**
 
+**규칙은 셀 수 있게 유지한다.** 스킬당 규칙 8개 이하, 같은 말을 두 번 하지 않는다. 규칙이
+늘어나면 줄을 압축하지 말고 **규칙을 잘라내거나 스킬을 쪼갠다** — 줄 수는 증상이지 원인이
+아니다. 이 스킬들은 소규모 작업마다 로드되어 대화와 프롬프트 예산을 두고 경쟁하고, 규칙이
+길어질수록 실제 준수율이 떨어진다.
+
 스킬을 수정한 뒤에는 두 가지를 확인한다:
 
 ```bash
 # 파이프라인 machinery / 특정 LLM 이름 누출 — 0건이어야 한다
 grep -rniE 'driver|dev-pipeline|attempts\.md|blocked_on|contract_path|test_paths|run_dir|orchestrator|red_test|stage-input|\.dev-pipeline|claude|codex|gpt|gemini' .agents/skills/
 
-# 분량 — 스킬당 60줄을 넘으면 압축 실패
-wc -l .agents/skills/*/SKILL.md
+# 규칙 수 — 스킬당 8개 이하 (줄 수는 참고용이지 합격 기준이 아니다)
+grep -c '^[0-9]\+\. \*\*' .agents/skills/*/SKILL.md
 ```

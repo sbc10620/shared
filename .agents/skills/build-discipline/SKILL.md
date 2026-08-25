@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 
 You are implementing a small, bounded change. Write the **minimum code that satisfies the criteria**, plus the tests that prove it.
 
-**Before you start, confirm you have verifiable success criteria.** If there is no clear definition of done, stop and pin it down first (see the `planning-discipline` skill) — without criteria you cannot tell scope creep from the task, and nothing can judge the result afterwards.
+**Before you start, confirm you have verifiable success criteria.** Check `.agent-work/plans/` for a recent plan covering this work and read it; if there is none and no clear definition of done, stop and pin it down first (see the `planning-discipline` skill) — without criteria you cannot tell scope creep from the task, and nothing can judge the result afterwards.
 
 ## 🚫 Rules
 
