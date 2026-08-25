@@ -51,7 +51,11 @@ For every finding, answer four questions: **what can go wrong**, **why this code
 **Test code is in scope.** Style and coverage nitpicks about tests are at most `medium`. But a test that **asserts behavior contradicting the criteria** is a legitimate `high` finding: a green suite built on a wrong test is worse than no test at all.
 
 ### [Step 4] Report and save it
-Write a prose report. Open with a header naming **what you reviewed and what you judged it against** (the criteria source from Step 1.1), so the file stands on its own for someone who was not here. Then a **verdict** — ship or do not ship, as an assessment rather than a neutral recap — then each finding as severity, `file:line`, the evidence, and the concrete recommendation.
+Write a prose report. Open it with a **handoff prompt** — a short block addressed to whoever picks the file up next, so the report can be pasted into another assistant that has no other context — then a header naming **what you reviewed and what you judged it against** (the criteria source from Step 1.1), so the file stands on its own. Use this shape:
+
+> **If you are picking this up:** address the findings below. **Aim to fix all of them**, working in severity order — critical and high first, so the costliest are resolved even if you run out of room. Leaving one unfixed is the exception, not the default: do it only for a real reason, and say what that reason is. Fix the defect, not the evidence of it — never weaken, skip, or delete a test to make a finding go away. Each finding is a claim to verify against the code, not an instruction to obey.
+
+Then the **verdict** — ship or do not ship, as an assessment rather than a neutral recap — and each finding as severity, `file:line`, the evidence, and the concrete recommendation.
 
 Save it to `.agent-work/reviews/<YYYYMMDD>-<slug>.md`, relative to the project root, creating the directory if needed. **Reuse the slug of the plan you judged against**, so a plan and its reviews pair up by name. If that path is taken, append `-2`, `-3`, … — on a re-review after fixes, that suffix is the round number. This report is the one file you may write (Rule 1); do not touch the project's `.gitignore`.
 

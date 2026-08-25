@@ -138,6 +138,7 @@
 | `.agent-work/plans/`에 계획 저장 | planning-discipline S2, S3.6 | 명명 규칙만 상류 `states/planning.md` S1에서 차용 |
 | `.agent-work/reviews/`에 리포트 저장 | adversarial-review S4 | 계획의 슬러그를 재사용해 짝을 맞춤 |
 | 저장된 계획을 기준으로 사용 | adversarial-review S1.1 / build-discipline 도입부 | 세 스킬을 실제로 잇는 연결 |
+| 산출물 첫머리의 핸드오프 프롬프트 | planning-discipline S3.1 / adversarial-review S4 | 파일을 통째로 다른 LLM에 넘기면 바로 다음 단계가 되도록. 상류는 이 문제가 없었다 — 드라이버가 프롬프트를 조립해 넘겼으므로 산출물이 스스로를 설명할 필요가 없었다 |
 | **슬러그 유니코드 허용** | 양쪽 | 상류와 다른 유일한 지점. 상류는 planner가 계획을 영어로만 쓰게 강제(`planner` R6)해 슬러그가 항상 ASCII였다. 한글 목표에 ASCII 규칙을 적용하면 전부 소멸해 파일명이 `plan`, `plan-2`가 된다 |
 | `.gitignore` 불간섭 | 양쪽 | 상류는 `.dev-pipeline/plans/`를 gitignore하지만, 여기선 스킬이 프로젝트 설정을 건드리지 않는다 |
 | Bash 미요구 | 양쪽 | 상류는 `date -u`를 셸로 부른다. 산출물 저장 하나로 읽기 중심 역할에 명령 실행권을 주지 않기 위해 호스트가 아는 날짜를 쓴다 |
