@@ -1,13 +1,13 @@
 ---
 name: build-discipline
-description: Discipline for writing production code and its tests on a small task — minimal surgical changes, reuse over invention, and asserting tests that cover the edge cases. Use when implementing a change against known success criteria.
+description: Test-first discipline for writing production code on a small task — tests before implementation, minimal surgical changes, reuse over invention, and asserting tests that cover the edge cases. Use when implementing a change against known success criteria.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Build Discipline
 
-You are implementing a small, bounded change. Write the **minimum code that satisfies the criteria**, plus the tests that prove it.
+You are implementing a small, bounded change. Write the **minimum code that satisfies the criteria**, and write the tests that prove it **first** — see them fail, then make them pass.
 
 **Before you start, confirm you have verifiable success criteria.** Check `.agent-work/plans/` for a recent plan covering this work and read it; if there is none and no clear definition of done, stop and pin it down first (see the `planning-discipline` skill) — without criteria you cannot tell scope creep from the task, and nothing can judge the result afterwards.
 
@@ -32,19 +32,29 @@ This is the single most common way a small task turns into an unbounded one.
 
 If you notice yourself re-reading the same files, or opening files unrelated to what you are changing, you have crossed from the first kind into the second.
 
-### [Step 2] Implement
-- [Step 2.1] Identify the files to change or create; read the relevant existing code first (Rule 2).
-- [Step 2.2] Make the changes file by file, preferring edits to rewrites.
-- [Step 2.3] Keep each change traceable to a specific criterion. If a change maps to no criterion, it is out of scope — drop it.
+### [Step 2] Write the tests first
+**Where the change needs tests at all, write them before the implementation.** A test written afterwards is shaped by the code you already wrote and tends to confirm it; written first, it is shaped by the criterion and can contradict the code. Skip this step only where there is genuinely nothing to assert — a pure configuration, documentation, or comment change with no observable behavior — and **say that you skipped it and why.**
 
-### [Step 3] Write the tests
-- [Step 3.1] Write at least one **real, asserting** test per criterion — specific inputs producing specific outputs or effects. **No empty tests, no skip/xfail, no always-true assertions, no placeholder bodies.** A test that passes no matter what the code does is worse than no test.
-- [Step 3.2] For that same criterion, cover the edge and error cases it **implies** before moving on: empty/null/zero input, boundary values (min, max, off-by-one), malformed input, and the error conditions the interface implies. A criterion covered only by its happy path is incomplete. Stay inside what the criteria imply — a behavior nothing points at is out of scope, not thoroughness.
-- [Step 3.3] Mirror the project's existing test layout, framework, naming, and fixtures. **Where there is no convention to follow, you are choosing one — do it deliberately and say what you chose.** Pick the framework the project's own dependencies already pull in over adding one (Rule 2), put tests where this ecosystem's tooling expects to find them, and name each test for the **behavior it asserts** (`test_rejects_empty_input`). State the choice and its one-line reason in your summary: the next change inherits it, and a convention nobody knew was set is worse than one argued for.
-- [Step 3.4] Do not refine one test indefinitely chasing an ambiguous expected value — apply Step 1, take the smallest reasonable interpretation, and move to the next criterion.
-- [Step 3.5] If a criterion genuinely **cannot** be tested as stated — self-contradictory, or the interface gives nothing concrete to assert — do not write a hollow test to satisfy the letter of Step 3.1. Write the tests that ARE meaningful and **say which criterion you could not test and why.**
+- [Step 2.1] Write at least one **real, asserting** test per criterion — specific inputs producing specific outputs or effects. **No empty tests, no skip/xfail, no always-true assertions, no placeholder bodies.** A test that passes no matter what the code does is worse than no test.
+- [Step 2.2] For that same criterion, cover the edge and error cases it **implies** before moving on: empty/null/zero input, boundary values (min, max, off-by-one), malformed input, and the error conditions the interface implies. A criterion covered only by its happy path is incomplete. Stay inside what the criteria imply — a behavior nothing points at is out of scope, not thoroughness.
+- [Step 2.3] Mirror the project's existing test layout, framework, naming, and fixtures. **Where there is no convention to follow, you are choosing one — do it deliberately and say what you chose.** Pick the framework the project's own dependencies already pull in over adding one (Rule 2), put tests where this ecosystem's tooling expects to find them, and name each test for the **behavior it asserts** (`test_rejects_empty_input`). State the choice and its one-line reason in your summary: the next change inherits it, and a convention nobody knew was set is worse than one argued for.
+- [Step 2.4] Do not refine one test indefinitely chasing an ambiguous expected value — apply Step 1, take the smallest reasonable interpretation, and move to the next criterion.
+- [Step 2.5] If a criterion genuinely **cannot** be tested as stated — self-contradictory, or the interface gives nothing concrete to assert — do not write a hollow test to satisfy the letter of Step 2.1. Write the tests that ARE meaningful and **say which criterion you could not test and why.**
 
-### [Step 4] Verify, self-check, and hand off
+### [Step 3] Watch them fail before you write the code
+Run the tests you just wrote. **This is what makes writing them first worth anything** — a test you never saw fail is a test you have no evidence actually checks something.
+
+- [Step 3.1] Each new test must **fail, and fail for the right reason**: the behavior is missing. A failure from a typo, a bad import, or a syntax error is not a red test, it is a broken one — fix it and run again.
+- [Step 3.2] **A test that passes before the code exists means one of two things, and they are not the same.** Either it asserts nothing real, in which case it is vacuous and you rewrite it until it fails — or the behavior genuinely already exists and the criterion covers what the code already does. That second case is legitimate: **say so and move on. Never manufacture a failure to satisfy this step.**
+- [Step 3.3] Do not write any implementation until every new test has either failed for the right reason or been accounted for under Step 3.2.
+
+### [Step 4] Implement
+- [Step 4.1] Identify the files to change or create; read the relevant existing code first (Rule 2).
+- [Step 4.2] Make the changes file by file, preferring edits to rewrites. Write the code that makes the failing tests pass — **not more.**
+- [Step 4.3] Keep each change traceable to a specific criterion. If a change maps to no criterion, it is out of scope — drop it.
+- [Step 4.4] **Never edit a test to make it pass.** If a test now looks wrong, it is either a real defect in the test — fix it deliberately and say you did — or it is telling you the implementation is wrong. Quietly relaxing an assertion until it goes green discards the only evidence you had.
+
+### [Step 5] Verify, self-check, and hand off
 Build, then run **the project's whole test suite, not only the tests you just wrote.** Your own tests prove the new behavior; only the existing ones prove you did not break the old. A failure there is yours until you have shown otherwise — check whether it also fails without your change before calling it pre-existing, and say which you found. Fix what you can; report what you cannot.
 
 When the checklist below passes, **tell the user the next step is an adversarial review of this change** — with the `adversarial-review` skill if it is available, judged against the criteria you built to, and hand it the plan you worked from. Say what you changed and where the criteria came from, so the review has its subject and its standard. **Do not review your own work here instead**: you will reproduce the blind spots you just built in, which is the whole reason the review is a separate step.
@@ -55,6 +65,9 @@ When the checklist below passes, **tell the user the next step is an adversarial
 - [ ] At the trust boundaries this change touches, is input validated at the edge, is data kept from becoming structure, and are no secrets exposed?
 - [ ] Did I state my assumption for anything that was ambiguous, rather than guess silently?
 - [ ] Is there a real asserting test per criterion, covering the edge and error cases it implies?
+- [ ] Were the tests written **before** the implementation — or, where the change needed none, did I say so and why?
+- [ ] Did I **see each new test fail for the right reason** before writing the code, or account for one that passed early (already-existing behavior, not a vacuous test)?
+- [ ] Did I leave every test asserting what it originally asserted, rather than relaxing one to get to green?
 - [ ] Are there no placeholder, skipped, or always-passing tests?
 - [ ] If no test convention existed, did I choose layout and framework deliberately and **say what I chose and why**, rather than leaving it implicit?
 - [ ] Did I run the **whole suite**, not just my own tests — and does it pass?

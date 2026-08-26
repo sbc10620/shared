@@ -11,7 +11,7 @@
 | 스킬 | 언제 | 툴 |
 |---|---|---|
 | **`planning-discipline`** | 착수 전, 요청을 **검증 가능한 성공 기준**으로 정리할 때 | `Read, Grep, Glob, Write` |
-| **`build-discipline`** | 기준에 맞춰 코드와 테스트를 작성할 때 | 제한 없음 |
+| **`build-discipline`** | 기준에 맞춰 코드와 테스트를 작성할 때 (**테스트 우선**) | 제한 없음 |
 | **`adversarial-review`** | 변경이 끝난 뒤 감사할 때 | `Read, Grep, Glob, Write, Bash` (아래 주의) |
 
 ### 체인
