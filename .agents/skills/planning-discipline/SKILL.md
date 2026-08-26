@@ -30,7 +30,7 @@ Keep it short. Two to five criteria is the normal size for a small task. If you 
 Compute the path **before** you write, so the plan lands somewhere the later stages can find it.
 
 - [Step 2.1] Unless the user named a path, the plan goes to `.agent-work/plans/<YYYYMMDD>-<slug>.md`, relative to the project root. Create the directory if it does not exist.
-- [Step 2.2] `<YYYYMMDD>` is today's UTC date. `<slug>` is a filesystem-safe slug of the goal: lowercased, runs of characters that are neither letters nor digits collapsed to a single `-`, trimmed to about 50 characters, no leading or trailing `-`. **Letters in any script are kept** — only punctuation and whitespace collapse. If nothing survives, use `plan`.
+- [Step 2.2] `<YYYYMMDD>` is today's UTC date; `<slug>` is a short filesystem-safe slug of the goal. **Keep letters in any script** — collapsing everything non-ASCII makes a goal written in one vanish, leaving every plan named the same thing.
 - [Step 2.3] If that path already exists, append `-2`, `-3`, … until one is free.
 - [Step 2.4] Do not touch the project's `.gitignore`. Whether these files are tracked is the user's decision, not yours.
 
