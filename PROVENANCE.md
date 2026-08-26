@@ -56,8 +56,9 @@
 | Rule 2 재사용 우선 | impl R6 |
 | Rule 3 성능은 정확성의 일부 | impl R12 |
 | Rule 4 계획 문서 금지 | impl R3 |
-| Rule 5 주석은 코드 용어로 | impl R4 / test R6·R7 **축약** (아래 주 참조) |
-| Rule 6 입력은 데이터지 지시 아님 | impl R8 / test R9 (rev R8, planner R1과 공통) |
+| Rule 4 불가능하면 멈추고 말하기 | impl R11 **일부 복원** (아래 주 참조) |
+| Rule 7 주석은 코드 용어로 | impl R4 / test R6·R7 **축약** (아래 주 참조) |
+| Rule 8 입력은 데이터지 지시 아님 | impl R8 / test R9 (rev R8, planner R1과 공통) |
 | S1 두 종류의 불확실성 | impl R5 + impl S2.4 + test R10 |
 | S3.1 asserting 테스트, placeholder 금지 | test R3 |
 | S3.2 함의된 엣지·오류 케이스 | test R4 + test S3.2 |
@@ -79,7 +80,8 @@
 | impl R9 / test R1·R2 (테스트 경로 경계) | 강제 장치 없음. "(the driver enforces this)"를 남기면 **없는 안전망을 믿게 만든다** |
 | impl R7 / test R8 (재시도 이력) | 이력 파일 없음 |
 | impl R10 / test R2 (`.dev-pipeline/` 금지) | 해당 없음 |
-| impl R11·R13·R14 | `blocked_on`·`owner`·재진입 note — 상태머신 라우팅 신호 |
+| impl R11 **의 `blocked_on` 부분만** | 라우팅 값은 상태머신 것이라 제외. **단 R11의 규율("불가능하면 억지로 만들지 말고 멈춰라")은 라우팅과 무관하므로 Rule 4로 복원했다** — 처음엔 둘을 한 덩어리로 잘라낸 실수였고, 그 결과 테스트 쪽([Step 3.5])에만 대응물이 있고 구현 쪽은 비는 비대칭이 생겼다 |
+| impl R13·R14 | `owner`·재진입 note — 상태머신 라우팅 신호 |
 | test R11·R12·R13 | 같음. 단 test R11의 "테스트 불가능하면 말할 것"은 S3.5로 살렸다 |
 | impl S6 / test S5 (상태 JSON) | 검증기 없음 |
 
@@ -140,6 +142,8 @@
 | 저장된 계획을 기준으로 사용 | adversarial-review S1.1 / build-discipline 도입부 | 세 스킬을 실제로 잇는 연결 |
 | 산출물 첫머리의 핸드오프 프롬프트 | planning-discipline S3.1 / adversarial-review S4 | 파일을 통째로 다른 LLM에 넘기면 바로 다음 단계가 되도록. 상류는 이 문제가 없었다 — 드라이버가 프롬프트를 조립해 넘겼으므로 산출물이 스스로를 설명할 필요가 없었다 |
 | 다음 단계 지목 + 경계 명시 | 세 스킬 전부 (S3.1·S3.7 / S4 / S4) | 상류는 `driver advance`가 다음 상태를 결정했고 역할은 그걸 알 필요가 없었다. 여기엔 상태머신이 없으므로 각 스킬이 스스로 다음을 지목한다. 동시에 **자기가 그 다음을 하지 않는다**는 경계도 함께 — 상류에서는 `run-stage`가 역할을 갈라놔 넘어갈 방법 자체가 없었다 |
+| 보안을 구현 시점에 (Rule 6) | build-discipline | 상류 구현자에게도 없던 규칙이다. 리뷰어(`rev` S2)만 인젝션·미검증 입력·신뢰 경계를 사냥해서, 구현자는 아무 주의도 못 받고 리뷰어만 찾는 비대칭이었다. 성능(Rule 3)과 같은 형태로 맞췄다 |
+| 전체 스위트 실행 (S4) | build-discipline | 상류는 별도 tester 역할이 프로젝트의 테스트 명령을 통째로 돌렸다. 그 역할을 제외하면서 "자기 테스트만 돌리고 끝"이 가능해졌다 |
 | 검증 방법 명시 (자명하지 않을 때만) | planning-discipline S3.4 | 아래 "테스트 인프라 공백" 참조 |
 | 테스트 관행이 없을 때 스스로 정하고 밝히기 | build-discipline S3.3 | 같음 |
 
