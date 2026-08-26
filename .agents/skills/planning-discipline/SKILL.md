@@ -41,7 +41,7 @@ Compute the path **before** you write, so the plan lands somewhere the later sta
 - [Step 3.2] For each behavior the request asks for, write a criterion as **concrete input → expected output or effect**.
 - [Step 3.3] Name the interface: signatures, data shapes, and **error modes** — what happens on invalid input, not just valid input.
 - [Step 3.4] Where a criterion's **evidence is not obvious from the criterion itself**, say what counts as satisfying it: a result observable only through a side effect, state or data that must be in place first, a dependency that has to be stood in for. This is still what, not how — name the evidence, never the framework or the command to run it. Say nothing where the input→output line already speaks for itself, and say so explicitly when the area has no tests yet, so whoever implements knows they are choosing the approach rather than following one.
-- [Step 3.5] Record real constraints separately from criteria (performance budgets, compatibility, things that must not change).
+- [Step 3.5] Record real constraints separately from criteria (performance budgets, compatibility, things that must not change). **Where the change touches a trust boundary, say so here** — untrusted input, authentication or permissions, secrets, anything crossing a process or network edge. Name the boundary and what must hold at it; do not prescribe the mechanism. A security expectation nobody wrote down is the one the implementation is most likely to miss and the review most expensive to catch.
 - [Step 3.6] State what is explicitly **out of scope**, where the request's boundary is easy to overshoot.
 - [Step 3.7] Write the plan to the path from Step 2, **tell the user where it landed, and name the next step** — implement it against this plan (`build-discipline`), then review the result against it (`adversarial-review`). Do not start implementing yourself: producing the plan is where this skill ends.
 
@@ -53,6 +53,7 @@ Review your own plan adversarially before handing it off. Every "yes" below is a
 - [ ] Is there a stated requirement with no criterion behind it, or an obvious edge/boundary/error case with no criterion?
 - [ ] Does any signature lack an input→output contract, leave error modes unspecified, or leave a data shape implicit?
 - [ ] Is there a criterion whose evidence is **not** obvious from its own input→output line — a side effect, a required setup, a stood-in dependency — that the plan leaves unstated?
+- [ ] Does the change touch a trust boundary — untrusted input, auth, secrets, a process or network edge — that the constraints do not mention?
 - [ ] Does the plan name a reuse point (`file:symbol`) or existing pattern that does **not** actually exist?
 - [ ] Does the work exceed one increment and need splitting?
 - [ ] Does the plan dictate HOW in a way that constrains the implementation beyond what the criteria require?
