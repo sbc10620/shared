@@ -77,20 +77,11 @@ When the checklist below passes, **tell the user the next step is an adversarial
 
 **Write the summary so it can travel without you.** The review is best run somewhere that never saw the implementation, and everything you learned along the way lives only in this conversation unless you put it in the summary. It needs: what you changed, where the criteria came from, **every assumption you took on an ambiguity** ([Step 1]), any test convention you had to invent ([Step 2.3]), anything you could not test ([Step 2.5]) or could not make pass ([Step 5]), and any trade-off you knowingly accepted. Without it the reviewer re-derives your deliberate choices adversarially and reports them back to you as findings. **Do not review your own work here instead**: you will reproduce the blind spots you just built in, which is the whole reason the review is a separate step.
 
-- [ ] Did I start from a clean tree — or, if the user waived that, name the already-dirty paths in my summary?
 - [ ] Does the implementation satisfy every success criterion?
 - [ ] Are the changes **surgical** — no unrequested features or abstractions, no unrelated refactors, no dead-code removal?
-- [ ] Are the runtime, memory, and dependency choices deliberate and non-wasteful, with no speculative optimization?
-- [ ] At the trust boundaries this change touches, is input validated at the edge, is data kept from becoming structure, and are no secrets exposed?
-- [ ] Did I state my assumption for anything that was ambiguous, rather than guess silently?
-- [ ] Is there a real asserting test per criterion, covering the edge and error cases it implies?
-- [ ] Were the tests written **before** the implementation — or, where the change needed none, did I say so and why?
-- [ ] For each new test: did I **see it fail for the right reason** before writing the code — or, where it passed because the behavior already exists, did I **break its subject and watch it go red** rather than assuming it was not vacuous?
-- [ ] **Is every deliberate breakage from Step 3.2 put back, with that file's diff showing only intended changes?** Nothing I sabotaged to prove a test may survive into the diff, and green alone does not prove it.
-- [ ] Did I leave git state untouched — no checkout, restore, stash, reset, clean, or worktree anywhere in this task?
-- [ ] Did I leave every test asserting what it originally asserted, rather than relaxing one to get to green?
-- [ ] Are there no placeholder, skipped, or always-passing tests?
-- [ ] If no test convention existed, did I choose layout and framework deliberately and **say what I chose and why**, rather than leaving it implicit?
-- [ ] Did I run the **whole suite**, not just my own tests — and does it pass?
-- [ ] Where the build or a test does not pass, have I said so plainly rather than working around it?
-- [ ] If the change turned out to be impossible as specified, did I stop and say what makes it so, rather than shipping something broken?
+- [ ] Were the runtime, memory, dependency, and trust-boundary choices deliberate — nothing wasteful, nothing speculative, nothing validated late?
+- [ ] Did I state my assumption for anything ambiguous, rather than guess silently?
+- [ ] Is there a real asserting test per criterion covering the edge and error cases it implies — none placeholder, skipped, or always-passing, and none relaxed to reach green?
+- [ ] Were the tests written **before** the implementation, and did I **see each one fail for the right reason** — or, where it passed because the behavior already exists, break its subject and watch it go red?
+- [ ] **Is every deliberate breakage put back**, with that file's diff showing only intended changes, and did I change **no git state** anywhere?
+- [ ] Did I run the **whole suite** — and where the build or a test does not pass, have I said so plainly rather than working around it?
