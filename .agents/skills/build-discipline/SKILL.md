@@ -9,7 +9,9 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 
 You are implementing a small, bounded change. Write the **minimum code that satisfies the criteria**, and write the tests that prove it **first** — see them fail, then make them pass.
 
-**Before you start, confirm you have verifiable success criteria.** Take a plan you were handed, or one at a path the user named; failing that, look in `.agent-work/plans/` for one covering this work. **A plan you went looking for is a guess until you check it** — read it and confirm it actually describes the work in front of you rather than assuming the newest one does. Building against the wrong contract is worse than building against none, because everything downstream is then judged by it. If there is no plan and no clear definition of done, stop and pin it down first (see the `planning-discipline` skill) — without criteria you cannot tell scope creep from the task, and nothing can judge the result afterwards.
+**Start from a clean tree.** Check `git status --porcelain`, ignoring `.agent-work/`. If anything else is listed, **stop and tell the user what is uncommitted, and ask them to commit or stash it before you begin.** Two things depend on this and both fail silently without it: their edits become indistinguishable from yours, so the review grades their work as your output under your summary — and [Step 3.2] and [Step 5] both restore files by their committed state, which is only correct while that state is what you started from. Proceed anyway only if the user explicitly says to, and then **name the already-dirty paths in your summary** so the review knows which changes are not yours.
+
+**Confirm you have verifiable success criteria.** Take a plan you were handed, or one at a path the user named; failing that, look in `.agent-work/plans/` for one covering this work. **A plan you went looking for is a guess until you check it** — read it and confirm it actually describes the work in front of you rather than assuming the newest one does. Building against the wrong contract is worse than building against none, because everything downstream is then judged by it. If there is no plan and no clear definition of done, stop and pin it down first (see the `planning-discipline` skill) — without criteria you cannot tell scope creep from the task, and nothing can judge the result afterwards.
 
 ## 🚫 Rules
 
@@ -46,10 +48,12 @@ Run the tests you just wrote. **A test you have never seen fail is a test with n
 
 - [Step 3.1] **It fails because the behavior is missing** — the normal case for new work. Confirm the failure is the *right* one: a typo, a bad import, or a syntax error is a broken test, not a red one, so fix it and run again. **When you are fixing a reported bug, the test must reproduce that actual failure**, not something adjacent to it — otherwise you will change something, see green, and still not know whether you fixed the bug.
 - [Step 3.2] **It passes because the behavior genuinely already exists.** Regression and coverage work lands here *by design*: the point is to pin down behavior that already works so a later change cannot break it silently, and there is no version of that where the test fails first. This is legitimate — but **do not take it on trust, because a vacuous test looks exactly like this one.** Prove it can fail, and do it safely: this is the **only** point where you deliberately damage working code, so treat the restore as part of the step rather than an afterthought.
-    1. **Copy the exact original text** of the region you are about to change, so you can put it back verbatim. Do not rely on `git` to undo it — at this point the working tree usually holds your own uncommitted work, and there is no clean revert target that does not also take that with it.
-    2. Make the smallest possible change that should break the behavior — invert a condition, return a wrong constant.
-    3. Run the test. It must go red. **A test that stays green while its subject is broken belongs in Step 3.3.**
-    4. **Restore the original text immediately, before running anything else or moving to the next test**, and confirm the test is green again. Do not batch this — one test's sabotage must never be live while you work on another. If pinning existing behavior is the whole task, there may be no implementation to write at all — say so, and Step 4 is a no-op rather than an invitation to change something.
+    1. Make the smallest possible change that should break the behavior — invert a condition, return a wrong constant. You have written only tests so far, so the file you are about to break is still exactly as committed.
+    2. Run the test. It must go red. **A test that stays green while its subject is broken belongs in Step 3.3.**
+    3. **Restore it immediately, before running anything else or moving to the next test** — `git checkout -- <path>` puts the file back exactly, which the clean-tree gate above is what makes safe. Do not batch this: one test's sabotage must never be live while you work on another.
+    4. **Confirm the restore.** The test is green again, and `git status --porcelain` no longer lists that file. Green alone is not proof — a partially undone break can still pass.
+
+    If pinning existing behavior is the whole task, there may be no implementation to write at all — say so, and [Step 4] is a no-op rather than an invitation to change something.
 - [Step 3.3] **It passes because it asserts nothing real** — vacuous. Rewrite it until it fails for a reason you can state in one sentence.
 - [Step 3.4] **Never manufacture a failure** to make a test look red, and never write implementation until every new test has either failed for the right reason (3.1) or been shown it *can* fail (3.2).
 
@@ -62,12 +66,13 @@ Run the tests you just wrote. **A test you have never seen fail is a test with n
 ### [Step 5] Verify, self-check, and hand off
 Build, then run **the project's whole test suite, not only the tests you just wrote.** Your own tests prove the new behavior; only the existing ones prove you did not break the old. Find the suite the way the project declares it — its task runner, package manifest, or CI configuration — rather than guessing at a command; **if you cannot find it, or it cannot run here (missing credentials, no suite at all), say so plainly instead of reporting a pass you did not get.**
 
-**A failure in the existing suite is yours until you have shown otherwise.** To check whether it predates your change, prefer somewhere your work is not at stake — the same test at `HEAD` in a scratch clone or worktree. If you do stash or revert in place to compare, **restore immediately and confirm the tree is back**, exactly as in [Step 3.2]. Say which you found. Fix what you can; report what you cannot.
+**A failure in the existing suite is yours until you have shown otherwise.** To check whether it predates your change, run that test against `HEAD` — `git stash`, run, `git stash pop`, which is safe precisely because you started clean and everything stashed is your own. **Confirm the pop restored everything** before continuing. Say which you found. Fix what you can; report what you cannot.
 
 When the checklist below passes, **tell the user the next step is an adversarial review of this change** — with the `adversarial-review` skill if it is available, judged against the criteria you built to, and hand it the plan you worked from.
 
 **Write the summary so it can travel without you.** The review is best run somewhere that never saw the implementation, and everything you learned along the way lives only in this conversation unless you put it in the summary. It needs: what you changed, where the criteria came from, **every assumption you took on an ambiguity** ([Step 1]), any test convention you had to invent ([Step 2.3]), anything you could not test ([Step 2.5]) or could not make pass ([Step 5]), and any trade-off you knowingly accepted. Without it the reviewer re-derives your deliberate choices adversarially and reports them back to you as findings. **Do not review your own work here instead**: you will reproduce the blind spots you just built in, which is the whole reason the review is a separate step.
 
+- [ ] Did I start from a clean tree — or, if the user waived that, name the already-dirty paths in my summary?
 - [ ] Does the implementation satisfy every success criterion?
 - [ ] Are the changes **surgical** — no unrequested features or abstractions, no unrelated refactors, no dead-code removal?
 - [ ] Are the runtime, memory, and dependency choices deliberate and non-wasteful, with no speculative optimization?
@@ -76,7 +81,7 @@ When the checklist below passes, **tell the user the next step is an adversarial
 - [ ] Is there a real asserting test per criterion, covering the edge and error cases it implies?
 - [ ] Were the tests written **before** the implementation — or, where the change needed none, did I say so and why?
 - [ ] For each new test: did I **see it fail for the right reason** before writing the code — or, where it passed because the behavior already exists, did I **break its subject and watch it go red** rather than assuming it was not vacuous?
-- [ ] **Is every deliberate breakage from Step 3.2 restored, verbatim, and confirmed green?** Nothing I sabotaged to prove a test may survive into the diff.
+- [ ] **Is every deliberate breakage from Step 3.2 restored and confirmed gone from `git status`?** Nothing I sabotaged to prove a test may survive into the diff, and green alone does not prove it.
 - [ ] Did I leave every test asserting what it originally asserted, rather than relaxing one to get to green?
 - [ ] Are there no placeholder, skipped, or always-passing tests?
 - [ ] If no test convention existed, did I choose layout and framework deliberately and **say what I chose and why**, rather than leaving it implicit?
