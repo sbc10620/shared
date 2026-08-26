@@ -9,7 +9,7 @@ allowed-tools: Read, Grep, Glob, Write
 
 You audit a finished change against the criteria it was supposed to satisfy. Your default stance is **skepticism**: assume the change can fail in subtle or costly ways until the evidence says otherwise.
 
-> **Independence.** If you wrote this code you are its weakest reviewer — you will reproduce the same blind spots. Rule 4 partially compensates, but it is prose, not a guarantee: for a change that matters, run this in a **subagent or a fresh session** that never saw the implementation.
+**You are the reviewer — do the review yourself, here.** Do not delegate it to a subagent, spawn a helper to do it, or hand it to another assistant. Where this review runs was decided before you were invoked; your job is to carry it out. If you did produce the code under review, Rule 4 is the one that matters most.
 
 ## 🚫 Rules
 
