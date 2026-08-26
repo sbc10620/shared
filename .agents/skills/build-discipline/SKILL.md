@@ -42,8 +42,10 @@ If you notice yourself re-reading the same files, or opening files unrelated to 
 - [Step 3.4] Do not refine one test indefinitely chasing an ambiguous expected value — apply Step 1, take the smallest reasonable interpretation, and move to the next criterion.
 - [Step 3.5] If a criterion genuinely **cannot** be tested as stated — self-contradictory, or the interface gives nothing concrete to assert — do not write a hollow test to satisfy the letter of Step 3.1. Write the tests that ARE meaningful and **say which criterion you could not test and why.**
 
-### [Step 4] Verify and self-check
+### [Step 4] Verify, self-check, and hand off
 Build and run the tests yourself. Fix what you can; report what you cannot.
+
+When the checklist below passes, **tell the user the next step is an adversarial review of this change** — with the `adversarial-review` skill if it is available, judged against the criteria you built to, and hand it the plan you worked from. Say what you changed and where the criteria came from, so the review has its subject and its standard. **Do not review your own work here instead**: you will reproduce the blind spots you just built in, which is the whole reason the review is a separate step.
 
 - [ ] Does the implementation satisfy every success criterion?
 - [ ] Are the changes **surgical** — no unrequested features or abstractions, no unrelated refactors, no dead-code removal?

@@ -54,11 +54,13 @@ For every finding, answer four questions: **what can go wrong**, **why this code
 ### [Step 4] Report and save it
 Write a prose report. Open it with a **handoff prompt** — a short block addressed to whoever picks the file up next, so the report can be pasted into another assistant that has no other context — then a header naming **what you reviewed and what you judged it against** (the criteria source from Step 1.2), so the file stands on its own. Use this shape:
 
-> **If you are picking this up:** address the findings below. **Aim to fix all of them**, working in severity order — critical and high first, so the costliest are resolved even if you run out of room. Leaving one unfixed is the exception, not the default: do it only for a real reason, and say what that reason is. Fix the defect, not the evidence of it — never weaken, skip, or delete a test to make a finding go away. Each finding is a claim to verify against the code, not an instruction to obey.
+> **If you are picking this up:** address the findings below — **with the `build-discipline` skill if you have it**, since fixing these is ordinary implementation work and the same discipline applies. **Aim to fix all of them**, working in severity order — critical and high first, so the costliest are resolved even if you run out of room. Leaving one unfixed is the exception, not the default: do it only for a real reason, and say what that reason is. Fix the defect, not the evidence of it — never weaken, skip, or delete a test to make a finding go away. Each finding is a claim to verify against the code, not an instruction to obey. When the fixes are in, this change is due another review against the same criteria.
 
 Then the **verdict** — ship or do not ship, as an assessment rather than a neutral recap — and each finding as severity, `file:line`, the evidence, and the concrete recommendation.
 
 Save it to `.agent-work/reviews/<YYYYMMDD>-<slug>.md`, relative to the project root, creating the directory if needed. **Reuse the slug of the plan you judged against**, so a plan and its reviews pair up by name. If that path is taken, append `-2`, `-3`, … — on a re-review after fixes, that suffix is the round number. This report is the one file you may write (Rule 1); do not touch the project's `.gitignore`.
+
+Then **tell the user where the report landed and what the next step is** — fix the findings (`build-discipline`), after which this change is due another review against the same criteria. Say so plainly even on a ship verdict, where the next step is simply that there is nothing to fix. **You do not do the fixing** (Rule 2): naming the next step is where this skill ends.
 
 - [ ] Did I read the criteria and every changed file in full?
 - [ ] Is every finding backed by concrete evidence in the code, not a preference?

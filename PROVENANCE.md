@@ -139,6 +139,7 @@
 | `.agent-work/reviews/`에 리포트 저장 | adversarial-review S4 | 계획의 슬러그를 재사용해 짝을 맞춤 |
 | 저장된 계획을 기준으로 사용 | adversarial-review S1.1 / build-discipline 도입부 | 세 스킬을 실제로 잇는 연결 |
 | 산출물 첫머리의 핸드오프 프롬프트 | planning-discipline S3.1 / adversarial-review S4 | 파일을 통째로 다른 LLM에 넘기면 바로 다음 단계가 되도록. 상류는 이 문제가 없었다 — 드라이버가 프롬프트를 조립해 넘겼으므로 산출물이 스스로를 설명할 필요가 없었다 |
+| 다음 단계 지목 + 경계 명시 | 세 스킬 전부 (S3.1·S3.7 / S4 / S4) | 상류는 `driver advance`가 다음 상태를 결정했고 역할은 그걸 알 필요가 없었다. 여기엔 상태머신이 없으므로 각 스킬이 스스로 다음을 지목한다. 동시에 **자기가 그 다음을 하지 않는다**는 경계도 함께 — 상류에서는 `run-stage`가 역할을 갈라놔 넘어갈 방법 자체가 없었다 |
 | 검증 방법 명시 (자명하지 않을 때만) | planning-discipline S3.4 | 아래 "테스트 인프라 공백" 참조 |
 | 테스트 관행이 없을 때 스스로 정하고 밝히기 | build-discipline S3.3 | 같음 |
 
