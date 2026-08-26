@@ -33,7 +33,7 @@ This is the single most common way a small task turns into an unbounded one.
 If you notice yourself re-reading the same files, or opening files unrelated to what you are changing, you have crossed from the first kind into the second.
 
 ### [Step 2] Write the tests first
-**Where the change needs tests at all, write them before the implementation.** A test written afterwards is shaped by the code you already wrote and tends to confirm it; written first, it is shaped by the criterion and can contradict the code. Skip this step only where there is genuinely nothing to assert — a pure configuration, documentation, or comment change with no observable behavior — and **say that you skipped it and why.**
+**Where the change needs tests at all, write them before the implementation.** A test written afterwards is shaped by the code you already wrote and tends to confirm it; written first, it is shaped by the criterion and can contradict the code. This holds whether the criterion describes new behavior, a bug to fix, or existing behavior being pinned down — what differs is only whether the test can fail yet, which [Step 3] sorts out. Skip this step only where there is genuinely nothing to assert — a pure configuration, documentation, or comment change with no observable behavior — and **say that you skipped it and why.**
 
 - [Step 2.1] Write at least one **real, asserting** test per criterion — specific inputs producing specific outputs or effects. **No empty tests, no skip/xfail, no always-true assertions, no placeholder bodies.** A test that passes no matter what the code does is worse than no test.
 - [Step 2.2] For that same criterion, cover the edge and error cases it **implies** before moving on: empty/null/zero input, boundary values (min, max, off-by-one), malformed input, and the error conditions the interface implies. A criterion covered only by its happy path is incomplete. Stay inside what the criteria imply — a behavior nothing points at is out of scope, not thoroughness.
@@ -41,12 +41,13 @@ If you notice yourself re-reading the same files, or opening files unrelated to 
 - [Step 2.4] Do not refine one test indefinitely chasing an ambiguous expected value — apply Step 1, take the smallest reasonable interpretation, and move to the next criterion.
 - [Step 2.5] If a criterion genuinely **cannot** be tested as stated — self-contradictory, or the interface gives nothing concrete to assert — do not write a hollow test to satisfy the letter of Step 2.1. Write the tests that ARE meaningful and **say which criterion you could not test and why.**
 
-### [Step 3] Watch them fail before you write the code
-Run the tests you just wrote. **This is what makes writing them first worth anything** — a test you never saw fail is a test you have no evidence actually checks something.
+### [Step 3] Prove each test can fail, before you write the code
+Run the tests you just wrote. **A test you have never seen fail is a test with no evidence it checks anything** — and that evidence is the entire reason for writing them first. Each test lands in one of three places, and telling them apart is this step's real work: two of them look identical from the outside, because a green test is a green test.
 
-- [Step 3.1] Each new test must **fail, and fail for the right reason**: the behavior is missing. A failure from a typo, a bad import, or a syntax error is not a red test, it is a broken one — fix it and run again.
-- [Step 3.2] **A test that passes before the code exists means one of two things, and they are not the same.** Either it asserts nothing real, in which case it is vacuous and you rewrite it until it fails — or the behavior genuinely already exists and the criterion covers what the code already does. That second case is legitimate: **say so and move on. Never manufacture a failure to satisfy this step.**
-- [Step 3.3] Do not write any implementation until every new test has either failed for the right reason or been accounted for under Step 3.2.
+- [Step 3.1] **It fails because the behavior is missing** — the normal case for new work. Confirm the failure is the *right* one: a typo, a bad import, or a syntax error is a broken test, not a red one, so fix it and run again. **When you are fixing a reported bug, the test must reproduce that actual failure**, not something adjacent to it — otherwise you will change something, see green, and still not know whether you fixed the bug.
+- [Step 3.2] **It passes because the behavior genuinely already exists.** Regression and coverage work lands here *by design*: the point is to pin down behavior that already works so a later change cannot break it silently, and there is no version of that where the test fails first. This is legitimate — but **do not take it on trust, because a vacuous test looks exactly like this one.** Prove it can fail: temporarily break the code it covers, confirm the test goes red, then restore the code. A test that stays green while its subject is broken belongs in Step 3.3. If pinning existing behavior is the whole task, there may be no implementation to write at all — say so, and Step 4 is a no-op rather than an invitation to change something.
+- [Step 3.3] **It passes because it asserts nothing real** — vacuous. Rewrite it until it fails for a reason you can state in one sentence.
+- [Step 3.4] **Never manufacture a failure** to make a test look red, and never write implementation until every new test has either failed for the right reason (3.1) or been shown it *can* fail (3.2).
 
 ### [Step 4] Implement
 - [Step 4.1] Identify the files to change or create; read the relevant existing code first (Rule 2).
@@ -66,7 +67,7 @@ When the checklist below passes, **tell the user the next step is an adversarial
 - [ ] Did I state my assumption for anything that was ambiguous, rather than guess silently?
 - [ ] Is there a real asserting test per criterion, covering the edge and error cases it implies?
 - [ ] Were the tests written **before** the implementation — or, where the change needed none, did I say so and why?
-- [ ] Did I **see each new test fail for the right reason** before writing the code, or account for one that passed early (already-existing behavior, not a vacuous test)?
+- [ ] For each new test: did I **see it fail for the right reason** before writing the code — or, where it passed because the behavior already exists, did I **break its subject and watch it go red** rather than assuming it was not vacuous?
 - [ ] Did I leave every test asserting what it originally asserted, rather than relaxing one to get to green?
 - [ ] Are there no placeholder, skipped, or always-passing tests?
 - [ ] If no test convention existed, did I choose layout and framework deliberately and **say what I chose and why**, rather than leaving it implicit?
