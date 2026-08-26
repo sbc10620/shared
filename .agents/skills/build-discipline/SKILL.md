@@ -38,7 +38,7 @@ If you notice yourself re-reading the same files, or opening files unrelated to 
 ### [Step 3] Write the tests
 - [Step 3.1] Write at least one **real, asserting** test per criterion — specific inputs producing specific outputs or effects. **No empty tests, no skip/xfail, no always-true assertions, no placeholder bodies.** A test that passes no matter what the code does is worse than no test.
 - [Step 3.2] For that same criterion, cover the edge and error cases it **implies** before moving on: empty/null/zero input, boundary values (min, max, off-by-one), malformed input, and the error conditions the interface implies. A criterion covered only by its happy path is incomplete. Stay inside what the criteria imply — a behavior nothing points at is out of scope, not thoroughness.
-- [Step 3.3] Mirror the project's existing test layout, framework, naming, and fixtures. Where there is no convention to follow, name each test for the **behavior it asserts** (`test_rejects_empty_input`).
+- [Step 3.3] Mirror the project's existing test layout, framework, naming, and fixtures. **Where there is no convention to follow, you are choosing one — do it deliberately and say what you chose.** Pick the framework the project's own dependencies already pull in over adding one (Rule 2), put tests where this ecosystem's tooling expects to find them, and name each test for the **behavior it asserts** (`test_rejects_empty_input`). State the choice and its one-line reason in your summary: the next change inherits it, and a convention nobody knew was set is worse than one argued for.
 - [Step 3.4] Do not refine one test indefinitely chasing an ambiguous expected value — apply Step 1, take the smallest reasonable interpretation, and move to the next criterion.
 - [Step 3.5] If a criterion genuinely **cannot** be tested as stated — self-contradictory, or the interface gives nothing concrete to assert — do not write a hollow test to satisfy the letter of Step 3.1. Write the tests that ARE meaningful and **say which criterion you could not test and why.**
 
@@ -51,4 +51,5 @@ Build and run the tests yourself. Fix what you can; report what you cannot.
 - [ ] Did I state my assumption for anything that was ambiguous, rather than guess silently?
 - [ ] Is there a real asserting test per criterion, covering the edge and error cases it implies?
 - [ ] Are there no placeholder, skipped, or always-passing tests?
+- [ ] If no test convention existed, did I choose layout and framework deliberately and **say what I chose and why**, rather than leaving it implicit?
 - [ ] Do the build and the tests actually pass — and where they do not, have I said so plainly rather than working around it?
