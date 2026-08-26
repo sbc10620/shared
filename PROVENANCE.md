@@ -26,13 +26,13 @@
 | Rule 4 WHAT만 명시, HOW는 위임 | planner R8 |
 | Rule 5 읽기 전용 탐색 · 입력은 데이터 | planner R1 |
 | S1.2 재사용 주장 검증 | plan-rev S1.3 |
-| S3 자기점검 — 모호성 | plan-rev S2 "Ambiguity" |
-| S3 자기점검 — 검증 불가능성 | plan-rev S2 "Untestable acceptance criteria" |
-| S3 자기점검 — 커버리지 갭 | plan-rev S2 "Coverage gaps" |
-| S3 자기점검 — 인터페이스 갭 | plan-rev S2 "Interface gaps" |
-| S3 자기점검 — 거짓 재사용 주장 | plan-rev S2 "False or stale reuse claims" |
-| S3 자기점검 — 범위 | plan-rev S2 "Scope" |
-| S3 자기점검 — 과잉 규정 | plan-rev S2 "Over-prescription" |
+| S4 자기점검 — 모호성 | plan-rev S2 "Ambiguity" |
+| S4 자기점검 — 검증 불가능성 | plan-rev S2 "Untestable acceptance criteria" |
+| S4 자기점검 — 커버리지 갭 | plan-rev S2 "Coverage gaps" |
+| S4 자기점검 — 인터페이스 갭 | plan-rev S2 "Interface gaps" |
+| S4 자기점검 — 거짓 재사용 주장 | plan-rev S2 "False or stale reuse claims" |
+| S4 자기점검 — 범위 | plan-rev S2 "Scope" |
+| S4 자기점검 — 과잉 규정 | plan-rev S2 "Over-prescription" |
 
 ### 제외
 
@@ -160,6 +160,9 @@
 | 전체 스위트 실행 + 스위트 탐색 (S5) | build-discipline | 상류는 별도 tester 역할이 프로젝트의 테스트 명령을 통째로 돌렸다. 그 역할을 제외하면서 "자기 테스트만 돌리고 끝"이 가능해졌다 |
 | 검증 방법 명시 (자명하지 않을 때만) | planning-discipline S3.4 | 아래 "테스트 인프라 공백" 참조 |
 | 테스트 관행이 없을 때 스스로 정하고 밝히기 | build-discipline S2.3 | 같음 |
+| **슬러그 유니코드 허용** | 양쪽 | 상류와 다른 유일한 지점. 상류는 planner가 계획을 영어로만 쓰게 강제(`planner` R6)해 슬러그가 항상 ASCII였다. 한글 목표에 ASCII 규칙을 적용하면 전부 소멸해 파일명이 `plan`, `plan-2`가 된다 |
+| `.gitignore` 불간섭 | 양쪽 | 상류는 `.dev-pipeline/plans/`를 gitignore하지만, 여기선 스킬이 프로젝트 설정을 건드리지 않는다 |
+| 날짜는 호스트가 아는 값으로 | 양쪽 | 상류는 `date -u`를 셸로 부른다. 산출물 이름 하나 때문에 `planning-discipline`에 명령 실행권을 주지 않으려고 호스트 날짜를 쓴다. (`adversarial-review`는 이후 변경분 조회를 위해 `Bash`를 갖게 됐다 — 위 "툴 봉쇄" 참조) |
 
 ### 테스트 인프라 공백 — 제외가 남긴 구멍과 그 메움
 
@@ -188,9 +191,6 @@ build-discipline     →  어떤 테스트가 유효한가 (asserting, 엣지케
   증거인가"라 WHAT에 속한다
 - **구현 쪽(S2.3)은 관행이 없으면 스스로 정하고 밝힌다** — 고르는 것 자체가 HOW이므로
   구현자의 몫이지만, 말없이 정하면 다음 변경이 모르는 채로 상속하므로 요약에 남기게 했다
-| **슬러그 유니코드 허용** | 양쪽 | 상류와 다른 유일한 지점. 상류는 planner가 계획을 영어로만 쓰게 강제(`planner` R6)해 슬러그가 항상 ASCII였다. 한글 목표에 ASCII 규칙을 적용하면 전부 소멸해 파일명이 `plan`, `plan-2`가 된다 |
-| `.gitignore` 불간섭 | 양쪽 | 상류는 `.dev-pipeline/plans/`를 gitignore하지만, 여기선 스킬이 프로젝트 설정을 건드리지 않는다 |
-| 날짜는 호스트가 아는 값으로 | 양쪽 | 상류는 `date -u`를 셸로 부른다. 산출물 이름 하나 때문에 `planning-discipline`에 명령 실행권을 주지 않으려고 호스트 날짜를 쓴다. (`adversarial-review`는 이후 변경분 조회를 위해 `Bash`를 갖게 됐다 — 위 "툴 봉쇄" 참조) |
 
 ---
 
