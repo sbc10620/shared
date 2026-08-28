@@ -45,38 +45,49 @@ tokio::task_local! {
 
 **증거**: task-local이 설정된 컨텍스트에서 `true`, 설정되지 않은 컨텍스트에서 `false`를 반환하는 단위 테스트.
 
-### 2. agent_loop에 task-local 설정
+### 2. agent_loop에 task-local 설정 (early return 이전)
 
-`tini/tinicore/src/agent/loop_/llm_call.rs:239`의 `wire_capture::scope` 호출부를
-`MAIN_TURN_MASKING.scope(true, ...)`로 감싼다.
+`tini/tinicore/src/agent/loop_/llm_call.rs`의 `call_llm` 함수 **진입부** (라인 159 부근)에서
+`MAIN_TURN_MASKING.scope(true, ...)`로 함수 전체를 감싼다.
+
+**주의 — `wire_capture::scope` (라인 239)에 설정하면 안 됨**: `call_llm_via_dispatcher`가
+라인 214에서 early return하므로, `wire_capture::scope` 이전에 분기하는 경로가
+task-local 범위 밖이 된다. 따라서 `call_llm` 함수 진입부에서 설정해야 한다.
 
 ```rust
-// 변경 후
-let outcome = crate::agent::pii_masking::MAIN_TURN_MASKING.scope(true, async {
-    crate::llm::wire_capture::scope(
-        WireCtx { ... },
-        fallback.call_with_fallback_with_extra_headers(...)
-    ).await
-}).await;
+// llm_call.rs — call_llm 함수 진입부
+pub(super) async fn call_llm(...) -> Result<CallLlmResponse, TinicoreError> {
+    // task-local을 함수 진입부에서 설정 — early return (call_llm_via_dispatcher) 포함
+    // 모든 메인 턴 경로(FallbackChain, dispatcher)를 커버
+    crate::agent::pii_masking::MAIN_TURN_MASKING.scope(true, async {
+        // ... 기존 call_llm 본문 전체 ...
+        // (use_dispatcher_for_agent_chat 분기 포함)
+        // (wire_capture::scope 호출 포함)
+    }).await
+}
 ```
 
-- 메인 턴의 FallbackChain → `call_llm_streaming_with_extra_headers` 경로 전체가
+- 메인 턴의 모든 경로(FallbackChain, `call_llm_via_dispatcher` → `dispatch_stream`)가
   task-local 범위 안에 들어감.
 - 메인 턴의 기존 마스킹 로직(`mask_messages_for_cloud`, `mask_llm_output`, `demask`)은 변경 없음.
 
 **증거**: 기존 메인 턴 마스킹 테스트가 전부 통과해야 함 (회귀 없음).
+`use_dispatcher_for_agent_chat` 켜진 환경에서도 task-local이 `true`인지 확인하는 테스트.
 
-### 3. LLM call 함수 5개에 마스킹 적용
+### 3. LLM call 함수 3개에 마스킹 적용
 
-다음 5개 함수의 **HTTP 송출 직전**에 마스킹을 적용한다:
+다음 3개 함수의 **HTTP 송출 직전**에 마스킹을 적용한다:
 
 | 함수 | 가시성 | 파일 |
 |---|---|---|
 | `call_provider` | `pub` | `llm/client.rs:458` |
-| `call_llm` | `pub` | `llm/client.rs:752` |
-| `call_llm_streaming` | `pub` | `llm/client.rs:2238` |
 | `call_llm_with_extra_headers` | `pub(crate)` | `llm/client.rs:810` |
 | `call_llm_streaming_with_extra_headers` | `pub(crate)` | `llm/client.rs:2430` |
+
+**`pub` wrapper 2개(`call_llm`, `call_llm_streaming`)는 마스킹을 적용하지 않는다.**
+이 두 함수는 각각 `call_llm_with_extra_headers`, `call_llm_streaming_with_extra_headers`를
+호출하는 얇은 wrapper이므로, wrapper와 내부 함수 양쪽에 마스킹을 적용하면
+이중 마스킹(vault 충돌)이 발생한다. 내부 함수에서만 마스킹을 적용한다.
 
 각 함수의 마스킹 로직 (공통):
 
@@ -98,16 +109,26 @@ let outcome = crate::agent::pii_masking::MAIN_TURN_MASKING.scope(true, async {
 - vault에 있는 플레이스홀더는 이미 마스킹된 상태이므로 mask_llm_output이 변경하지 않음.
 - demask는 vault의 매핑으로 플레이스홀더를 원본으로 복원.
 
-**call_provider 특이사항**:
+**call_provider 특이사항 — `LlmMessage` 타입 마스킹**:
 - `call_provider`는 `LlmChatRequest`(`Vec<LlmMessage>`)를 받음.
-- 다른 4개 함수는 `&[ChatMessage]`를 받음.
-- `LlmMessage`와 `ChatMessage`는 다른 타입이므로, `call_provider`의 마스킹은
-  `LlmMessage` → text 추출 → 마스킹 → 교체 방식으로 별도 구현 필요.
+- 다른 2개 함수는 `&[ChatMessage]`를 받음.
+- `LlmMessage`는 `LlmContent` enum을 가지며, variant는 `Text(Cow<str>)`, `ToolCall(ToolCallRequest)`, `ToolResult` 등.
+- 기존 `mask_messages_for_cloud` / `mask_llm_output`은 `ChatMessage` 기반이며,
+  `LlmMessage`용 마스킹 함수나 `From<LlmMessage> for ChatMessage` 변환이 코드베이스에 없음.
+- **마스킹 대상**: `LlmContent::Text` variant의 text만 추출하여 마스킹하고,
+  다른 variant (`ToolCall`, `ToolResult`)는 PII를 포함하지 않으므로 그대로 둔다.
+- 마스킹된 text로 새 `LlmMessage`를 재구성하여 `LlmChatRequest`에 교체.
 
 **call_llm_streaming_with_extra_headers 특이사항**:
 - 스트리밍 응답은 실시간으로 `events` 리스너에 전달됨.
 - 실시간 토큰에 PII가 포함될 수 있으나, 현재도 미해결이므로 회귀 아님.
 - 최종 `CallLlmResponse.content`에 대해서만 mask_llm_output → demask 적용.
+
+**응답의 tool_calls / reasoning_content 마스킹**:
+- `CallLlmResponse.tool_calls`의 `arguments`와 `LlmChatResponse.tool_calls`에 PII가 포함될 수 있으나,
+  **백그라운드 경로는 tool을 전달하지 않으므로** (`tools: &[]` 또는 `Default::default()`) tool_call이 발생하지 않는다.
+- `reasoning_content` / `reasoning_trace`도 백그라운드에서 활성화되지 않는다.
+- 향후 백그라운드에서 tool 또는 reasoning을 사용하는 경우, 이 필드들의 마스킹이 필요하다 (out-of-scope).
 
 **증거**:
 - 백그라운드 경로에서 PII가 마스킹되어 송출되는지 확인하는 테스트.
@@ -145,8 +166,9 @@ let outcome = crate::agent::pii_masking::MAIN_TURN_MASKING.scope(true, async {
 
 ### 호환성
 
-- `call_provider`, `call_llm`, `call_llm_streaming`의 함수 시그니처는 변경하지 않음
-  (파라미터 추가 없음 — task-local + global 조회로 자동 적용).
+- `call_provider`, `call_llm_with_extra_headers`, `call_llm_streaming_with_extra_headers`의
+  함수 시그니처는 변경하지 않음 (파라미터 추가 없음 — task-local + global 조회로 자동 적용).
+- `call_llm`, `call_llm_streaming` (pub wrapper)은 변경하지 않음 (내부 함수가 마스킹 처리).
 - 기존 호출자 코드 변경 불필요.
 - `feature = "sensitive"` 가드 유지: 해당 feature가 없으면 마스킹 코드가 컴파일에서 제외됨.
 
@@ -158,3 +180,5 @@ let outcome = crate::agent::pii_masking::MAIN_TURN_MASKING.scope(true, async {
 - `call_llm` / `call_llm_streaming`의 가시성을 `pub(crate)`로 강등 (외부 결정 사항).
 - `ActiveLlmRouter`의 Product 채널이 dispatcher를 경유하도록 구조 변경.
 - `LlmMessage` 타입에 대한 별도 PII detector 구현 (기존 `ChatMessage`용 detector 재용).
+- 백그라운드 경로에서 tool 사용 시 `tool_calls.arguments` 및 `reasoning_content` 마스킹
+  (현재 백그라운드는 tool/reasoning 미사용).
