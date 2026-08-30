@@ -111,9 +111,16 @@ For every item worth walking through, in this exact shape:
 - ...
 ```
 
-**Before/After blocks must be verbatim.** Every line inside a `Before`/`After` fence is real source pulled from `git diff`/`git show` — never replace an actual line (or a whole match arm, function body, etc.) with a prose summary of what it does and present that inside the fence as if it were code. If a block is too long to show in full, elide the untouched middle explicitly (`// ... unchanged ...`) rather than substituting a paraphrase, or show the full block anyway — do not silently swap code for commentary. This applies even when the paraphrase is accurate; the reader must be able to trust that anything inside a fenced block is copy-pasteable from the real file.
+**Before/After blocks must be verbatim.** Every line inside a `Before`/`After` fence is real source pulled from `git diff`/`git show` — never replace an actual line (or a whole match arm, function body, etc.) with a prose summary of what it does and present that inside the fence as if it were code. If a block is too long to show in full, elide the untouched middle explicitly (`// ... unchanged ...`) rather than substituting a paraphrase, or show the full block anyway — do not silently swap code for commentary. This applies even when the paraphrase is accurate; the reader must be able to trust that anything inside a fenced block is copy-pasteable from the real file. The line annotations below are the one sanctioned addition on top of verbatim source — they append a marker/comment, they never replace or reword the underlying code text.
 
-**Self-check before sending:** for every bullet in **변경된 내용**, confirm it points at a line actually visible in that item's Before/After blocks. If a bullet describes something the shown code doesn't contain (e.g. "installs X" but the fence never shows the call that installs X), the fence was truncated or paraphrased — fix the fence, don't adjust the bullet to match a shortcut.
+**Line annotations (required in every Before/After block):**
+
+1. **Added-line marker.** Every line in an `After` block that does not exist in the corresponding `Before` block gets a leading `+` (before the line's own indentation) — mirrors `git diff` output. Lines unchanged from `Before` (context) get no `+`. `Before` blocks never get a `+` — nothing in a `Before` block is "added" relative to itself.
+2. **Function-call purpose comment.** On a line that calls another function/method, append a trailing comment naming the call and stating *why it is called at this specific site* — not a restatement of what the function generically does. ("`build_request()` 재호출 목적: 마스킹된 요청으로 HTTP 요청을 다시 만듦" beats "build_request는 요청을 만드는 함수".)
+3. **Function-declaration summary comment.** Immediately above any function/method declaration (`fn ...`) shown in the block, add one line stating what that function does overall, from the reader's point of view (not implementation detail).
+4. **Don't annotate everything.** Comments 2 and 3 go only on function calls and function declarations; trivial lines (field-copy assignments, braces, blank lines, simple literals) get no comment. A line is also worth annotating when it's the exact line a **변경된 내용** bullet is pointing at and the connection isn't obvious from the surrounding code alone — use judgment, don't caption every line mechanically.
+
+**Self-check before sending:** for every bullet in **변경된 내용**, confirm it points at a line actually visible in that item's Before/After blocks. If a bullet describes something the shown code doesn't contain (e.g. "installs X" but the fence never shows the call that installs X), the fence was truncated or paraphrased — fix the fence, don't adjust the bullet to match a shortcut. Also confirm every `+` marker is correct (present exactly on lines absent from `Before`) and that call/declaration comments describe purpose, not just restate the name.
 
 Rules for the two bullet sections:
 
@@ -136,6 +143,7 @@ Before sending the final answer, verify it against each of these (they point bac
 - [ ] Step 0: resolved `before_ref`/`after_ref` stated to the user up front.
 - [ ] Step 2: every item's header carries `[확인됨]` or `[추정]`, and every `[추정]` block's reconstruction is labeled as such, not presented as `git show` output.
 - [ ] Step 4 verbatim rule: every line inside a Before/After fence is real — none swapped for a prose summary.
+- [ ] Step 4 line annotations: `+` markers correct on every added line (and absent from `Before`), function calls carry a purpose comment, function declarations carry a one-line summary above them, and trivial lines are left uncommented.
 - [ ] Step 4 self-check: every **변경된 내용** bullet is backed by a line actually visible in that item's Before/After.
 - [ ] Step 4 opinion rules: every **변경관련 의견** bullet is either grounded in checkable evidence (a grep result, a convention found elsewhere, a concrete blast-radius path) or explicitly "없음 — <reason>" — none are generic best-practice filler.
 - [ ] Step 3/5: large-diff prioritization was stated when applicable, and 종합 의견 only appears if it covers a cross-cutting concern not already in a per-item opinion.
