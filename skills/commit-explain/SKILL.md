@@ -109,6 +109,13 @@ For every item worth walking through, in this exact shape:
 **변경관련 의견:**
 - <bullet, terse, an honest engineering opinion>
 - ...
+
+**호출 흐름:** (optional — see below; a small visual diagram, not a bullet list)
+```
+<caller 1> ──"<condition/arg>"──┐
+                                 ├─▶ <shared callee>
+<caller 2> ──"<condition/arg>"──┘
+```
 ```
 
 **Before/After blocks must be verbatim.** Every line inside a `Before`/`After` fence is real source pulled from `git diff`/`git show` — never replace an actual line (or a whole match arm, function body, etc.) with a prose summary of what it does and present that inside the fence as if it were code. If a block is too long to show in full, elide the untouched middle explicitly (`// ... unchanged ...`) rather than substituting a paraphrase, or show the full block anyway — do not silently swap code for commentary. This applies even when the paraphrase is accurate; the reader must be able to trust that anything inside a fenced block is copy-pasteable from the real file. The line annotations below are the one sanctioned addition on top of verbatim source — they append a marker/comment, they never replace or reword the underlying code text.
@@ -132,6 +139,16 @@ Rules for the two bullet sections:
   - Where you'd genuinely have done it differently, say what you'd have done, not just what's wrong with what's there.
   - Flag scope/blast-radius concerns explicitly: default-on feature flags, renamed public identifiers, config that used to be hot-reloadable and is now compiled in, anything that silently changes behavior for consumers not touched by the diff.
 
+**호출 흐름 (call flow) — add when it clarifies, skip when it doesn't:**
+
+Add this section to an item when the function(s) it introduces or changes have **more than one caller**, or sit in a **chain the reader would otherwise have to reconstruct themselves** (a value threaded through several hops before it matters, a shared helper feeding two or three different call sites with different arguments). Skip it when the item's only caller is already fully visible inside the Before/After block — repeating that there would be padding.
+
+- Find every real caller with `grep -rn "<fn_name>(" --include="*.rs" .` (or the language equivalent) — never list a call site you have not confirmed exists.
+- Draw it as a small diagram inside a fenced code block — boxes/arrows, not a bullet list. Plain ASCII box-and-arrow art is the default (renders as-is in any markdown viewer, including a terminal); reach for a `mermaid` fence instead only when you know the output destination renders Mermaid. Either way: one node per caller and per shared callee, one arrow per call labeled with the condition/argument that determines that path (e.g. `has_masking → Some(AlreadyMasked)`).
+- Keep node/edge labels short — file:function names and the deciding condition, not full code or full paths. This is a map, not a second code dump; the Before/After block already carries the verbatim code.
+- If the argument passed differs meaningfully per call site (e.g. a flag that's `Some(A)` at one site, `Some(B)` at another, `None` at a third), the arrow label says what makes it differ — the condition, not just the value.
+- A plain table is an acceptable fallback only when the relationship genuinely resists drawing (e.g. many call sites varying along more dimensions than fit on arrows legibly) — reach for the diagram first.
+
 ## Step 5 — Wrap-up
 
 End with a short "종합 의견" (a few bullets, not a new essay) only if there's a cross-cutting concern that doesn't belong to any single item — e.g. "this commit mixes a pure move with a rename, which is fine mechanically but makes the diff unreviewable as a unit." Skip this section if every concern was already covered per-item; don't pad.
@@ -147,6 +164,7 @@ Before sending the final answer, verify it against each of these (they point bac
 - [ ] Step 4 self-check: every **변경된 내용** bullet is backed by a line actually visible in that item's Before/After.
 - [ ] Step 4 opinion rules: every **변경관련 의견** bullet is either grounded in checkable evidence (a grep result, a convention found elsewhere, a concrete blast-radius path) or explicitly "없음 — <reason>" — none are generic best-practice filler.
 - [ ] Step 3/5: large-diff prioritization was stated when applicable, and 종합 의견 only appears if it covers a cross-cutting concern not already in a per-item opinion.
+- [ ] Step 4 호출 흐름: present only where a function has multiple real (grep-confirmed) callers or a multi-hop chain, absent where the sole caller is already shown in Before/After; every call site listed actually exists; rendered as a box/arrow (or Mermaid) diagram, not a bullet list or table, unless the relationship genuinely resisted drawing.
 
 ## What NOT to do
 
@@ -156,3 +174,4 @@ Before sending the final answer, verify it against each of these (they point bac
 - Don't write opinions that are true of almost any diff ("could use more tests", "consider documentation") — every opinion must be specific to what this diff actually did.
 - Don't spawn a subagent for this — it's a focused, single-thread investigation over one commit or range; do it inline.
 - Don't walk the range commit-by-commit — one cumulative before/after per file (Step 0's endpoints), not N sequential diffs for N commits.
+- Don't invent or guess a call site in a 호출 흐름 section — every caller listed must come back from an actual `grep`/`git grep` for the function name; if there's only one caller and it's already in the Before/After block, omit the section entirely rather than restating it.
