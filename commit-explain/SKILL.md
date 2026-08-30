@@ -111,6 +111,10 @@ For every item worth walking through, in this exact shape:
 - ...
 ```
 
+**Before/After blocks must be verbatim.** Every line inside a `Before`/`After` fence is real source pulled from `git diff`/`git show` — never replace an actual line (or a whole match arm, function body, etc.) with a prose summary of what it does and present that inside the fence as if it were code. If a block is too long to show in full, elide the untouched middle explicitly (`// ... unchanged ...`) rather than substituting a paraphrase, or show the full block anyway — do not silently swap code for commentary. This applies even when the paraphrase is accurate; the reader must be able to trust that anything inside a fenced block is copy-pasteable from the real file.
+
+**Self-check before sending:** for every bullet in **변경된 내용**, confirm it points at a line actually visible in that item's Before/After blocks. If a bullet describes something the shown code doesn't contain (e.g. "installs X" but the fence never shows the call that installs X), the fence was truncated or paraphrased — fix the fence, don't adjust the bullet to match a shortcut.
+
 Rules for the two bullet sections:
 
 - **변경된 내용** is purely descriptive. No "should have", no "this is risky" — just what changed. If a reader skipped the code blocks entirely, these bullets alone should tell them what happened.
@@ -125,9 +129,21 @@ Rules for the two bullet sections:
 
 End with a short "종합 의견" (a few bullets, not a new essay) only if there's a cross-cutting concern that doesn't belong to any single item — e.g. "this commit mixes a pure move with a rename, which is fine mechanically but makes the diff unreviewable as a unit." Skip this section if every concern was already covered per-item; don't pad.
 
+## Step 6 — Pre-send checklist
+
+Before sending the final answer, verify it against each of these (they point back to the rule that spells out the detail — this list is a scan, not a restatement):
+
+- [ ] Step 0: resolved `before_ref`/`after_ref` stated to the user up front.
+- [ ] Step 2: every item's header carries `[확인됨]` or `[추정]`, and every `[추정]` block's reconstruction is labeled as such, not presented as `git show` output.
+- [ ] Step 4 verbatim rule: every line inside a Before/After fence is real — none swapped for a prose summary.
+- [ ] Step 4 self-check: every **변경된 내용** bullet is backed by a line actually visible in that item's Before/After.
+- [ ] Step 4 opinion rules: every **변경관련 의견** bullet is either grounded in checkable evidence (a grep result, a convention found elsewhere, a concrete blast-radius path) or explicitly "없음 — <reason>" — none are generic best-practice filler.
+- [ ] Step 3/5: large-diff prioritization was stated when applicable, and 종합 의견 only appears if it covers a cross-cutting concern not already in a per-item opinion.
+
 ## What NOT to do
 
 - Don't show only the changed lines without surrounding context — the user explicitly wants to recognize *where* in the file the change sits.
+- Don't paraphrase real code into a descriptive comment inside a Before/After fence (e.g. turning a multi-line match arm into `/* installs X */`) — this silently drops the exact call the reader came to verify, and produces a "변경된 내용" bullet that claims more than the fence shows. Elide explicitly or show it in full.
 - Don't present an inferred "before" as if it came from `git show` — always carry the `[추정]` label through to the section header.
 - Don't write opinions that are true of almost any diff ("could use more tests", "consider documentation") — every opinion must be specific to what this diff actually did.
 - Don't spawn a subagent for this — it's a focused, single-thread investigation over one commit or range; do it inline.
