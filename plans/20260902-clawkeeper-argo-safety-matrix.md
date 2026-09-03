@@ -250,13 +250,15 @@ def approval_cb(command: str, description: str = "") -> str:   # 위치 인자 �
 
 ### 2.2 콘텐츠 스캔 축
 
-| 이름 | 위치 (LOC) | 하는 일 |
-|---|---|---|
-| `audit_text` | `dispatchable_policy/audit.rs:1016` (2313) | **룰 23개** / 6범주: PromptInjection 4, DataExfiltration 4, CredentialAccess 8, InvisiblePayload 2(태그 `U+E0001-E007F` **+ BiDi override**), Obfuscation 3, Privilege 2. `Severity` 5단계 |
-| `prompt_guard` | `agent/prompt_guard.rs` (694) | **인바운드 사용자 메시지** PI 탐지. 호스트 공급 룰, `Warn`/`Block`/`Sanitize{replacement}` |
-| `static_scan` | `security/static_scan.rs` (278) | 스킬 번들 소스 시그니처 스캔 (설치 시점) |
-| `denied_pattern` | `agent/guardrails_builtin.rs` (667) | `RegexSet`. **4개 가드레일 트레잇 모두 구현**(`:124/134/144/198`) |
-| `classifier` | `agent/guardrails_classifier.rs` (1086) | LLM 분류기를 TOOL-INPUT 가드레일로. `Accept`→pass / `AskUser*`→Escalate / `Block`→Block |
+**"무엇을(대상) → 어떻게 검사해서(탐지) → 무엇을 하는가(조치)"** 로 정리한다.
+
+| 이름 | 검사 대상 | 탐지 방식 | 조치 |
+|---|---|---|---|
+| `audit_text`<br>`dispatchable_policy/audit.rs:1016` (2313) | **스킬/툴 매니페스트 텍스트** (`SKILL.md` 등), 레지스트리에 등록되기 직전의 문자열 | 하드코딩 정규식 **룰 23개** / 6범주 — PromptInjection 4, DataExfiltration 4, CredentialAccess 8, InvisiblePayload 2(태그 `U+E0001-E007F` + BiDi override), Obfuscation 3, Privilege 2. 줄 단위 매칭, 룰 간 포섭(`subsumed_by_rule_ids`) | `Severity`(5단계)가 `block_threshold` 이상이고 waiver에 없으면 **등록 거부**(`RegistryError::BlockedByAudit`). 미만이면 `AuditReport`에 finding만 실려 통과 |
+| `prompt_guard`<br>`agent/prompt_guard.rs` (694) | **인바운드 사용자 메시지** — 그 턴의 최신 user 텍스트, 첫 LLM 왕복 **전** | 호스트가 공급한 정규식 룰셋을 컴파일해 매칭(`compile_cached`로 턴 간 재사용). Core는 룰을 갖지 않아 **빈 룰셋이면 패스 전체를 스킵** | 룰별 `GuardAction` 3종 — `Warn`(통과 + 훅 이벤트) / `Block`(LLM 호출 전 턴 거부, **문제 내용을 사용자에게 되돌려 보내지 않음**) / `Sanitize{replacement}`(매치 구간을 치환하고 계속, UTF-8 경계 보존) |
+| `denied_pattern`<br>`agent/guardrails_builtin.rs` (667) | **등록한 레이어에 따라 4가지** — `InputGuardrail`은 사용자 텍스트(`:128`), `OutputGuardrail`은 모델 답변(`:139`), `ToolInputGuardrail`은 **직렬화된 툴 인자 JSON**(`:149`, 어느 필드든 패턴이 겨냥 가능), `ToolOutputGuardrail`은 툴 결과(`:202`) | 운영자 공급 패턴을 `RegexSet`으로 컴파일해 매칭. 4개 트레잇을 **한 타입이 모두 구현**하므로 같은 룰셋을 원하는 층에 골라 등록 | 매치 시 tripwire. 메타데이터로 **매치된 룰 인덱스만** 실어보내고 매치된 텍스트는 절대 안 실음. 패턴이 비면 `new`가 `Ok(None)` → 가드 자체가 등록되지 않음 |
+| `classifier`<br>`agent/guardrails_classifier.rs` (1086) | **툴 호출 인자** (TOOL-INPUT 층). 단 호스트가 그 툴에 대해 `ToolSignal`을 공급한 경우에만 — 미공급 툴은 아예 분류하지 않음 | LLM `AutoModeClassifier` 호출(툴 호출당 네트워크 왕복 1회). 심각도 순위가 매겨진 `Issue` 목록 위의 3분기 `ClassifyAction` | `Accept{minor_issues}`→통과(minor는 메타데이터로) / `AskUserMandatory`·`AskUserRemembered`→tripwire + **`Escalate`**(오케스트레이터가 승인 흐름으로 라우팅) / `Block`→tripwire + 거부 |
+| `static_scan`<br>`security/static_scan.rs` (278) | **스킬 번들 소스 코드**(JS/Python), 스킬 설치기가 런타임을 부르기 전 | 언어별 위험 시그니처 문자열 — JS `eval(`, `new Function(` 등. 모듈 주석이 스스로 "샌드박스도 린터도 권위 있는 소스도 아닌, 게으른 스킬을 걸러내는 **1차 통과 검사**"라고 규정 | `scan_js`/`scan_py`는 `Vec<StaticScanHit>` 반환, `require_clean_js`/`require_clean_py`는 히트가 있으면 `Err`. **⚠ 다만 워크스페이스 전체에서 이 네 함수의 호출자가 0건** — `security/mod.rs:18`의 모듈 선언만 있고 실제 조치로 이어지는 경로가 없다. **[실행경로확인]** |
 
 > **`audit_text`의 이력**: `97f73caa5c`(2026-06-01, sanghnkim-max, PR #1030)에서 파일·23룰·호출부
 > 2곳이 한꺼번에 들어왔고, 이후 룰 테이블은 **한 번도 바뀌지 않았다**(`git log -S "const RULES"`
@@ -363,6 +365,7 @@ Luhn·주민번호 체크섬), `types/security.rs`(39), `context_policy/`, `harn
 | TOOL-OUTPUT 체인 | ✅ | ✅ | ❌ | 배선은 `execution.rs:3221` `run_tool_output_guardrails`에 존재하나 `if !set.tool_output.is_empty()` 조건. 위 세 팩이 모두 OFF라 비어 있음 | **OFF** |
 | `prompt_guard` | ✅ | ✅ | ❌ | 호출은 `agent/loop_.rs:1895`(정의 `:674`), 스킵 조건 `:681` `ctx.config.prompt_guard.is_empty()`. **`CliConfig`에 `prompt_guard` 필드 자체가 없어 `config.toml`로도 도달 불가.** 워크스페이스 유일 설정자는 `tinicore/tests/prompt_guard_e2e.rs:221` | **OFF** |
 | `classifier` | ✅ | ✅ | ❌ | 호스트가 툴별 `ToolSignal`을 공급해야 분류. 미공급 툴은 분류 안 함 | **OFF** |
+| `static_scan` | ✅ | ✅ | ❌ | **호출자 0건.** `security/mod.rs:18`의 `pub mod static_scan;` 선언만 있고 `scan_js`/`scan_py`/`require_clean_js`/`require_clean_py`를 부르는 코드가 워크스페이스에 없다 | **OFF** (미배선) |
 
 ### 4.2 가드레일 셋 설치 경로 (3개, 모두 호스트 공급 의존)
 
@@ -527,3 +530,5 @@ sed -n '87,111p' ~/Works/argo-tizen/crates/argot-daemon/src/agent_config.rs  # P
 | 7 | §4.3 **argo-tizen 절** 신설 — vendored tinicore 바이트 동일, PII 기본 `Full`, PromptGuard 베이스라인 룰 5개 | `diff -rq` 0줄, `argot-config/src/lib.rs:501-512`, `agent_config.rs:87,102` |
 | 8 | §4.4에 **"Core는 룰을 안 박는다"가 CLAUDE.md에 없음** 명시 | CLAUDE.md § Protecting the Core layer는 제품 identity만 금지. "no rule"은 모듈별 자체 해석 |
 | 9 | §2.2에 `audit_text` **이력·설계 스코프** 추가 | `97f73caa5c`(2026-06-01), 룰 무변경, "one pre-registration audit" |
+| 10 | §2.2를 **"검사 대상 → 탐지 방식 → 조치"** 3열 구조로 재작성 | 요청 반영 |
+| 11 | `static_scan`이 **호출자 0건**임을 발견 — §2.2에 경고, §4.1에 `OFF(미배선)` 행 추가 | `grep -rn "static_scan\|scan_js\|scan_py\|StaticScanHit"` 결과가 `security/mod.rs:18` 모듈 선언 하나뿐 |
