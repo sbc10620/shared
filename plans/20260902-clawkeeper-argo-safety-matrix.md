@@ -351,27 +351,39 @@ Luhn·주민번호 체크섬), `types/security.rs`(39), `context_policy/`, `harn
 **(a) 코드 존재 / (b) 기본 빌드 컴파일 / (c) 런타임 실행** 3단계. 기준은
 **env 없음 + 설정 파일 없음 + 기본 cargo feature**.
 
-### 4.1 활성화 지점 — 어디서 켜지나
+### 4.1 활성화 지점 — 어디서 켜지나 (제품별)
 
-| 이름 | a | b | c | **활성화 지점 (조건)** | 최종 |
-|---|---|---|---|---|---|
-| `scrubber` | ✅ | ✅ | ✅ | `execution.rs:3866` `scrubber::finalize_result_safety` — `post_execute` 안에서 **감싸는 `if`·`#[cfg]` 없이** 호출. 모듈 선언 `tools/mod.rs:70`도 게이트 없음 | **ON** |
-| `untrusted_envelope` | ✅ | ✅ | ✅ | `execution.rs:3568` — `post_execute`에서 항상. `tool_def` 없으면 Untrusted(fail-closed) | **ON** |
-| `ssrf` | ✅ | ✅ | ✅ | `web_render.rs:192`(리터럴), `:217`(DNS 재검사) / `tinicli/src/adapters/web_render_ssrf.rs:34-36` / `tiniffi/src/http.rs:179` — 전부 무조건 | **ON** |
-| `url_validator` | ✅ | ✅ | ✅ | `http.rs:261,1431,1601`(`http_fetch`/`http_post`), `brave_search.rs:421,1303`, `desktop_web.rs:835,1181`, `document_read.rs:242` | **ON** |
-| `path_validator` | ✅ | ✅ | ✅ | 공용 헬퍼 `tools/builtins/mod.rs:225` `validate_and_reauthorize` → **빌트인 12개**(`file`, `file_open`, `glob`, `document_{read,edit,render,recalc,validate}`, `docx_edit`, `ocr`, `powershell`)가 진입 시 호출. 블록리스트는 하드코딩 상수 | **ON** (파일 툴 한정 — `bash` 미포함) |
-| `network_policy` · `is_private_or_local` | ✅ | ✅ | ✅ | `url_validator.rs:87` | **ON** |
-| `network_policy` · `validate_domain` | ✅ | ✅ | ❌ | `bash.rs:392`는 `execute_sandboxed` 안이고 `bash.rs:131`의 `if !use_system`에서만 도달. `use_system`은 `ctx.config.shell_mode` 유래이며 `config/core_config.rs:153-157`이 **`#[default] System`**("데스크톱/서버 기본") | **OFF** (데스크톱 기본) |
-| `audit_text` | ✅ | ✅ | ⚠ | `tools/registry/store.rs:418`, `dispatchable_policy/discovery.rs:731` — **프로덕션 호출부는 이 둘뿐**. 툴 결과·LLM 출력엔 미적용 | **부분 ON** (등록 시점만) |
-| `pii_filter` | ✅ | ❌ | — | **feature `guardrails`가 필요한데 어느 default에도 없음** — `tinicore/Cargo.toml:19`(`:22-27`에 "deliberately NOT in this list" 명시), `tinicli/Cargo.toml:27`, `argo-cli/Cargo.toml:34` | **OFF** (컴파일 제외) |
-| `sensitive_masking` | ✅ | ✅ | ❌ | 설치는 `tinicli/src/cli_entry.rs:389` `install_pii(PiiMode::parse(cfg.pii_mode), …)` — **`#[cfg(feature="guardrails")]` 안**. 게다가 `pii_mode` 미설정 시 `Off`(`tinicli/src/guardrails/pii.rs:124` `Some("off") \| None => Self::Off`). `run_onboarding.rs`가 `pii_mode`를 쓰지 않으므로 기본 생성 설정에도 없음 | **OFF** (이중 게이트) |
-| `arg_shape`·`command_safety`·`secret_path`·`path_boundary` (G1~G4) | ✅ | ✅ | ❌ | `agent/guardrails.rs:1066` — env **`ARGO_GUARDRAIL_TOOL_PACK`** 에 JSON이 있을 때만 `with_tool_input_pack` 호출. 레포에 이 env를 세팅하는 기본값 없음 | **OFF** |
-| `url_scan`·`secret_needles` (exfil) | ✅ | ✅ | ❌ | `agent/guardrails.rs:1088` — env **`ARGO_GUARDRAIL_EXFIL`** JSON 필요 | **OFF** |
-| `denied_pattern` | ✅ | ✅ | ❌ | `agent/guardrails.rs:1041-1055` — env **`ARGO_GUARDRAIL_DENY_{INPUT,OUTPUT,TOOL_INPUT,TOOL_OUTPUT}`** 필요. 빈 패턴이면 `DeniedPatternGuardrail::new`가 `Ok(None)` → 등록 안 함 | **OFF** |
-| TOOL-OUTPUT 체인 | ✅ | ✅ | ❌ | 배선은 `execution.rs:3221` `run_tool_output_guardrails`에 존재하나 `if !set.tool_output.is_empty()` 조건. 위 세 팩이 모두 OFF라 비어 있음 | **OFF** |
-| `prompt_guard` | ✅ | ✅ | ❌ | 호출은 `agent/loop_.rs:1895`(정의 `:674`), 스킵 조건 `:681` `ctx.config.prompt_guard.is_empty()`. **`CliConfig`에 `prompt_guard` 필드 자체가 없어 `config.toml`로도 도달 불가.** 워크스페이스 유일 설정자는 `tinicore/tests/prompt_guard_e2e.rs:221` | **OFF** |
-| `classifier` | ✅ | ✅ | ❌ | 호스트가 툴별 `ToolSignal`을 공급해야 분류. 미공급 툴은 분류 안 함 | **OFF** |
-| `static_scan` | ✅ | ✅ | ❌ | **호출자 0건.** `security/mod.rs:18`의 `pub mod static_scan;` 선언만 있고 `scan_js`/`scan_py`/`require_clean_js`/`require_clean_py`를 부르는 코드가 워크스페이스에 없다 | **OFF** (미배선) |
+**ARGO** = `tinicli`/`argo-cli` 기본 빌드 · **tizen** = `argot-daemon`
+(`~/Works/argo-tizen`, `bd1adcb9`). 두 제품은 **같은 tinicore 코드**를 쓰므로(§4.3)
+차이는 전부 feature 선언과 배선에서 온다.
+
+| 이름 | 활성화 지점 (조건) | ARGO | tizen |
+|---|---|---|---|
+| `scrubber` | `execution.rs:3866` `finalize_result_safety` — `post_execute` 안에서 **감싸는 `if`·`#[cfg]` 없이** 호출. 모듈 선언 `tools/mod.rs:70`도 게이트 없음 | **ON** | **ON** |
+| `untrusted_envelope` | `execution.rs:3568` — `post_execute`에서 항상. `tool_def` 없으면 Untrusted(fail-closed) | **ON** | **ON** |
+| `ssrf` | `web_render.rs:192`(리터럴)·`:217`(DNS 재검사), `tinicli/src/adapters/web_render_ssrf.rs:34-36`, `tiniffi/src/http.rs:179`. `web_render` 모듈은 **feature 게이트 없음** | **ON** | **ON** (단 호스트 어댑터가 붙어야 실효) |
+| `url_validator` | `http.rs:261,1431,1601`(`http_fetch`/`http_post`), `brave_search.rs`, `desktop_web.rs`, `document_read.rs:242`. `http` 모듈은 게이트 없음 | **ON** | **ON** |
+| `path_validator` | 공용 헬퍼 `builtins/mod.rs:225` `validate_and_reauthorize`를 통과하는 빌트인만. **`bash`는 이 경로를 안 탄다** | **ON** (빌트인 12개) | **ON** (**빌트인 3개** — `file`, `file_open`, `glob`만 게이트 없음. `document_*`는 `format-office`, `ocr`은 `ocr`, `powershell`은 `bash` feature 필요한데 tizen 핀에 셋 다 없음) |
+| `network_policy` · `is_private_or_local` | `url_validator.rs:87` | **ON** | **ON** |
+| `network_policy` · `validate_domain` | `bash.rs:392`(`execute_sandboxed` 안) ← `bash.rs:131` `if !use_system` ← `core_config.rs:153-157` **`#[default] System`** | **OFF** (데스크톱 기본이 `System`) | **N/A** — `bash` feature 자체가 tizen 핀에 없어 **툴이 존재하지 않음**. argot 크레이트에 `shell_mode`/`ShellMode` 참조도 0건 |
+| `audit_text` | `tools/registry/store.rs:418`, `dispatchable_policy/discovery.rs:731` — **프로덕션 호출부는 이 둘뿐**. 툴 결과·LLM 출력엔 미적용 | **부분 ON** (등록 시점만) | **부분 ON** (동일) |
+| `pii_filter` | feature **`guardrails`** 필요 | **OFF** — 어느 default에도 없음(`tinicore/Cargo.toml:19`의 `:22-27`에 "deliberately NOT in this list", `tinicli:27`, `argo-cli:34`) | **ON** — `crates/argot-daemon/Cargo.toml:30`이 `guardrails`,`sensitive`를 **무조건** 요청. 주석: "a build without PII enforcement is not a supported configuration for this product, so there is no Cargo feature to turn them off" |
+| `sensitive_masking` | 호스트가 `install_pii`를 부르고 모드가 `off`가 아니어야 함 | **OFF** (이중 게이트) — `tinicli/src/cli_entry.rs:389`가 `#[cfg(feature="guardrails")]` 안이고, `pii_mode` 미설정 시 `Off`(`tinicli/src/guardrails/pii.rs:124`). `run_onboarding.rs`도 이 키를 안 씀 | **ON** — `[safety.pii] mode`의 **`PiiMode::Full`이 `#[default]`**(`crates/argot-config/src/lib.rs:501-512`). `full`은 입력 admission gate + 출력/LLM 마스킹 둘 다 |
+| `arg_shape`·`command_safety`·`secret_path`·`path_boundary` (G1~G4) | `agent/guardrails.rs:1066` — env `ARGO_GUARDRAIL_TOOL_PACK` JSON이 있을 때만 `with_tool_input_pack` | **OFF** | **OFF** — argot은 env 경로를 아예 안 씀(`crates/argot-daemon/src/guardrails/mod.rs:18`: "installs no `ARGO_GUARDRAIL_DENY_*` chains at all"), `with_tool_input_pack` 호출 0건 |
+| `url_scan`·`secret_needles` (exfil) | `agent/guardrails.rs:1088` — env `ARGO_GUARDRAIL_EXFIL` JSON 필요 | **OFF** | **OFF** — `with_exfil_pack` 호출 0건 |
+| `denied_pattern` | `agent/guardrails.rs:1041-1055` — env `ARGO_GUARDRAIL_DENY_{INPUT,OUTPUT,TOOL_INPUT,TOOL_OUTPUT}` 필요. 빈 패턴이면 `new`가 `Ok(None)` → 등록 안 함 | **OFF** | **OFF** |
+| **INPUT 체인** | `GuardrailSet`에 input 체인이 있어야 함 | **OFF** | **ON** — `crates/argot-daemon/src/guardrails/pii.rs:84` `GuardrailSet::new().with_input(chain)`. 내용은 PII `SensitiveGuardrail`(`on_incomplete(Block)`). **단 차단 대상은 `layers: [input]` 인식기 집합뿐** — `kr_phonenumber`/`us_phonenumber`는 `[default]`라 이 게이트를 그냥 통과한다(`pii.rs:71-78` 주석이 명시) |
+| **TOOL-OUTPUT 체인** | `execution.rs:3221` `run_tool_output_guardrails`, `if !set.tool_output.is_empty()` | **OFF** | **OFF** — argot이 만드는 세트는 `with_input`뿐 |
+| `prompt_guard` | `loop_.rs:1895` 호출, `:681` `ctx.config.prompt_guard.is_empty()`면 스킵 | **OFF** — **`CliConfig`에 `prompt_guard` 필드 자체가 없어 `config.toml`로도 도달 불가.** 유일 설정자는 `tinicore/tests/prompt_guard_e2e.rs:221` | **OFF (기본) · 켤 수 있음** — `[safety.prompt_guard] mode`가 존재하고(`argot-config/src/lib.rs:441`) 기본 `Off`. **제품이 룰을 이미 공급**: `agent_config.rs:87` 베이스라인 3개(`ignore_previous_instructions`, `reveal_system_prompt`, `role_override`) + `:102` 신뢰태그 위조 2개. `warn`/`block`으로 바꾸면 즉시 동작 |
+| `classifier` | 호스트가 툴별 `ToolSignal` 공급 필요 | **OFF** | **OFF** |
+| `static_scan` | **호출자 0건** — `security/mod.rs:18` 모듈 선언만 있고 `scan_js`/`scan_py`/`require_clean_*`를 부르는 코드가 워크스페이스에 없음 | **OFF** (미배선) | **OFF** (미배선) |
+
+**tizen이 tinicore를 쓰는 방식** — 워크스페이스 루트(`Cargo.toml:96`)가
+`default-features = false`로 핀하고 `["sqlite", "memory-lexical", "llm-ollama",
+"test-fixtures", "sub-agent-kinds", "i18n", "triage", "fastpath", "mcp"]`만 켠 뒤,
+`argot-daemon`이 `memory-tizentv`, `guardrails`, `sensitive`를 더한다. **`bash`,
+`format-office`, `ocr`, `vfs` 등 tinicore의 default feature는 전부 빠진다** — 그래서
+셸 툴이 아예 없고 `path_validator`가 커버하는 툴 수도 ARGO보다 적다.
 
 ### 4.2 가드레일 셋 설치 경로 (3개, 모두 호스트 공급 의존)
 
@@ -383,30 +395,42 @@ Luhn·주민번호 체크섬), `types/security.rs`(39), `context_policy/`, `harn
 
 **세 경로 모두 기본값을 공급하지 않는다.** `install_guardrails`는 `OnceLock`이라 **한 번만 성공**한다.
 
-### 4.3 argo-tizen(`argot-daemon`)은 다르다
+### 4.3 두 제품이 같은 코드를 쓰는 방식 (vendoring)
 
 vendored `tini/tinicore`는 ARGO tinicore와 **바이트 단위로 동일**하다 — `src/**/*.rs` 1178개
 `diff -rq` 0줄, `Cargo.toml`·`tests/`까지 일치. `project/scripts/sync-tini.sh`가 모듈을 통째로
-복사하며 "`tini/`엔 argot 고유 파일이 없다"고 명시한다. **차이는 코드가 아니라 제품 배선이다.**
+(삭제 후 복사) 갱신하며 "`tini/`엔 argot 고유 파일이 없다 — 모든 경로가 `ARGO/<module>`을
+미러링한다"고 명시한다. `.github/workflows/tini-sync.yml`이 같은 스크립트를 호출한다.
+서브모듈이 아니라 **소스 복사** 방식이다.
 
-| 이름 | ARGO (`tinicli`/`argo-cli`) | argo-tizen (`argot-daemon`) |
-|---|---|---|
-| feature `guardrails`,`sensitive` | ❌ default에 없음 | ✅ `crates/argot-daemon/Cargo.toml:30`에 명시 |
-| `pii_filter` + `sensitive_masking` | `pii_mode` 기본 `Off` → **OFF** | `[safety.pii] mode` — **`PiiMode::Full`이 `#[default]`**(`crates/argot-config/src/lib.rs:501-512`) → **ON** |
-| `prompt_guard` | 설정 필드 자체가 없음 → **OFF** | `[safety.prompt_guard] mode` 존재(`argot-config/src/lib.rs:441`), 기본 `Off`. **베이스라인 룰 5개를 제품이 공급**: `agent_config.rs:87` `CORE_PROMPT_GUARD_BASELINE_RULES` 3개(`ignore_previous_instructions`, `reveal_system_prompt`, `role_override`) + `:102` `RAW_PROMPT_GUARD_RULES` 2개(`<argot-context>`/`<turn-context>` 신뢰태그 위조). **DB 영속화 전** 적용 |
-| 설치되는 체인 | env 기반 | `crates/argot-daemon/src/guardrails/pii.rs:84` `GuardrailSet::new().with_input(chain)` — **input 체인만** |
-| TOOL-OUTPUT 체인 | **OFF** | **OFF** (동일) — `with_tool_input_pack`/`with_exfil_pack`/`audit_text` 호출 없음 |
+⇒ **`tinicore` 수정은 sync로 argo-tizen에 자동 전파된다. 그러나 배선은 전파되지 않는다** —
+argot의 배선 코드(`crates/argot-daemon/src/guardrails/`)는 `tini/` 밖이라 sync 대상이 아니다.
+tinicore에 `audit_text` → `ToolOutputGuardrail` 어댑터를 넣어도, argot이
+`.with_tool_output(...)`을 호출하지 않으면 동작하지 않는다. **제품별 배선 커밋이 각각 필요하다.**
 
-⇒ **`tinicore` 수정은 sync로 argo-tizen에 자동 전파되지만 배선은 전파되지 않는다.**
-제품별 배선 커밋이 각각 필요하다.
+설치 슬롯도 제품마다 다르다. argot은 tinicore의 process-global 슬롯을 쓰고
+(`install_guardrails` + `install_sensitive_masking`), tinicli는 env 기반 운영자 체인과의
+충돌을 피하려 그 슬롯을 비켜 간다. `install_guardrails`는 `OnceLock`이라 **한 번만 성공**하므로,
+argot에 나중에 tool_output 가드레일을 얹으려면 **별도 호출이 아니라 같은 `GuardrailSet`에
+체인을 추가**해야 한다.
 
 ### 4.4 요약
 
-- **기본 ON**: `scrubber`, `untrusted_envelope`, `ssrf`, `url_validator`, `path_validator`(파일 툴 한정),
-  `network_policy`의 사설IP 판정, `audit_text`(등록 시점 한정)
-- **기본 OFF**: `pii_filter`·`sensitive_masking`(ARGO만 — tizen은 ON), G1~G4, exfil 팩,
-  `denied_pattern`, TOOL-OUTPUT 체인 전체, `prompt_guard`, `classifier`,
-  `network_policy`의 도메인 allowlist
+| | ARGO (`tinicli`/`argo-cli`) | argo-tizen (`argot-daemon`) |
+|---|---|---|
+| **ON** | `scrubber`, `untrusted_envelope`, `ssrf`, `url_validator`, `network_policy`(사설IP), `path_validator`(빌트인 12개) | 좌동 — 단 `path_validator`는 **빌트인 3개**만. **추가로 `pii_filter`+`sensitive_masking`(기본 `full`), INPUT 체인** |
+| **부분 ON** | `audit_text` (등록 시점만) | 좌동 |
+| **OFF** | `pii_filter`, `sensitive_masking`, G1~G4, exfil 팩, `denied_pattern`, TOOL-OUTPUT 체인, `prompt_guard`, `classifier`, `network_policy`(도메인) | G1~G4, exfil 팩, `denied_pattern`, TOOL-OUTPUT 체인, `classifier`. `prompt_guard`는 **룰이 준비돼 있어 설정만 바꾸면 켜짐** |
+| **N/A** | — | `network_policy`(도메인) — `bash` feature 부재로 툴 자체가 없음 |
+| **미배선(죽은 코드)** | `static_scan` | 좌동 |
+
+**두 제품의 공통 구멍**: TOOL-OUTPUT 체인이 양쪽 다 비어 있어 **툴 결과에 대한 검사가 하나도
+돌지 않는다.** `audit_text`는 룰을 갖고 있으나 등록 경로에만 붙어 있고, exfil 팩(`url_scan`,
+`secret_needles`)도 꺼져 있다. §5의 1순위가 여기를 겨냥한다.
+
+**tizen이 앞서 있는 부분**: PII 탐지·마스킹이 기본 ON이고(제품이 "PII 없는 빌드는 지원 구성이
+아니다"라고 선언), `prompt_guard` 룰까지 제품이 공급해 둔 상태다. **ARGO가 기본 정책 배포를
+결정할 때 참고할 선례다**(§5.1 항목 2).
 
 Core 레이어 규칙상 Core는 제품 identity를 하드코딩할 수 없고 정책은 호스트가 공급해야 하므로,
 "메커니즘은 다 있는데 기본값이 비어 아무것도 안 도는" 상태가 기본이 된다.
@@ -539,3 +563,6 @@ sed -n '87,111p' ~/Works/argo-tizen/crates/argot-daemon/src/agent_config.rs  # P
 | 10 | §2.2를 **"검사 대상 → 탐지 방식 → 조치"** 3열 구조로 재작성 | 요청 반영 |
 | 11 | `static_scan`이 **호출자 0건**임을 발견 — §2.2에 경고, §4.1에 `OFF(미배선)` 행 추가 | `grep -rn "static_scan\|scan_js\|scan_py\|StaticScanHit"` 결과가 `security/mod.rs:18` 모듈 선언 하나뿐 |
 | 12 | **§2 인벤토리 전체(2.1~2.6)를 "검사 대상 → 탐지 방식 → 조치" 3열로 통일** | 요청 반영. 이 과정에서 확인된 사항: `pii_filter`는 **탐지만** 하고 조치는 상위 층 몫(`filter.rs:126` `analyze` → `Vec<PiiMatch>`), `path_validator`(예외 없음)와 G3 `secret_path`(`known_hosts` 예외)의 **엄격도가 반대**, `secret_needles`는 경보이고 `scrubber`는 조용한 치환이라 역할이 분담됨 |
+| 13 | **§4.1에 argo-tizen 열 추가** — 기능별 ARGO/tizen ON/OFF를 나란히. §4.3은 vendoring·배선 전파로, §4.4는 제품 대조 요약으로 재편 | 요청 반영 |
+| 14 | tizen은 tinicore를 **`default-features = false`**로 쓴다는 사실 반영 (`argo-tizen/Cargo.toml:96`) — `bash`·`format-office`·`ocr` 등이 빠져 **셸 툴이 아예 없고**(→ `network_policy` 도메인 검사는 OFF가 아니라 **N/A**), `path_validator`가 커버하는 빌트인도 12개→**3개**(`file`, `file_open`, `glob`) | 모듈별 `#[cfg(feature=…)]` 대조 |
+| 15 | tizen INPUT 체인의 **실제 차단 범위** 명시 — `layers: [input]` 인식기만 막고 `kr_phonenumber`/`us_phonenumber`는 통과 | `crates/argot-daemon/src/guardrails/pii.rs:71-78` 주석이 "이 게이트를 'PII 일반'을 막는다고 서술하지 말라"고 직접 경고 |
