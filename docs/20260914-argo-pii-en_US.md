@@ -30,9 +30,10 @@
 이 문서의 regex 표에서 **"score 사용 필요"** 로 표시한 패턴은, 형식만으로는 정확도가 낮아서 context 단어 없이 매칭되면 오탐이 될 가능성이 높은 것들이다. 이런 패턴을 채택하려면 Presidio 와 같은 방식의 점수 체계가 먼저 있어야 한다.
 
 - `RecognizerConfig` 와 `PatternMeta` 에 recognizer 단위 `score` 필드(기본값 0.5)를 추가한다.
-- `compute_score` 를 "기본 점수 + context 가산(예: 0.35)" 방식으로 바꾸고 임계값 0.5 는 유지한다.
-- 기존 recognizer 는 모두 기본값 0.5 이므로 동작이 바뀌지 않는다. `card_number` 와 Aho-Corasick 계열은 Luhn 과 고정 접두가 이미 강한 필터라서 `score` 를 지정할 필요가 없다. `PatternMeta` 를 통해 같은 파이프라인을 타지만 값이 기본이라 영향이 없다.
-- 정확도가 낮은 패턴은 같은 `pii_type` 을 가진 별도 recognizer(예: `us_driver_license_numeric`)로 분리해 `score: 0.3` 처럼 낮게 준다. context 없이는 0.3 으로 탈락하고, context 가 있으면 0.65 로 통과한다. pid 가 패턴 단위이고 `PatternMeta` 가 recognizer 설정을 패턴마다 복제하므로, 패턴별 점수보다 recognizer 분리가 스키마 변경이 적다.
+- `compute_score` 를 "기본 점수 + context 가산" 방식으로 바꾸고 임계값 0.5 는 유지한다. 가산값은 **0.5** 를 권장한다. 그러면 기존 recognizer 의 context 매치 점수가 지금과 같은 1.0 으로 유지되어 `tinicore/tests/guardrails/filter_test.rs` 의 `score == 1.0` 단정 3건(5331, 5441, 5471행)이 그대로 통과한다. Presidio 기본값 0.35 를 쓰면 통과·탈락 결과는 같지만 점수가 0.85 로 바뀌어 이 테스트들을 갱신해야 한다.
+- 기존 recognizer 는 모두 기본값 0.5 이므로 통과·탈락 결과가 바뀌지 않는다. `card_number` 와 Aho-Corasick 계열은 Luhn 과 고정 접두가 이미 강한 필터라서 `score` 를 지정할 필요가 없다. `PatternMeta` 를 통해 같은 파이프라인을 타지만 값이 기본이라 영향이 없다.
+- 낮은 `score` 를 준 recognizer 에는 `context_words` 를 반드시 채워야 한다. `compute_score` 는 `context_words` 가 비어 있으면 가산 없이 기본 점수를 돌려주므로, 비워 두면 모든 매치가 탈락한다.
+- 정확도가 낮은 패턴은 같은 `pii_type` 을 가진 별도 recognizer(예: `us_driver_license_numeric`)로 분리해 `score: 0.3` 처럼 낮게 준다. context 없이는 0.3 으로 탈락하고, context 가 있으면 0.8 로 통과한다. pid 가 패턴 단위이고 `PatternMeta` 가 recognizer 설정을 패턴마다 복제하므로, 패턴별 점수보다 recognizer 분리가 스키마 변경이 적다.
 
 context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`, `ach`, `aba` 같은 짧은 단어는 `card`, `routing`, `read` 안에서도 걸린다. 점수 체계를 도입하면 이런 단어가 가산의 근거가 되므로, 짧은 단어는 목록에서 빼거나 앞뒤에 공백을 포함한 형태로 등록해야 한다.
 
@@ -41,7 +42,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 - lazy DFA 이므로 **lookahead·lookbehind·역참조를 쓸 수 없다.** 배제 규칙(예: SSN 의 `000`, `666`, `9xx` 지역번호 제외)은 regex 가 아니라 `validator.rs` 의 검증 함수로 구현하거나, handwritten detector 안에서 코드로 처리한다.
 - 현재 `validator.rs` 에 존재하는 검증기는 `luhn`, `rrn`, `phonenumber` 세 가지뿐이다. `rrn` 은 자릿수만 확인하고 `phonenumber` 는 항상 `true` 를 돌려준다. 아래 "검증기" 필드에서 "현재"는 이 세 가지 기준이고, "구현 가능"은 새로 작성해야 하는 검증 논리를 뜻한다.
 - **`validator::validate` 는 fail-open 이다.** 모르는 검증기 이름이 오면 `true` 를 돌려준다. 따라서 YAML 에 `ssn`, `aba_routing` 같은 이름을 먼저 적고 함수를 나중에 구현하면 경고 없이 모든 매치가 통과한다. 반드시 **검증기 구현 → YAML 등록** 순서로 작업한다.
-- 단어 경계 처리는 `boundary_check` 와 `boundary_check_reject_before/after` 설정으로 한다. README 는 패턴 안의 `(?-u:\b)` 대신 이 설정을 쓰도록 권장한다(DFA 상태 수 감소). handwritten detector 도 같은 설정을 따른다.
+- 단어 경계 처리는 `boundary_check` 와 `boundary_check_reject_before/after` 설정으로 한다. `config.rs` 의 `boundary_check_reject_before` 필드 주석은 패턴 안의 `(?-u:\b)` 대신 이 설정을 쓰도록 안내한다(DFA 상태 수 감소). handwritten detector 도 같은 설정을 따른다.
 - `RecognizerConfig` 에 대소문자 무시 옵션이 없다. 소문자 입력까지 잡으려면 패턴 안에 `(?i)` 인라인 플래그를 넣거나 문자 클래스에 소문자를 포함해야 한다. 기존 `us_passport` 는 `[a-zA-Z]` 로 소문자를 허용하고, 이 문서의 운전면허 제안은 `[A-Z]` 만 쓴다. 구현 시 통일한다.
 
 ### regex 표의 형식
@@ -52,8 +53,8 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 |---|---|---|
 
 "비고" 열의 표기는 다음 뜻이다.
-- **score 사용 필요**: 형식만으로는 정확도가 낮다. 점수 체계 도입 후 낮은 `score` 로 등록해서 context 단어가 있을 때만 통과시킨다. 점수 체계가 없는 동안에는 등록하지 않는다.
-- **score 사용 고려**: 검증기가 있으면 기본 점수로 충분하지만, 검증기 없이 등록한다면 낮은 `score` 를 권장한다.
+- **score 사용 필요**: 형식만으로는 정확도가 낮다. 점수 체계 도입 후 낮은 `score` 로 등록해서 context 단어가 있을 때만 통과시킨다. 신규 패턴은 점수 체계가 없는 동안 등록하지 않는다. 이미 YAML 에 있는 기존 recognizer(`us_passport`)는 예외로, 현재 상태(오탐 감수)로 유지하다가 점수 체계 도입 후 낮은 `score` 로 전환한다.
+- **score 사용 고려**: 형식만으로는 정확도가 중간이다. 검증기가 있으면 기본 점수로 충분하고, 검증기가 없거나 검증기 없이 등록한다면 낮은 `score` 를 권장한다.
 - **기본**: 형식 자체가 충분히 특이해서 기본 점수 0.5 로 등록해도 된다.
 
 ## 1. 적용 법령 및 감독기관
@@ -84,7 +85,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 |---|---|---|---|---|---|---|---|
 | us_social_security_number | 사회보장번호 (SSN) | 가능 | regex (+ `ssn` 검증기) | 없음 / 범위 배제 규칙 | 기본 | 기존 | 채택 |
 | us_itin | 개인 납세자 번호 (ITIN) | 가능 | regex | 없음 / 없음 (구간 규칙은 regex 로 표현) | 기본 | 신규 | 채택 |
-| us_ein | 고용주 식별번호 (EIN) | 가능 | regex | 없음 / 접두 번호 목록 | 기본 | 신규 | 미채택 (보류) |
+| us_ein | 고용주 식별번호 (EIN) | 가능 | regex | 없음 / 없음 (접두 목록은 regex 로 표현) | 기본 | 신규 | 미채택 (보류) |
 | us_passport | 여권번호 | 가능 (약함) | regex | 없음 / 없음 | **사용 필요** | 기존 | 채택 (점수 체계 도입 후 낮은 score 로 전환) |
 | us_driver_license | 운전면허·주 신분증 번호 (영문자 접두 형식) | 가능 (주별 패턴) | **byte-scan handwritten** (주별 형식 표) | 없음 / 생년월일 구간 등 구조 검증 | 사용 고려 | 신규 | 채택 |
 | us_driver_license (숫자만 형식, `_numeric` recognizer) | NY·TX 등 숫자만 있는 운전면허번호 | 가능 (매우 약함) | regex | 없음 / 없음 | **사용 필요** | 신규 | 채택 (점수 체계 도입이 선행 조건) |
@@ -93,7 +94,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | us_medicare_beneficiary_identifier | Medicare 수혜자 식별번호 (MBI) | 가능 (형식 엄격) | regex | 없음 / 없음 | 기본 | 신규 | 채택 |
 | us_dea_number | DEA 규제약물 등록번호 | 가능 | regex (+ `dea` 검증기) | 없음 / 체크 디지트 | 사용 고려 | 신규 | 채택 |
 | us_npi | 국가 의료제공자 식별번호 (NPI) | 가능 | regex (+ Luhn 래퍼) | 없음 / Luhn (접두 80840) | 사용 필요 | 신규 | 미채택 (공개 등록부) |
-| us_alien_registration_number | 외국인 등록번호 (A-Number) | 가능 | regex | 없음 / 없음 | **사용 필요** | 신규 | 채택 (점수 체계 도입 후 낮은 score 로 전환) |
+| us_alien_registration_number | 외국인 등록번호 (A-Number) | 가능 | regex | 없음 / 없음 | **사용 필요** (구분자 없는 패턴) / 기본 (그룹 표기 패턴) | 신규 | 채택 (그룹 표기 패턴은 바로, 구분자 없는 패턴은 점수 체계 도입 후) |
 | us_vehicle_identification_number | 차량 식별번호 (VIN) | 가능 | regex (+ `vin` 검증기) | 없음 / 체크 디지트 (mod 11) | 사용 고려 | 신규 | 조건부 채택 (공통 항목으로 이관 검토) |
 
 이외에 검토했으나 결정론적 검출이 불가능해서 미채택한 항목은 4절에 정리했다.
@@ -113,7 +114,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 
     | regex | 매칭 예시 | 비고 (score 사용 필요 등) |
     |---|---|---|
-    | `[0-9]{3}[- ][0-9]{2}[- ][0-9]{4}` (기존) | `219-09-9999`, `123 45 6789` | 기본. `ssn` 검증기 병행. 구분자 없는 9자리는 여권·라우팅번호와 충돌하므로 의도적으로 제외. 기존 설정 `boundary_check_reject_after: _:-` 유지 |
+    | `([0-9]{3}[- ][0-9]{2}[- ][0-9]{4})` (기존) | `219-09-9999`, `123 45 6789` | 기본. `ssn` 검증기 병행. 구분자 없는 9자리는 여권·라우팅번호와 충돌하므로 의도적으로 제외. 기존 설정 `boundary_check_reject_after: _:-` 유지 |
 
     lookahead 가 없으므로 `000`·`666`·`9xx` 배제는 regex 로 표현할 수 없고 `ssn` 검증기가 맡는다. 오탐: `3-2-4` 숫자 조합이면 무엇이든 잡히므로 검증기 없이는 중간 수준이다.
   - **byte-scan handwritten**: 가능. 숫자열을 뽑아 `3-2-4` 그룹 경계와 구분자를 확인하고, 배제 규칙을 코드 안에서 바로 처리한다. 오탐률은 regex + `ssn` 검증기 조합과 **동일**하다. 단일 패턴이라 DFA 메모리 부담이 없으므로 옮길 이유는 약하다. ITIN·EIN·라우팅번호처럼 "숫자열 + 그룹 규칙" 계열을 하나의 숫자열 스캐너로 묶는다면 SSN 도 그 안에 포함하는 것이 자연스럽다.
@@ -234,10 +235,14 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
   - **권장**: 영문자 접두 형식은 **byte-scan handwritten**(주별 형식이 10개를 넘는 시점부터 regex 보다 유리. 초기에는 regex 로 시작 가능). 숫자만 있는 형식은 `us_driver_license_numeric` recognizer 로 분리하고 점수 체계 도입 후 낮은 `score` 로 등록한다.
 - **검증기**:
   - 현재: 없음
-  - 구현 가능: 범용 체크섬은 없다. FL·IL·WI 는 번호 안에 생년월일이 `(월-1)×31+일` 형식(여성은 +500 또는 +600)으로 들어가므로 유효 범위(1-372, 501-872, 601-972)를 벗어나면 배제하는 구조 검증이 가능하다. Wisconsin 마지막 자리가 체크 디지트라는 자료가 있으나 확인이 필요하다. NY·TX 등 숫자만 있는 형식은 검증 수단이 없다.
+  - 구현 가능: 범용 체크섬은 없다. FL·IL·WI 는 번호 안에 생년월일을 인코딩하므로, 그 자리의 값이 주별 유효 구간을 벗어나면 배제하는 구조 검증이 가능하다. 승수와 여성 오프셋이 주마다 다르므로 검증 표는 주별로 따로 둔다(아래 값은 2차 자료 기준이며 각 주 DMV 자료로 확인이 필요하다).
+    - Illinois: `(월-1)×31+일`, 여성 +600 → 남성 1-372, 여성 601-972
+    - Florida: `(월-1)×40+일`, 여성 +500 → 남성 1-471, 여성 501-971
+    - Wisconsin: `(월-1)×40+일`, 여성 +500 → 남성 1-471, 여성 501-971
+    Wisconsin 마지막 자리가 체크 디지트라는 자료가 있으나 계산식이 공개되어 있지 않아 확인이 필요하다. NY·TX 등 숫자만 있는 형식은 검증 수단이 없다.
 - **채택 여부 및 근거**: 채택. 영문자 접두 형식은 바로 채택한다. 숫자만 있는 형식은 주법과 DPPA 가 보호하는 핵심 신분증이므로 채택하되, 점수 체계 도입이 선행 조건이다. 점수 체계 없이 등록하면 모든 7-9자리 숫자가 마스킹되므로 그 전에는 등록하지 않는다.
 - **기존 구현 여부**: 신규
-- **context_words 후보**: `driver license`, `driver's license`, `drivers license`, `dl#`, `dl number`, `license number`, `lic#`, `dmv`, `state id`, `id card`, `운전면허`. 기존 `kr_driver_license` 의 영문 context_words(`driver`, `license`, `permit`, `lic`, `dls`, `cdls`, `driving`)와 공유 가능하다. 숫자만 있는 형식은 이 단어들이 유일한 판단 근거이므로 목록을 충실히 채워야 한다.
+- **context_words 후보**: `driver license`, `driver's license`, `drivers license`, `dl#`, `dl number`, `license number`, `lic#`, `dmv`, `state id`, `id card`, `운전면허`. 기존 `kr_driver_license` 의 영문 context_words(`driver`, `license`, `permit`, `lic`, `identification`, `dls`, `cdls`, `lic#`, `driving`)와 공유 가능하다. 숫자만 있는 형식은 이 단어들이 유일한 판단 근거이므로 목록을 충실히 채워야 한다.
 
 ### us_bank_account
 
@@ -255,7 +260,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
     | `{ROUTING_NUMBER}\s[A-Za-z\d]{6,17}(\s\d{3,4})?` (기존) | `021000021 1234567890` | score 사용 고려. 계좌번호 자리가 영문자를 허용해서 `021000021 please` 처럼 뒤따르는 영단어까지 매치된다(확인됨). `[0-9]{6,17}` 로 좁히는 것을 권장 |
     | `{ROUTING_NUMBER}-[A-Za-z\d]{6,17}(-\d{3,4})?` (기존) | `011000015-123456789012` | 위와 같다 |
     | `{ROUTING_NUMBER}:[A-Za-z\d]{6,17}(:\d{3,4})?` (기존) | `021000021:1234567890` | 위와 같다 |
-    | `ROUTING_NUMBER` 키워드 개선안: `(0[0-9]\|1[0-2]\|2[1-9]\|3[0-2]\|6[1-9]\|7[0-2]\|80)[0-9]{7}` | `021000021`, `011000015` (`131000021`, `331000021` 은 거부) | `config/default/ROUTING_NUMBER.txt` 의 현재 두 줄 `\d{9}`, `0\d{8}`(둘째 줄은 첫째 줄에 포함되어 중복)을 이 한 줄로 교체. Federal Reserve 배정 접두 구간만 허용 |
+    | `ROUTING_NUMBER` 키워드 개선안: `(0[0-9]\|1[0-2]\|2[1-9]\|3[0-2]\|6[1-9]\|7[0-2]\|80)[0-9]{7}` | `021000021`, `011000015` (`131000021`, `331000021` 은 거부) | `config/default/ROUTING_NUMBER.txt` 의 현재 두 줄 `\d{9}`, `0\d{8}` 을 이 한 줄로 교체. 둘째 줄은 첫째 줄에 포함되어 중복일 뿐 아니라, 템플릿 3개 × 키워드 2줄 = pid 6개가 되어 `0` 으로 시작하는 라우팅번호는 두 pid 가 동일 span 을 내놓는다. `dedupe_contained_matches` 는 동일 span 을 둘 다 남기므로(`recognizer.rs` 주석 "Identical spans are both kept") `analyze()` 결과에 같은 매치가 두 번 나타날 수 있다(코드 판독 기준). Federal Reserve 배정 접두 구간만 허용 |
 
     오탐: "9자리 + 구분자 + 6-17자리" 조합은 자연어에서 드물어 중간 이하이며, 접두 구간·체크 디지트·계좌번호 숫자 제한을 더하면 낮아진다.
   - **byte-scan handwritten**: 가능하며 검증기와의 결합이 더 자연스럽다. 숫자열 9자리를 뽑아 접두 구간 표와 ABA 체크 디지트를 매칭 단계에서 바로 확인하고, 이어지는 구분자와 계좌번호를 검사한다. 오탐률은 "regex + 접두 구간 + `aba_routing` 검증기" 조합과 **동일**하다. 차이는 검증기가 매치 전체 문자열에서 앞 9자리를 스스로 잘라내야 하는 반면, handwritten 은 라우팅 부분에만 체크 디지트를 적용하기 쉽다는 구현상의 편의뿐이다.
@@ -323,7 +328,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 
 ### us_dea_number
 
-- **설명**: DEA Registration Number. 마약단속국(DEA)이 규제약물을 처방·조제·제조할 수 있는 의사, 약사, 병원 등에 발급하는 등록번호. 영문자 2자 + 숫자 7자리이다. 첫 문자는 등록자 유형(`A`, `B`, `F`, `G` 는 의사·병원·약국, `M` 은 중급 처방자, `P`, `R` 은 제조·유통, `X` 는 2023년 폐지된 구 X-waiver(부프레노르핀 처방 허가) 번호로 오래된 문서에 잔존)이고, 둘째 문자는 등록자 성의 첫 글자(또는 `9`)이다.
+- **설명**: DEA Registration Number. 마약단속국(DEA)이 규제약물을 처방·조제·제조할 수 있는 의사, 약사, 병원 등에 발급하는 등록번호. 영문자 2자 + 숫자 7자리이다. 첫 문자는 등록자 유형(`A`, `B`, `F`, `G` 는 의사·병원·약국, `M` 은 중급 처방자, `P`, `R` 은 제조·유통, `X` 는 구 X-waiver(부프레노르핀 처방 허가) 번호로, 2022년 12월 법 제정·2023년 1월 시행으로 폐지되어 오래된 문서에만 잔존)이고, 둘째 문자는 등록자 성의 첫 글자(또는 `9`)이다.
   - 예시: `AB1234563` (형식 예시. `(1+3+5) + 2*(2+4+6) = 33` 이므로 체크 디지트 `3` 이 맞다), `FA1234563`
 - **법적 근거**:
   - 법령: Controlled Substances Act 및 21 CFR Part 1301, HIPAA (개별 의료제공자와 결합 시 PHI 의 일부)
@@ -349,7 +354,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 
 ### us_npi
 
-- **설명**: National Provider Identifier. CMS 가 모든 의료제공자(개인·기관)에게 발급하는 10자리 번호. 첫 자리는 `1` 또는 `2` 이다(ISO 7812 카드 발급자 식별번호와의 충돌을 피하기 위한 규정). HIPAA 거래 표준에서 의료제공자 식별에 쓰인다.
+- **설명**: National Provider Identifier. CMS 가 모든 의료제공자(개인·기관)에게 발급하는 10자리 번호. 첫 자리는 `1` 또는 `2` 이다(CMS NPI 규정. 이유에 대한 설명은 CMS NPI Final Rule 로 확인이 필요하다). HIPAA 거래 표준에서 의료제공자 식별에 쓰인다.
   - 예시: `1234567893` (CMS 의 NPI 체크 디지트 안내 문서에 실린 공식 예시. `80840` 접두를 붙인 Luhn 검사를 통과한다)
 - **법적 근거**:
   - 법령: HIPAA Administrative Simplification (45 CFR Part 162)
@@ -389,12 +394,12 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
     | `[aA][- ]?[0-9]{3}[ -][0-9]{3}[ -][0-9]{3}` | `A 123 456 789`, `A-123-456-789` | 기본에 가깝다. 3자리 그룹 구분이 있으면 우연한 충돌이 드물다 |
 
   - **byte-scan handwritten**: 가능하지만 이득이 없다. 체크섬과 접두 표가 없으므로 오탐률이 regex 와 **동일**하다.
-  - **Aho-Corasick**: 형식상 가능하다. 이 항목은 고정 리터럴 접두(`A`)가 있는 유일한 미국 항목이다. 다만 anchor `A`/`a` 는 1바이트라 텍스트의 모든 A 에서 verifier 가 호출되므로 `010`(3바이트) 같은 anchor 에 비해 이득이 거의 없다. `A-`, `A ` 를 anchor 로 쓰면 구분자 없는 `A123456789` 를 놓친다. 오탐률은 regex 와 **동일**하다.
-  - **권장**: regex. 점수 체계 도입 후 첫 패턴은 낮은 `score` 로 전환한다.
+  - **Aho-Corasick**: 형식상 가능하다. 이 항목은 여권 카드의 `C` 와 함께 고정 리터럴 접두(`A`)가 있는 드문 미국 항목이며, anchor 를 실용적으로 검토할 만한 것은 이 항목뿐이다. 다만 anchor `A`/`a` 는 1바이트라 텍스트의 모든 A 에서 verifier 가 호출되므로 `010`(3바이트) 같은 anchor 에 비해 이득이 거의 없다. `A-`, `A ` 를 anchor 로 쓰면 구분자 없는 `A123456789` 를 놓친다. 오탐률은 regex 와 **동일**하다.
+  - **권장**: regex. 그룹 표기 패턴은 기본 점수로 바로 등록하고, 구분자 없는 첫 패턴은 점수 체계 도입 전에는 등록하지 않으며 도입 후 낮은 `score` 로 등록한다.
 - **검증기**:
   - 현재: 없음
   - 구현 가능: 체크섬 없음.
-- **채택 여부 및 근거**: 채택. 검증기는 없지만 이민 신분이라는 특수 민감정보를 드러내며 CCPA 가 명시적으로 민감 범주로 분류한다. 구분자 없는 형태는 점수 체계 도입 후 낮은 `score` 로 전환하는 것이 전제이다.
+- **채택 여부 및 근거**: 채택. 검증기는 없지만 이민 신분이라는 특수 민감정보를 드러내며 CCPA 가 명시적으로 민감 범주로 분류한다. 구분자 없는 형태는 점수 체계 도입이 선행 조건이며, 그 전에는 그룹 표기 패턴만 등록한다.
 - **기존 구현 여부**: 신규
 - **context_words 후보**: `alien number`, `alien registration`, `a-number`, `a number`, `a#`, `uscis`, `uscis number`, `uscis#`, `green card`, `permanent resident`, `i-94`, `외국인등록`. (`ead` 는 `read`, `head` 에 포함되므로 ` ead ` 처럼 공백을 포함해 등록한다.)
 
@@ -446,7 +451,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 
 | 순서 | 작업 | 대상 | 종류 |
 |---|---|---|---|
-| 선행 | recognizer 단위 `score` 필드(기본 0.5)와 "기본 점수 + context 가산" 방식의 `compute_score` 도입. 기존 recognizer 동작은 불변 | 엔진 (`config.rs`, `recognizer.rs`) | 엔진 변경. "score 사용 필요" 패턴 등록의 전제 조건 |
+| 선행 | recognizer 단위 `score` 필드(기본 0.5)와 "기본 점수 + context 가산(0.5 권장)" 방식의 `compute_score` 도입. 기존 recognizer 의 통과·탈락 결과는 불변. 가산값을 0.5 가 아닌 값으로 잡으면 `filter_test.rs` 의 `score == 1.0` 단정 3건 갱신 필요 | 엔진 (`config.rs`, `recognizer.rs`) | 엔진 변경. "score 사용 필요" 패턴 등록의 전제 조건 |
 | 1 | `ssn` 범위 배제 검증기 추가 | us_social_security_number | validator 신규 |
 | 2 | `us_itin` recognizer 추가 (`boundary_check_reject_after: _:-`) | us_itin | YAML 신규 |
 | 3 | `us_driver_license` 영문자 접두 형식 추가 (byte-scan detector 또는 초기에는 regex). 주별 형식 표 부록 필요 | us_driver_license | handwritten 신규 (또는 YAML 신규) |
@@ -455,7 +460,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | 6 | `phonenumber` 자리표시자를 NANP 규칙 검증으로 교체, 개선 패턴 적용 + `boundary_check: true` 추가 | us_phonenumber | validator 수정, YAML 수정 |
 | 7 | `us_medicare_beneficiary_identifier` recognizer 추가 | us_medicare_beneficiary_identifier | YAML 신규 |
 | 8 | `dea` 체크 디지트 검증기와 `us_dea_number` recognizer 추가 | us_dea_number | validator 신규, YAML 신규 |
-| 9 | `us_alien_registration_number` recognizer 추가. 구분자 없는 패턴은 선행 작업 완료 후 낮은 `score` 로 | us_alien_registration_number | YAML 신규 |
+| 9 | `us_alien_registration_number` recognizer 추가 (그룹 표기 패턴만). 구분자 없는 패턴은 **선행 작업 완료 후** 낮은 `score` 의 별도 recognizer 로 추가 | us_alien_registration_number | YAML 신규 |
 | 10 | `us_passport` 를 선행 작업 완료 후 낮은 `score` 로 전환 | us_passport | YAML 수정 |
 | 11 | `vin` 체크 디지트 검증기와 recognizer 추가 (공통 이관 여부 결정 후) | us_vehicle_identification_number | validator 신규, YAML 신규 |
 | 선택 | SSN·ITIN·라우팅번호를 묶는 공용 숫자열 byte-scan detector | us_social_security_number, us_itin, us_bank_account | handwritten 신규. 메모리 절감 목적이며 오탐률 변화는 없다 |
