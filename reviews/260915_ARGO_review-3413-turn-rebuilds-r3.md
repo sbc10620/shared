@@ -90,6 +90,14 @@ merge-base `0721ca2692` 기준 현재 워킹 트리에서 실행했고, 구현�
 | `cargo clippy -p tinicli --features guardrails --lib` | 린트 경고 없음 |
 | `audit_core_layer_deps.py` / `audit_core_product_leak.py` / `audit_core_crate_name_leak.py` (각 `--self-test` 포함) | 3종 모두 clean |
 
+리베이스로 main의 LLM 경로 변경(#3410·#3412: `llm/client.rs`, `llm/fallback.rs`, `agent/loop_/llm_call.rs`, `traits/http.rs`, `types/cancel.rs`)이 들어왔고 이 브랜치의 마스킹 설치가 바로 그 egress 경로 위에 놓이므로, 구현자 명령에 없던 아래 3건을 추가로 돌렸습니다. 이전 라운드까지의 검증은 모두 이름 필터를 건 부분 실행이었고, `bench_engine.rs`(82줄 변경, 빌드 횟수 assertion 2/3→1/2)는 `--lib --tests`로는 컴파일되지 않기 때문입니다.
+
+| 추가 명령 | 결과 |
+|---|---|
+| `cargo test -p tinicore --features guardrails,sensitive,test-fixtures --test pii_masking_egress_e2e` | 10 passed |
+| `cargo check -p tinicore --features guardrails,sensitive,test-fixtures --examples` | 통과 (bench_engine 포함 컴파일 확인) |
+| `cargo test -p tinicore --features guardrails,sensitive,test-fixtures --lib` (debug, 전체) | 15715 passed, 0 failed, 11 ignored |
+
 ## 인계 시 참고 사항
 
 - 남은 지적은 없습니다. 참고 사항 1은 반영하려면 문자열 한 곳만 바꾸면 되고, 넣지 않아도 됩니다.
