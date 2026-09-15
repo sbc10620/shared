@@ -62,17 +62,107 @@ tinicore/src/agent/prompt_guard.rs       백엔드만 regex::Regex → guardrail
 
 **게이트 경계의 근거**: `engine/`이 새로 요구하는 것은 `regex-automata/hybrid` feature뿐이고 크레이트 자체는 이미 슬림 그래프에 있다. 24 KB 임베디드 YAML·`PiiSpanDetector`·hook은 `pii/`에 남아 슬림 빌드에서 계속 빠진다.
 
+### 1-A. `MatchEngine` 트레잇의 위치와 handwritten 탐지기의 주입
+
+`MatchEngine`(`recognizer.rs:59`, 현재 `pub(crate)`)은 **`engine/recognizer.rs`에 남고 `pub`으로 올린다.** `PatternEngine`은 지금처럼 `engines: Vec<Box<dyn MatchEngine>>`를 들고 첫 번째는 항상 DFA 청크 엔진이다(`recognizer.rs:260`).
+
+지금은 `collect_patterns_and_detectors`(`recognizer.rs:~650`)가 `recognizer_type == "HandWrittenRecognizer"`인 항목을 모아 `handwritten::build_handwritten_detectors(&deferred, start_pid)`(`handwritten/mod.rs:169`)를 **직접 호출**한다. 이 호출이 `engine → pii` 역방향 의존이므로 함수 포인터로 바꾼다.
+
+```rust
+// engine/recognizer.rs
+pub type HandwrittenBuilder =
+    for<'a> fn(&[&'a RecognizerConfig], usize) -> (Vec<Box<dyn MatchEngine>>, Vec<&'a RecognizerConfig>);
+
+pub struct EngineExtensions {
+    pub keyword_lookup: fn(&str) -> Option<&'static str>,   // pii::keyword_file_content 또는 |_| None
+    pub handwritten: Option<HandwrittenBuilder>,             // Some(pii::handwritten::build_handwritten_detectors) 또는 None
+}
+impl Default for EngineExtensions { /* keyword None, handwritten None */ }
+
+// pii/mod.rs
+pub(crate) fn extensions() -> EngineExtensions {
+    EngineExtensions { keyword_lookup: keyword_file_content, handwritten: Some(handwritten::build_handwritten_detectors) }
+}
+```
+
+- `PatternEngine::from_config(config, layer, chunk_size, &ext)`: `HandWrittenRecognizer` 항목은 `ext.handwritten`이 `Some`이면 지금과 같은 순서로 pid를 이어 붙여 `engines`에 push, `None`이면 `tracing::warn!` 후 skip.
+- 호출자별 전달: `pii/shared.rs`·`PiiSpanDetector`·`build_filters_with_params` → `pii::extensions()`. `agent::prompt_guard`·`clawkeeper` → `EngineExtensions::default()`.
+- 결과: `handwritten/`은 `pii/`에 남아 `engine::MatchEngine`을 구현만 하고, `engine/`은 `pii`를 한 글자도 참조하지 않는다.
+
+### 1-B. PromptGuard의 Block/Warn 흐름
+
+액션은 **YAML에도 적고, 엔진 밖에서 집행한다.** 엔진은 "어느 `entity_type`이 매치됐는가"만 답하고, 판정은 `agent::prompt_guard::evaluate`가 룰 순서대로 내린다.
+
+```
+prompt_injection.yaml        action: block | warn | sanitize   ─┐
+                                                               ▼
+clawkeeper::baseline_rules()   Vec<PromptGuardRule{id, pattern, action}>   (YAML에서 파생)
+                                                               │  호스트가 CoreConfig.prompt_guard 에 넣음
+                                                               ▼
+prompt_guard::compile(&PromptGuardConfig)
+   PromptGuardRule → RecognizerConfig{entity_type: id, patterns:[pattern], action}
+   → PatternEngine (DFA)          + rules: Vec<(id, action)>  ← 순서 보존
+                                                               ▼
+prompt_guard::evaluate(&guard, text)
+   engine.scan(text) → 매치된 entity_type 집합 (1회)
+   for (id, action) in rules:            ← 호스트가 준 순서
+       Block  & hit → return Block{rule_id: id}
+       Warn   & hit → warned.push(id)
+       Sanitize & hit → 스팬 치환 후 재스캔
+```
+
+- `RecognizerConfig.action`은 `Option<GuardAction>`이다. PII 인식기에는 없고(`None`), 엔진은 이 필드를 읽지 않는다. `PatternMeta`에 그대로 실려 다니므로 `clawkeeper`는 YAML을 파싱한 `EngineConfig`에서 `(entity_type, action)`을 뽑아 `PromptGuardRule`로 만든다.
+- 룰별 처분이 데이터에 있으므로 "룰 3개만 Warn"은 YAML 세 줄로 끝나고, `baseline_rules_with_action(Warn)`은 지금처럼 전부 덮어쓴다.
+- `tool_output.rs`도 같은 `compile`/`evaluate`를 부르므로 흐름이 같다. `observe_only`는 `baseline_rules_with_action(Warn)`으로, `waived_rule_ids`는 룰 벡터 필터로 처리한다(지금과 동일).
+
+### 1-C. YAML 형태 변화
+
+**기존 PII YAML(`pii/config/pii_filter_config.yaml`)은 한 글자도 바꾸지 않는다.** 스키마가 넓어질 뿐이다.
+
+| 키 | 지금 | 이후 |
+|---|---|---|
+| `pii_type` | 필수 | `entity_type`의 alias로 계속 읽음. 새 파일은 `entity_type`을 쓴다 |
+| `action` | 없음 | 선택. `action: block` / `action: warn` / `action: sanitize` + 형제 키 `replacement: "…"`. `GuardAction`이 `#[serde(tag = "action")]`(`tinicore-traits/src/prompt_guard.rs:31`)이므로 `RecognizerConfig`에 `#[serde(flatten)] action: Option<GuardAction>`으로 넣으면 이 모양이 그대로 나온다. PII 인식기는 생략(`None`) |
+| `layers` | `input` / `output` / `default` | 값이 자유 문자열이므로 PI 룰은 `prompt_guard` / `tool_output`을 쓴다. 검사 지점이 자기 층 이름으로 필터를 만든다 |
+| `recognizer_type` | `PatternRecognizer` / `PatternTemplateRecognizer` / `HandWrittenRecognizer` | 동일. PI 룰은 전부 `PatternRecognizer` |
+| `filter.deidentifier_config` | 층별 마스킹 설정 | PI YAML에는 `filter:` 블록 자체를 생략(`#[serde(default)]`로 비어 있음 허용) |
+
+새 파일 `clawkeeper/prompt_injection.yaml`의 실제 모양:
+
+```yaml
+# Transcribed verbatim from ClawKeeper return_content_scan.py — do not edit patterns.
+# Engine is ASCII-mode (\b, \s, (?i) are ASCII); opt a rule into Unicode with a leading (?u).
+recognizers:
+  ignore_prior:
+    recognizer_type: PatternRecognizer
+    entity_type: ignore_prior
+    action: block
+    layers: [prompt_guard, tool_output]
+    patterns:
+    - (?i)\b(ignore|disregard|forget|override)\s+(all\s+)?(prior|previous|above|earlier|preceding)\s+(instructions?|prompts?|directives?|rules?|system\s+prompts?)
+  imperative_credential_read:
+    recognizer_type: PatternRecognizer
+    entity_type: imperative_credential_read
+    action: warn            # measured FP 6/9 — observe until field data says otherwise
+    layers: [prompt_guard, tool_output]
+    patterns:
+    - …원문…
+  invisible_payload:
+    recognizer_type: PatternRecognizer
+    entity_type: invisible_payload
+    action: warn
+    layers: [prompt_guard, tool_output]
+    patterns:
+    - (?u)[\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}\u{202A}-\u{202E}\u{2066}-\u{2069}\u{00AD}]
+```
+
+`context_words`·`validation_methods`·`boundary_check`는 적지 않는다(기본값이면 점수 0.5 = threshold 통과, 검증 없음). YAML은 `include_str!`로 임베드되고 `clawkeeper/mod.rs`의 테스트가 "10개, Block 6 + Warn 4, 전부 컴파일"을 고정한다.
+
 ---
 
 ## 2. 커밋 순서 (각 커밋마다 §5 검증 통과)
 
-### C0. 측정 — 착수 게이트 (코드 변경 0)
-
-메모리 이득은 아직 가정이다. 리팩터링 전에 지금 트리로 잴 수 있으므로 먼저 잰다.
-
-- `examples/guardrails/bench_prompt_guard_memory.rs`(신규, `required-features = ["guardrails"]`): 카운팅 전역 할당자로 (a) `prompt_injection.rs`의 룰 10개를 `regex::Regex`로 컴파일한 뒤 상주 바이트, (b) 같은 10개를 `PiiConfig`로 구성해 `PiiEngine::from_config`로 컴파일한 뒤 상주 바이트 + `min_cache_info()` 합계, (c) 각각 1 KB·64 KB 텍스트를 스캔한 뒤의 상주 바이트(lazy DFA 캐시 성장분)를 출력한다. 기존 `bench_session_cache.rs`의 측정 방식을 따른다.
-- 슬림 바이너리 영향: `cargo build -p tinicore --no-default-features --release`의 rlib 크기를 `regex-automata/hybrid` 추가 전후로 비교한다(feature 한 줄만 바꿔 측정).
-- **수치를 사용자에게 보고하고 C1 이후 진행 여부를 다시 확인한다.** 이득이 미미하면 C1~C4는 하지 않고, 룰 YAML화(C4의 데이터 부분)와 `observe_only` 중복 제거만 `regex` 백엔드 위에서 수행한다.
+> 착수 목적은 **엔진 구조 통일**이다(사용자 확인, 2026-09-15). 메모리 수치는 착수 조건이 아니라 C5의 사후 기록이다.
 
 ### C1. 엔진 일반화 — 파일 이동 없이, PII 동작 변화 0
 
@@ -136,7 +226,8 @@ recognizers:
 
 ### C5. 사후 측정과 문서
 
-- C0의 벤치를 새 `PatternEngine` 경로로 다시 돌려 전후 수치를 커밋 메시지에 남긴다.
+- `examples/guardrails/bench_prompt_guard_memory.rs`(신규, `required-features = ["guardrails"]`): 카운팅 전역 할당자로 (a) 룰 10개를 `regex::Regex`로 컴파일한 뒤 상주 바이트, (b) 같은 10개를 `PatternEngine`으로 컴파일한 뒤 상주 바이트 + `min_cache_info()` 합계, (c) 1 KB·64 KB 텍스트 스캔 후 상주 바이트를 출력. 기존 `bench_session_cache.rs`의 측정 방식을 따른다. 결과는 커밋 메시지에 기록한다.
+- 슬림 rlib 크기 전후(`cargo build -p tinicore --no-default-features --release`)도 같이 기록한다.
 - `pii/AGENTS.md`·`README.md`: 엔진 위치 변경 반영. `guardrails/mod.rs` 모듈 doc의 서브모듈 목록에 `engine` 추가.
 
 ---
@@ -196,7 +287,6 @@ cargo run -p tinicore --example bench_prompt_guard_memory --features guardrails
 ```
 
 **완료 조건**
-- [ ] C0 수치를 보고하고 사용자가 C1 진행을 확인함
 - [ ] C1 직후 PII 테스트 결과가 이전과 동일(16,949 passed, `us_bank_account` 14건)
 - [ ] C2 직후 `--no-default-features` 컴파일 통과, `hybrid` feature가 슬림 그래프에 잡힘
 - [ ] C3 직후 argo-tizen rsync 검증에서 unresolved import 0건
