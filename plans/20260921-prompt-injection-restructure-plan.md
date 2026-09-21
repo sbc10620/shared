@@ -1,6 +1,8 @@
 # ClawKeeper 룰의 층 분리·툴 결과 SensitiveGuardrail 통합·엔진 진입점 통일·base64 수기 탐지기
 
 **작업 위치**: `~/Works/ARGO-ClawKeeper`(worktree), 브랜치 `dev/byungchul.so/guardrails-clawkeeper`
+
+> **진행 상태 (2026-09-22)**: 8커밋 전부 로컬 커밋 완료, 전 레인 통과. **push 안 함**(원격은 옛 `6e8882174c`, force-with-lease 필요). 최종 해시: P0 `0e37ee00c2` · C1 `a3fb20b037` · C2 `70aff37a14` · C3 `5be5a34231` · R1 `b7574eb060` · R2 `3a5274dd4c` · N1 `2f4da6775c` · C5 `886a1b9225`. 백업 `backup/pre-restructure-20260921`(`6e8882174c`). 배선 계획서 `20260921-prompt-injection-guardrails-wiring-plan.md` 작성·push. 계획과 달라진 점: C1에서 `PatternFilter::mask()`가 사라지며 `replace_spans` 공용화는 불필요해짐; `check_layer_declared`(빈 룰 세트는 통과)로 층 이름 검증 유지; R2의 `merge_overlaps` 없음; `SharedEngine`이 `filter_for` 대신 `slot()`만 제공; C5는 7룰 기준으로 재측정(323 KB vs 86 KB).
 **base**: `origin/main` `d7a783d756`. 현재 HEAD `6e8882174c`(8커밋, 원격과 동일). **기존 커밋을 amend·재배치**하고 신규 커밋은 base64 하나. 리베이스 전 상태는 `backup/pre-restructure-YYYYMMDD`로 보존. push는 force-with-lease 필요·별도 지시, PR 별도 지시.
 **범위 밖(문서만)**: 부팅 배선(`install_guardrails_from_config` 확장, `PromptInjectionConfig`)은 구현하지 않고 `~/Works/shared/plans/20260921-prompt-injection-guardrails-wiring-plan.md`(한국어)로만 남긴다.
 
@@ -275,13 +277,15 @@ git range-diff origin/main..backup/pre-restructure-<날짜> origin/main..HEAD
 grep -rn 'ClawKeeperScan\|ToolOutputClawKeeperGuardrail\|guardrails::clawkeeper' tinicore   # 0건
 ```
 
+**검증 결과 (2026-09-22, HEAD `886a1b9225`)**: 중간 커밋 7개 각각 clippy full·slim 통과; nextest tinicore-traits 813 · tinicore 17,046 · tinicli 1,262 · prompt_injection+prompt_guard 54(`guardrails`만) · ABA 14; feature-OFF·슬림·sensitive-only·guardrails-only 컴파일; Core 게이트 3종·reimpl·sensitive_slim 클린; panic 21·unreachable 13·risky_unwrap 8; argo-tizen 게이트 오류 0.
+
 **불변 조건**: ABA 14 · feature-OFF·슬림·`sensitive`-only·`guardrails`-only 컴파일 · Core 게이트 3종 · panic 21·unreachable 13·risky_unwrap 8 · argo-tizen unresolved import 0. nextest 총계는 기준선 갱신(17,079에서 삭제 9건·추가 약 15건).
 
 **완료 조건**
-- [ ] C1: `grep -rn 'deidentifier\|mask_char\|from_yaml\|PiiHookCallback\|pii_type:' tinicore/src tinicore/tests tinicore/examples` 0건(함수명 `pii_type_to_kind` 등 제외), 엔진 공개 진입점 `from_config`·`from_config_with_chunk_size`만
-- [ ] R1: `--features sensitive`만으로는 `prompt_injection` 심볼이 컴파일되지 않음(`guardrails` 필요), 디렉터리 `guardrails/prompt_injection/` 존재·`clawkeeper/` 없음, `baseline_rules()` 7개(block 6 + warn 1), YAML 12개, `prompt_injection/`에 `agent::prompt_guard` import 0건(테스트 제외)
-- [ ] R2: `PromptInjection(_).is_restorable() == false`, 직렬화 `{"class":"prompt_injection","label":"override"}`, 공유 엔진 층 분리 테스트, `compile` 중복 id 거절, e2e `INJECTION_PAYLOAD` 거부 + `result.output` = `blocked: content withheld from the model; policy classes: PROMPT_INJECTION`, `trust_this_source` 문장 통과+로그, 접두사 name, 64 KiB debug!, `tool_output.rs` 없음
-- [ ] N1: base64 케이스 4건, TOOL-OUTPUT block, `baseline_rules()`에 미포함
-- [ ] C5: `cargo run -p tinicore --example bench_prompt_guard_memory --release` 동작
-- [ ] 배선 계획서 shared에 push
-- [ ] `git log --follow` `engine/recognizer.rs` 체인 유지
+- [x] C1: `grep -rn 'deidentifier\|mask_char\|from_yaml\|PiiHookCallback\|pii_type:' tinicore/src tinicore/tests tinicore/examples` 0건(함수명 `pii_type_to_kind` 등 제외), 엔진 공개 진입점 `from_config`·`from_config_with_chunk_size`만
+- [x] R1: `--features sensitive`만으로는 `prompt_injection` 심볼이 컴파일되지 않음(`guardrails` 필요), 디렉터리 `guardrails/prompt_injection/` 존재·`clawkeeper/` 없음, `baseline_rules()` 7개(block 6 + warn 1), YAML 12개, `prompt_injection/`에 `agent::prompt_guard` import 0건(테스트 제외)
+- [x] R2: `PromptInjection(_).is_restorable() == false`, 직렬화 `{"class":"prompt_injection","label":"override"}`, 공유 엔진 층 분리 테스트, `compile` 중복 id 거절, e2e `INJECTION_PAYLOAD` 거부 + `result.output` = `blocked: content withheld from the model; policy classes: PROMPT_INJECTION`, `trust_this_source` 문장 통과+로그, 접두사 name, 64 KiB debug!, `tool_output.rs` 없음
+- [x] N1: base64 케이스 4건, TOOL-OUTPUT block, `baseline_rules()`에 미포함
+- [x] C5: `cargo run -p tinicore --example bench_prompt_guard_memory --release` 동작
+- [x] 배선 계획서 shared에 push (`961f435`)
+- [x] `git log --follow` `engine/recognizer.rs` 체인 유지
