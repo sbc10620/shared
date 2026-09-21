@@ -4,7 +4,7 @@
 **base**: `origin/main`(`d7a783d756`, 2026-09-21 리베이스) 위의 커밋 3개(P0 `0e37ee00c2`, P1 `805db7463f`, P3사전 `3aa6567f0b`) 뒤에 이어서 쌓는다.
 
 > **진행 상태 (2026-09-21 갱신)**: C1~C5 다섯 커밋 전부 로컬 커밋 완료, **push는 아직 하지 않았다**(원격에는 2026-09-17 base 커밋 3개까지만 있어 force-with-lease가 필요하다).
-> C1 `51d35c5379` · C2 `cd5ecb73dc` · C3 `bdfd20a565` · C4 `9a1cf16ea4` · C5 `7ad95521f2`.
+> C1 `51d35c5379` · C2 `cd5ecb73dc` · C3 `bdfd20a565` · C4 `9a1cf16ea4` · C5 `6e8882174c`(2026-09-21 메시지만 amend: 슬림 rlib 측정이 리베이스 전 base 기준임을 명시).
 > 2026-09-21에 `origin/main`(36커밋, PR #3428 us_passport score 포함) 위로 리베이스했다. 충돌은 예상대로 C1에서만 났고(`pii/recognizer.rs` 3곳, `filter_test.rs` 6곳) main 본문(`ContextWord`·`score`·`NO_CONTEXT_WARNED`)을 채택한 뒤 이름 변경만 다시 적용했다. 자동 병합이 남긴 잠복 오류는 해당 커밋에 amend로 넣었다: P0 `config.rs`의 `crate::guardrails::recognizer::DEFAULT_SCORE` → `super::recognizer::DEFAULT_SCORE`; C1 main의 수기 `impl Default for RecognizerConfig`에 `action: None` 추가와 테스트 모듈 앞으로 이동, main이 새로 쓴 `AGENTS.md` "How a scan resolves matches" 절의 옛 식별자 6곳 개명; C2 `bench_scan.rs:41` 주석 경로. 리베이스 전 상태는 `backup/pre-main-rebase-20260921`(`da26802dbe`).
 > 계획과 달라진 점은 §2 각 커밋 끝의 "실제 결과" 항목과 §4에 적었다.
 
@@ -243,7 +243,7 @@ recognizers:
 - 슬림 rlib 크기 전후(`cargo build -p tinicore --no-default-features --release`)도 같이 기록한다.
 - `pii/AGENTS.md`·`README.md`: 엔진 위치 변경 반영. `guardrails/mod.rs` 모듈 doc의 서브모듈 목록에 `engine` 추가.
 
-**실제 결과 (C5 `7ad95521f2`, 리베이스 전 `da26802dbe`)**: **계획과 다른 점**: 예제에 `required-features`를 두지 않았다. 엔진·룰·턴 스코프가 모두 게이트 밖이라 슬림 빌드에서도 컴파일되어야 `clippy --all-targets`가 엔진 표면을 검사하기 때문이다. 측정값(2026-09-17, `--release`, Apple Silicon): `regex::Regex` x10 컴파일 1,731 KB → 1 KB 스캔 후 2,670 KB / `PatternEngine` 231 KB → 239 KB; `min_cache_info` fwd 68.5 KB·rev 68.9 KB(예약 208 KB씩); 스캔 중앙값 1 KB regex 12.1 us vs engine 5.3 us, 64 KB 343 us vs 334 us; 턴 종료 후 잔존 3.1 KB. 슬림 rlib 150,143,120 B → 151,879,952 B(+1,736,832 B, +1.2 %). 전부 커밋 메시지에 기록했다.
+**실제 결과 (C5 `6e8882174c`, 리베이스 전 `da26802dbe`)**: **계획과 다른 점**: 예제에 `required-features`를 두지 않았다. 엔진·룰·턴 스코프가 모두 게이트 밖이라 슬림 빌드에서도 컴파일되어야 `clippy --all-targets`가 엔진 표면을 검사하기 때문이다. 측정값(2026-09-17, `--release`, Apple Silicon): `regex::Regex` x10 컴파일 1,731 KB → 1 KB 스캔 후 2,670 KB / `PatternEngine` 231 KB → 239 KB; `min_cache_info` fwd 68.5 KB·rev 68.9 KB(예약 208 KB씩); 스캔 중앙값 1 KB regex 12.1 us vs engine 5.3 us, 64 KB 343 us vs 334 us; 턴 종료 후 잔존 3.1 KB. 슬림 rlib 150,143,120 B → 151,879,952 B(+1,736,832 B, +1.2 %). 전부 커밋 메시지에 기록했다.
 
 ---
 
@@ -306,9 +306,9 @@ cargo run -p tinicore --example bench_prompt_guard_memory --features guardrails
 - [x] C2 직후 `--no-default-features` 컴파일 통과, `hybrid` feature가 슬림 그래프에 잡힘
 - [x] C3 직후 argo-tizen rsync 검증에서 unresolved import 0건
 - [x] C4 직후 `baseline_rules()`가 10개, Block 6 + Warn 4
-- [x] C5 측정 수치가 커밋 메시지에 기록됨(`7ad95521f2`)
+- [x] C5 측정 수치가 커밋 메시지에 기록됨(`6e8882174c`)
 - [x] `git log --follow`로 `engine/recognizer.rs`가 `pii/recognizer.rs` → `guardrails/recognizer.rs` 이력까지 이어짐(2026-09-21 리베이스 후 재확인, R099 두 번)
 
-**검증 기준선 (2026-09-21 리베이스 후, HEAD `7ad95521f2`)**: clippy `-D warnings` 통과 · nextest tinicore **17,079**(리베이스 전 17,049, main 추가분) · tinicli **1,262** · ABA 14 · prompt_guard 20 · feature-OFF·슬림 check 통과, `hybrid` 슬림 그래프 포함 · Core 게이트 3종·reimpl 클린 · panic 21·unreachable 13·risky_unwrap 8 · sensitive_slim 클린 · argo-tizen(`e8dc41e9`) rsync 게이트 오류 0. 중간 커밋 P0·C1·C2·C3·C4도 각각 clippy 통과. 절대 수치는 `origin/main`이 움직이면 같이 바뀌므로 리베이스 후에는 새 main에서 기준선을 다시 잡아 비교한다. 절대 수치와 무관하게 지켜야 하는 불변 조건은 ABA 14, Block 6 + Warn 4, feature-OFF 컴파일, Core 게이트 3종, argo-tizen unresolved import 0이다.
+**검증 기준선 (2026-09-21 리베이스 후, HEAD `6e8882174c`)**: clippy `-D warnings` 통과 · nextest tinicore **17,079**(리베이스 전 17,049, main 추가분) · tinicli **1,262** · ABA 14 · prompt_guard 20 · feature-OFF·슬림 check 통과, `hybrid` 슬림 그래프 포함 · Core 게이트 3종·reimpl 클린 · panic 21·unreachable 13·risky_unwrap 8 · sensitive_slim 클린 · argo-tizen(`e8dc41e9`) rsync 게이트 오류 0. 중간 커밋 P0·C1·C2·C3·C4도 각각 clippy 통과. C2에서 슬림 check 통과, C1에서 nextest tinicore 17,070·ABA 14 통과. 브랜치가 추가한 테스트 수는 리베이스 전후 모두 43개(삭제 0). 절대 수치는 `origin/main`이 움직이면 같이 바뀌므로 리베이스 후에는 새 main에서 기준선을 다시 잡아 비교한다. 절대 수치와 무관하게 지켜야 하는 불변 조건은 ABA 14, Block 6 + Warn 4, feature-OFF 컴파일, Core 게이트 3종, argo-tizen unresolved import 0이다.
 
-**남은 일**: (1) 사용자 지시 후 force-with-lease push, (2) PR은 별도 지시.
+**남은 일**: (1) 사용자 지시 후 force-with-lease push, (2) PR은 별도 지시. **병합 순서 제약**: 이 시리즈가 `PiiError`→`EngineError` 등 이름을 바꾸므로 argo-tizen PR #1395(`e8dc41e9`, 파사드 심볼만 쓰도록 고친 것, 2026-09-21 기준 미병합)가 argo-tizen main에 먼저 들어가야 한다. 그 전에 이 브랜치가 ARGO main에 병합되면 argo-tizen main이 깨진다.
