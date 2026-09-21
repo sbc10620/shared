@@ -2,7 +2,7 @@
 
 **작업 위치**: `~/Works/ARGO-ClawKeeper`(worktree), 브랜치 `dev/byungchul.so/guardrails-clawkeeper`
 
-> **진행 상태 (2026-09-22)**: 8커밋 전부 로컬 커밋 완료, 전 레인 통과. **push 안 함**(원격은 옛 `6e8882174c`, force-with-lease 필요). 최종 해시: P0 `0e37ee00c2` · C1 `a3fb20b037` · C2 `70aff37a14` · C3 `5be5a34231` · R1 `b7574eb060` · R2 `3a5274dd4c` · N1 `2f4da6775c` · C5 `886a1b9225`. 백업 `backup/pre-restructure-20260921`(`6e8882174c`). 배선 계획서 `20260921-prompt-injection-guardrails-wiring-plan.md` 작성·push. 계획과 달라진 점: C1에서 `PatternFilter::mask()`가 사라지며 `replace_spans` 공용화는 불필요해짐; `check_layer_declared`(빈 룰 세트는 통과)로 층 이름 검증 유지; R2의 `merge_overlaps` 없음; `SharedEngine`이 `filter_for` 대신 `slot()`만 제공; C5는 7룰 기준으로 재측정(323 KB vs 86 KB).
+> **진행 상태 (2026-09-22)**: 8커밋 전부 로컬 커밋 완료, 전 레인 통과. **push 안 함**(원격은 옛 `6e8882174c`, force-with-lease 필요). 최종 해시: P0 `0e37ee00c2` · C1 `a3fb20b037` · C2 `70aff37a14` · C3 `5be5a34231` · R1 `df8f99d92a` · R2 `ede9197fd4` · N1 `07f2a8b3e0` · C5 `a008caad4c`(2026-09-22 자문 리뷰 반영 amend 후). 백업 `backup/pre-restructure-20260921`(`6e8882174c`). 배선 계획서 `20260921-prompt-injection-guardrails-wiring-plan.md` 작성·push. 계획과 달라진 점: C1에서 `PatternFilter::mask()`가 사라지며 `replace_spans` 공용화는 불필요해짐; `check_layer_declared`(빈 룰 세트는 통과)로 층 이름 검증 유지; R2의 `merge_overlaps` 없음; `SharedEngine`이 `filter_for` 대신 `slot()`만 제공; C5는 7룰 기준으로 재측정(323 KB vs 86 KB).
 **base**: `origin/main` `d7a783d756`. 현재 HEAD `6e8882174c`(8커밋, 원격과 동일). **기존 커밋을 amend·재배치**하고 신규 커밋은 base64 하나. 리베이스 전 상태는 `backup/pre-restructure-YYYYMMDD`로 보존. push는 force-with-lease 필요·별도 지시, PR 별도 지시.
 **범위 밖(문서만)**: 부팅 배선(`install_guardrails_from_config` 확장, `PromptInjectionConfig`)은 구현하지 않고 `~/Works/shared/plans/20260921-prompt-injection-guardrails-wiring-plan.md`(한국어)로만 남긴다.
 
@@ -277,7 +277,7 @@ git range-diff origin/main..backup/pre-restructure-<날짜> origin/main..HEAD
 grep -rn 'ClawKeeperScan\|ToolOutputClawKeeperGuardrail\|guardrails::clawkeeper' tinicore   # 0건
 ```
 
-**검증 결과 (2026-09-22, HEAD `886a1b9225`)**: 중간 커밋 7개 각각 clippy full·slim 통과; nextest tinicore-traits 813 · tinicore 17,046 · tinicli 1,262 · prompt_injection+prompt_guard 54(`guardrails`만) · ABA 14; feature-OFF·슬림·sensitive-only·guardrails-only 컴파일; Core 게이트 3종·reimpl·sensitive_slim 클린; panic 21·unreachable 13·risky_unwrap 8; argo-tizen 게이트 오류 0.
+**검증 결과 (2026-09-22, HEAD `a008caad4c`)**: 중간 커밋 각각 clippy full·slim 통과(P0~C3은 첫 라운드, R1~C5는 amend 후 재실행); nextest tinicore-traits 813 · tinicore 17,048 · tinicli 1,262 · prompt_injection+prompt_guard 56(`guardrails`만) · ABA 14; feature-OFF·슬림·sensitive-only·guardrails-only 컴파일; Core 게이트 3종·reimpl·sensitive_slim 클린; panic 21·unreachable 13·risky_unwrap 8; argo-tizen 게이트 오류 0.
 
 **불변 조건**: ABA 14 · feature-OFF·슬림·`sensitive`-only·`guardrails`-only 컴파일 · Core 게이트 3종 · panic 21·unreachable 13·risky_unwrap 8 · argo-tizen unresolved import 0. nextest 총계는 기준선 갱신(17,079에서 삭제 9건·추가 약 15건).
 
@@ -289,3 +289,8 @@ grep -rn 'ClawKeeperScan\|ToolOutputClawKeeperGuardrail\|guardrails::clawkeeper'
 - [x] C5: `cargo run -p tinicore --example bench_prompt_guard_memory --release` 동작
 - [x] 배선 계획서 shared에 push (`961f435`)
 - [x] `git log --follow` `engine/recognizer.rs` 체인 유지
+
+**자문 리뷰 반영 (2026-09-22, R2 amend)**
+- `PatternFilter`에 `audit_tag: &'static str` 필드를 추가해 `[pii] detect` 로그 접두사가 소비자별(`pii`·`prompt_guard`·`prompt_injection`)로 갈리게 했다. 같은 줄의 키 `pii_types  =`는 세 소비자가 공유하므로 `entities   =`로 바꿨고 `pii/AGENTS.md`의 예시도 함께 고쳤다.
+- `SharedEngine::from_yaml`(cfg(test) 시임)을 추가해 `a_sanitize_rule_is_refused_at_construction`이 실제 `from_shared` 경로를 타게 했고, `ordinary_tool_output_baseline`·`an_uncompilable_host_rule_is_an_error_not_a_panic`을 추가했다. `engine_config()`는 테스트 전용이 되어 `#[cfg(test)]`로 내렸다.
+- **오탐 회계에 추가**: 기준선 테스트가 README 설치 문단 "Run `npm install` and copy `.env.example` to `.env`"를 툴 결과 층에서 차단하는 것을 잡아냈다. `imperative_credential_read`가 툴 결과 층에서 `block`인 데 따른 설계상의 비용이며(§1의 배정 그대로), 테스트에 `known_false_positives`로 "차단됨"을 고정하고 `rules.yaml` 주석에 기록했다. 탈출구는 배선 config의 `labels`에서 `embedded_directive`를 빼는 것이다(배선 계획서 §1).
