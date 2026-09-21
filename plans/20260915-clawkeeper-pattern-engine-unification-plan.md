@@ -1,11 +1,11 @@
 # ClawKeeper 룰을 YAML로 옮기고 PII 엔진을 범용 패턴 엔진으로 통일
 
 **작업 위치**: `~/Works/ARGO-ClawKeeper`(worktree), 브랜치 `dev/byungchul.so/guardrails-clawkeeper` (원격 이름 동일). `~/Works/ARGO`는 다른 브랜치 작업 중이므로 거기서 작업하지 않는다.
-**base**: `origin/main`(`d99f5557b2`, 2026-09-17 리베이스) 위의 커밋 3개(P0 `9194810bb1`, P1 `d61b9c096b`, P3사전 `34d5a0f592`) 뒤에 이어서 쌓는다.
+**base**: `origin/main`(`d7a783d756`, 2026-09-21 리베이스) 위의 커밋 3개(P0 `0e37ee00c2`, P1 `805db7463f`, P3사전 `3aa6567f0b`) 뒤에 이어서 쌓는다.
 
-> **진행 상태 (2026-09-21 갱신)**: C1~C5 다섯 커밋 전부 로컬 커밋 완료, **push는 아직 하지 않았다**(원격에는 base 커밋 3개까지만 있다).
-> C1 `5057bbdb69` · C2 `dc98e8900c` · C3 `92567a40ee` · C4 `0c40881b5a` · C5 `da26802dbe`.
-> 이후 `origin/main`이 36커밋 앞서 나갔고, 그중 PR #3428(`792c5af95f` 등 4커밋, us_passport score)이 `pii/config.rs`·`pii/recognizer.rs`를 고쳤다. 이 두 파일은 C1이 수정하고 C2가 `engine/`으로 옮긴 파일이므로, 리베이스하면 **C1 단계에서 충돌**이 난다. 해소 원칙은 이전과 같다(main 본문을 취하고 이름·경로 변경만 다시 적용).
+> **진행 상태 (2026-09-21 갱신)**: C1~C5 다섯 커밋 전부 로컬 커밋 완료, **push는 아직 하지 않았다**(원격에는 2026-09-17 base 커밋 3개까지만 있어 force-with-lease가 필요하다).
+> C1 `51d35c5379` · C2 `cd5ecb73dc` · C3 `bdfd20a565` · C4 `9a1cf16ea4` · C5 `7ad95521f2`.
+> 2026-09-21에 `origin/main`(36커밋, PR #3428 us_passport score 포함) 위로 리베이스했다. 충돌은 예상대로 C1에서만 났고(`pii/recognizer.rs` 3곳, `filter_test.rs` 6곳) main 본문(`ContextWord`·`score`·`NO_CONTEXT_WARNED`)을 채택한 뒤 이름 변경만 다시 적용했다. 자동 병합이 남긴 잠복 오류는 해당 커밋에 amend로 넣었다: P0 `config.rs`의 `crate::guardrails::recognizer::DEFAULT_SCORE` → `super::recognizer::DEFAULT_SCORE`; C1 main의 수기 `impl Default for RecognizerConfig`에 `action: None` 추가와 테스트 모듈 앞으로 이동, main이 새로 쓴 `AGENTS.md` "How a scan resolves matches" 절의 옛 식별자 6곳 개명; C2 `bench_scan.rs:41` 주석 경로. 리베이스 전 상태는 `backup/pre-main-rebase-20260921`(`da26802dbe`).
 > 계획과 달라진 점은 §2 각 커밋 끝의 "실제 결과" 항목과 §4에 적었다.
 
 ---
@@ -181,7 +181,7 @@ recognizers:
 | `pii/error.rs` | `PiiError`→`EngineError` |
 | 파사드·테스트·예제·tinicli | 이름 일괄 치환. 별칭은 두지 않는다 (사용자 확인: 호환 부담 없음) |
 
-**실제 결과 (C1 `5057bbdb69`)**: 계획대로 `pii/` 안에서만 변경. `EngineExtensions` 주입, `entity_type`(alias `pii_type`)·`action` 스키마 추가. nextest tinicore 17,036 → 17,049(추가 테스트 분), `us_bank_account` 14건 유지.
+**실제 결과 (C1 `51d35c5379`, 리베이스 전 `5057bbdb69`)**: 계획대로 `pii/` 안에서만 변경. `EngineExtensions` 주입, `entity_type`(alias `pii_type`)·`action` 스키마 추가. nextest tinicore 17,036 → 17,049(추가 테스트 분), `us_bank_account` 14건 유지.
 
 ### C2. 파일 이동 + 게이트 경계 이동
 
@@ -191,7 +191,7 @@ recognizers:
 - `tinicore/CLAUDE.md`·`.github/workflows/CLAUDE.md`에 슬림 빌드 설명이 있으면 갱신.
 - `tests/guardrails/*`의 `[[test]] required-features`는 그대로(`pii/`를 쓰므로).
 
-**실제 결과 (C2 `dc98e8900c`)**: 계획대로 `engine/`으로 이동, `guardrails` 모듈 상시 컴파일, `regex-automata` 상시 의존. `git log --follow`로 `engine/recognizer.rs` → `pii/recognizer.rs` → `guardrails/recognizer.rs` 이력이 이어지는 것을 확인했다(R099 두 번).
+**실제 결과 (C2 `cd5ecb73dc`, 리베이스 전 `dc98e8900c`)**: 계획대로 `engine/`으로 이동, `guardrails` 모듈 상시 컴파일, `regex-automata` 상시 의존. `git log --follow`로 `engine/recognizer.rs` → `pii/recognizer.rs` → `guardrails/recognizer.rs` 이력이 이어지는 것을 확인했다(R099 두 번).
 
 ### C3. `agent::prompt_guard` 백엔드 교체
 
@@ -208,7 +208,7 @@ pub struct CompiledGuard {
 - 모듈 doc의 "UTF-8-safe sanitisation… the `regex` crate guarantees" 문단을 C1의 스냅 규칙으로 교체.
 - `tinicore/tests/prompt_guard_e2e.rs`와 `prompt_guard.rs` 인라인 테스트를 새 의미로 갱신. `test_hooks`(컴파일 지연 테스트)는 유지.
 
-**실제 결과 (C3 `92567a40ee`)**: 백엔드를 `PatternEngine`+`TurnSlot`으로 교체. 계획에 없던 `PatternEngine::scan_keep_nested`를 추가했다. PII 스캔의 교차 엔티티 포함 필터(긴 스팬이 안에 든 짧은 스팬을 지움)를 그대로 쓰면, `Warn` 룰의 `.{0,800}` 스팬이 `Block` 룰의 짧은 매치를 덮어 Block 판정이 사라지므로, 프롬프트 가드는 그 필터만 건너뛰는 스캔을 쓴다. `invisible_payload`의 `(?u)` 접두사는 이 단계에서 넣었다. argo-tizen rsync 게이트 unresolved import 0건.
+**실제 결과 (C3 `bdfd20a565`, 리베이스 전 `92567a40ee`)**: 백엔드를 `PatternEngine`+`TurnSlot`으로 교체. 계획에 없던 `PatternEngine::scan_keep_nested`를 추가했다. PII 스캔의 교차 엔티티 포함 필터(긴 스팬이 안에 든 짧은 스팬을 지움)를 그대로 쓰면, `Warn` 룰의 `.{0,800}` 스팬이 `Block` 룰의 짧은 매치를 덮어 Block 판정이 사라지므로, 프롬프트 가드는 그 필터만 건너뛰는 스캔을 쓴다. `invisible_payload`의 `(?u)` 접두사는 이 단계에서 넣었다. argo-tizen rsync 게이트 unresolved import 0건.
 
 ### C4. ClawKeeper 룰을 YAML로
 
@@ -235,7 +235,7 @@ recognizers:
 - `tool_output.rs`: `observe_only`의 인라인 `map`(`:200-210`)을 `baseline_rules_with_action(GuardAction::Warn)`으로 대체. `ClawKeeperScanPack::from_rules`의 Sanitize 거부 로직은 유지.
 - 모듈 doc에 ASCII 모드 주의(`\b`·`\s`·`(?i)`가 Python `re`와 다름)와 `(?u)` 옵트인 규칙을 남긴다.
 
-**실제 결과 (C4 `0c40881b5a`)**: `clawkeeper/prompt_injection.yaml` Block 6 + Warn 4, `prompt_injection.rs` 삭제. **계획과 다른 점**: `baseline_rules()`의 반환 타입을 `Vec<PromptGuardRule>`에서 `Result<Vec<PromptGuardRule>, EngineError>`로 바꿨다. YAML 파싱 실패를 `unwrap`으로 삼키면 `risky_unwrap` 기준선(8)과 panic 기준선(21)을 깨기 때문이다. 현재 tinicore 밖에서 호출하는 제품이 없어 호환 영향은 없다. 후속 영향은 §4 참고. `SCORE_THRESHOLD`(0.5)와 `DEFAULT_SCORE`(0.5)는 `<` 비교라 `context_words`가 없는 룰도 통과하며, 이 경계는 `a_rule_with_no_context_words_is_reported` 테스트로 고정했다.
+**실제 결과 (C4 `9a1cf16ea4`, 리베이스 전 `0c40881b5a`)**: `clawkeeper/prompt_injection.yaml` Block 6 + Warn 4, `prompt_injection.rs` 삭제. **계획과 다른 점**: `baseline_rules()`의 반환 타입을 `Vec<PromptGuardRule>`에서 `Result<Vec<PromptGuardRule>, EngineError>`로 바꿨다. YAML 파싱 실패를 `unwrap`으로 삼키면 `risky_unwrap` 기준선(8)과 panic 기준선(21)을 깨기 때문이다. 현재 tinicore 밖에서 호출하는 제품이 없어 호환 영향은 없다. 후속 영향은 §4 참고. `SCORE_THRESHOLD`(0.5)와 `DEFAULT_SCORE`(0.5)는 `<` 비교라 `context_words`가 없는 룰도 통과하며, 이 경계는 `a_rule_with_no_context_words_is_reported` 테스트로 고정했다.
 
 ### C5. 사후 측정과 문서
 
@@ -243,7 +243,7 @@ recognizers:
 - 슬림 rlib 크기 전후(`cargo build -p tinicore --no-default-features --release`)도 같이 기록한다.
 - `pii/AGENTS.md`·`README.md`: 엔진 위치 변경 반영. `guardrails/mod.rs` 모듈 doc의 서브모듈 목록에 `engine` 추가.
 
-**실제 결과 (C5 `da26802dbe`)**: **계획과 다른 점**: 예제에 `required-features`를 두지 않았다. 엔진·룰·턴 스코프가 모두 게이트 밖이라 슬림 빌드에서도 컴파일되어야 `clippy --all-targets`가 엔진 표면을 검사하기 때문이다. 측정값(2026-09-17, `--release`, Apple Silicon): `regex::Regex` x10 컴파일 1,731 KB → 1 KB 스캔 후 2,670 KB / `PatternEngine` 231 KB → 239 KB; `min_cache_info` fwd 68.5 KB·rev 68.9 KB(예약 208 KB씩); 스캔 중앙값 1 KB regex 12.1 us vs engine 5.3 us, 64 KB 343 us vs 334 us; 턴 종료 후 잔존 3.1 KB. 슬림 rlib 150,143,120 B → 151,879,952 B(+1,736,832 B, +1.2 %). 전부 커밋 메시지에 기록했다.
+**실제 결과 (C5 `7ad95521f2`, 리베이스 전 `da26802dbe`)**: **계획과 다른 점**: 예제에 `required-features`를 두지 않았다. 엔진·룰·턴 스코프가 모두 게이트 밖이라 슬림 빌드에서도 컴파일되어야 `clippy --all-targets`가 엔진 표면을 검사하기 때문이다. 측정값(2026-09-17, `--release`, Apple Silicon): `regex::Regex` x10 컴파일 1,731 KB → 1 KB 스캔 후 2,670 KB / `PatternEngine` 231 KB → 239 KB; `min_cache_info` fwd 68.5 KB·rev 68.9 KB(예약 208 KB씩); 스캔 중앙값 1 KB regex 12.1 us vs engine 5.3 us, 64 KB 343 us vs 334 us; 턴 종료 후 잔존 3.1 KB. 슬림 rlib 150,143,120 B → 151,879,952 B(+1,736,832 B, +1.2 %). 전부 커밋 메시지에 기록했다.
 
 ---
 
@@ -306,9 +306,9 @@ cargo run -p tinicore --example bench_prompt_guard_memory --features guardrails
 - [x] C2 직후 `--no-default-features` 컴파일 통과, `hybrid` feature가 슬림 그래프에 잡힘
 - [x] C3 직후 argo-tizen rsync 검증에서 unresolved import 0건
 - [x] C4 직후 `baseline_rules()`가 10개, Block 6 + Warn 4
-- [x] C5 측정 수치가 커밋 메시지에 기록됨(`da26802dbe`)
-- [x] `git log --follow`로 `engine/recognizer.rs`가 `pii/recognizer.rs` → `guardrails/recognizer.rs` 이력까지 이어짐(2026-09-21 확인)
+- [x] C5 측정 수치가 커밋 메시지에 기록됨(`7ad95521f2`)
+- [x] `git log --follow`로 `engine/recognizer.rs`가 `pii/recognizer.rs` → `guardrails/recognizer.rs` 이력까지 이어짐(2026-09-21 리베이스 후 재확인, R099 두 번)
 
-**C5 시점 검증 기준선**: nextest tinicore 17,049 · tinicli 1,259 · ABA 14 · panic 21 · risky_unwrap 8. 이 절대 수치는 `origin/main`이 움직이면 같이 바뀌므로, 리베이스 후에는 새 main에서 기준선을 다시 잡고 비교해야 한다. 절대 수치와 무관하게 지켜야 하는 불변 조건은 ABA 14, Block 6 + Warn 4, feature-OFF 컴파일, Core 게이트 3종, argo-tizen unresolved import 0이다.
+**검증 기준선 (2026-09-21 리베이스 후, HEAD `7ad95521f2`)**: clippy `-D warnings` 통과 · nextest tinicore **17,079**(리베이스 전 17,049, main 추가분) · tinicli **1,262** · ABA 14 · prompt_guard 20 · feature-OFF·슬림 check 통과, `hybrid` 슬림 그래프 포함 · Core 게이트 3종·reimpl 클린 · panic 21·unreachable 13·risky_unwrap 8 · sensitive_slim 클린 · argo-tizen(`e8dc41e9`) rsync 게이트 오류 0. 중간 커밋 P0·C1·C2·C3·C4도 각각 clippy 통과. 절대 수치는 `origin/main`이 움직이면 같이 바뀌므로 리베이스 후에는 새 main에서 기준선을 다시 잡아 비교한다. 절대 수치와 무관하게 지켜야 하는 불변 조건은 ABA 14, Block 6 + Warn 4, feature-OFF 컴파일, Core 게이트 3종, argo-tizen unresolved import 0이다.
 
-**남은 일**: (1) `origin/main` 위로 리베이스(C1 충돌 예상) 후 재검증, (2) 사용자 지시 후 push, (3) PR은 별도 지시.
+**남은 일**: (1) 사용자 지시 후 force-with-lease push, (2) PR은 별도 지시.
