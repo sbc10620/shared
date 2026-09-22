@@ -1,4 +1,6 @@
-# 프롬프트 인젝션 가드레일 배선 계획 (구현 전 문서)
+# 프롬프트 인젝션 가드레일 배선 계획 (구현 완료)
+
+> **상태 (2026-09-22)**: 구현 완료. 브랜치 `dev/byungchul.so/guardrails-clawkeeper`에 배선 4커밋(`1d746a9a60` · `c9e950fd34` · `fd9d46ca45` · `00022c120f`)을 재구성 8커밋 위에 쌓았다. 구현 계획서는 `20260922-prompt-injection-wiring-implementation-plan.md`. 아래 §1~§3은 최초 구상이며, **실제 구현과 다른 점**은 각 절 머리에 적었다.
 
 **전제**: `~/Works/ARGO-ClawKeeper` 브랜치 `dev/byungchul.so/guardrails-clawkeeper`의 재구성 시리즈(계획서 `20260921-prompt-injection-restructure-plan.md`)가 끝난 상태. 이 문서는 그 위에 얹을 **배선(부팅 시 설치)** 작업의 형태만 적는다. 아직 구현하지 않는다.
 
@@ -14,6 +16,8 @@
 | feature | `prompt_injection/` 전체가 `guardrails` 뒤, 툴 결과 탐지기는 `sensitive`도 필요 | argo-tizen은 둘 다 켜져 있음 |
 
 ## 1. 설정 표면
+
+> **구현과의 차이**: 입력 층에는 `labels`를 두지 않았다(소비자 `CompiledGuard`가 룰 id별 `GuardAction`으로 판정하므로 라벨 block 목록이라는 개념이 없다). 층별 구조체를 `PromptInjectionInputConfig`/`PromptInjectionToolOutputConfig` 둘로 나눴고, `additional_rules`는 `#[serde(skip)]`이 아니라 tinicli의 `[[prompt_injection.rules]]`로 설정 파일에서도 넣을 수 있다. tinicli 쪽 타입은 문자열을 받고 부팅에서 변환한다(`load_config`가 파싱 실패 시 파일 전체를 기본값으로 바꾸므로, 오타 하나가 provider까지 지우면 안 됨). `labels`가 빈 목록이면 부팅 실패, block 룰이 없는 라벨은 경고 후 무시.
 
 `GuardrailsConfig`(`pii/install.rs`)에 필드 하나를 더한다. `#[serde(default)]`라 기존 호스트 설정은 그대로 파싱된다.
 
@@ -56,6 +60,8 @@ labels = ["override", "embedded_directive", "comment_directive", "base64_decoded
 
 ## 2. `install_guardrails_from_config` 확장
 
+> **구현과의 차이**: 설치 파일을 셋으로 나눴다 — `guardrails/install.rs`(공통 설정값·리포트·오류·진입점), `pii/install.rs`(`PiiConfig`·`build_pii`), `prompt_injection/install.rs`(`PromptInjectionConfig`·`build`). `SensitiveGuardrail`에 block 목록 교체 생성자를 넣는 대신 `tool_output_guardrail_with_block(detector, block)`을 추가했다. 전부 빌드한 뒤 설치하고, PII 입력 가드와 인젝션 툴 결과 가드를 **한 세트로 한 번** 설치한다. 오류 변형 `PromptInjection { detail }`·`PromptGuardSlotTaken` 추가. 호스트 룰의 정규식이 깨지면 엔진이 "chunk 0"만 알려 주므로, `SharedEngine::new`가 룰 하나씩 다시 빌드해 범인을 지목한다.
+
 ```rust
 // pii/install.rs — 기존 PII 설치 뒤에
 if config.prompt_injection.input.enabled || config.prompt_injection.tool_output.enabled {
@@ -84,6 +90,8 @@ if config.prompt_injection.input.enabled || config.prompt_injection.tool_output.
 
 ## 3. `loop_.rs`의 fallback
 
+> **구현과의 차이**: 전역 슬롯의 이름은 `prompt_guard::install`/`installed`(+진단용 `installed_engine_build_count`)이고 `agent/prompt_guard.rs`에 있다. tinicli는 여기에 더해 **저장 전 게이트**를 REPL·TUI에 넣었다(`save_message` 앞, PII 게이트 옆): loop는 최신 사용자 메시지 하나만 보므로, 게이트가 없으면 차단된 메시지가 저장된 뒤 다음 턴부터 검사 없이 전달된다.
+
 `apply_inbound_prompt_guard`(`loop_.rs:684`)는 지금 `ctx.config.prompt_guard`(`CoreConfig`)만 읽는다. 배선 후:
 
 ```rust
@@ -105,6 +113,7 @@ let guard = if ctx.config.prompt_guard.is_empty() {
 | `ProductPolicy.guard_rules` | 유지 → `additional_rules` |
 | `prompt_guard_config_for_mode`의 `PromptGuardMode::{Warn,Block}` → 단일 액션 | 삭제 후보. 룰별 액션이 YAML에 있고 `baseline_rules_with_action`도 없어짐. 모드는 `Off`/`On`으로 |
 | `core.prompt_guard` 직접 설정 (`apply_prompt_guard_mode`) | `install_guardrails_from_config`의 `prompt_injection` 설정으로 대체 |
+| `GuardrailsConfig { pii: … }` 구조체 리터럴 (`crates/argot-daemon/src/guardrails/mod.rs:45`) | **필수**: `..Default::default()` 한 줄 추가. 필드가 늘어 exhaustive 리터럴이 깨진다(E0063). 동기화 시 컴파일 오류로 드러남 |
 
 전환 전까지는 argo-tizen이 자기 룰을 계속 쓴다(`compile`은 id 기반으로 바뀌었지만 경로는 유지). **주의**: 재구성 시리즈가 `PiiError`→`EngineError` 등을 바꿨으므로 argo-tizen PR #1395(`e8dc41e9`)가 먼저 병합돼 있어야 한다.
 
