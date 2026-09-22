@@ -78,6 +78,7 @@ if config.prompt_injection.input.enabled || config.prompt_injection.tool_output.
 ```
 
 - 공유 엔진은 두 층이 같이 켜지면 **턴마다 1회** 빌드된다(첫 `acquire`가 빌드, 턴 종료 시 해제).
+- **슬롯 등록 시점 (2026-09-22 코드 리뷰 발견 1의 처리)**: `turn_guard()`는 guard를 잡는 순간 registry에 있는 슬롯만 pin한다. 현행 `compile_cached` 경로는 슬롯을 턴 중간(`loop_.rs:684`)에 만들기 때문에 새 설정의 첫 턴에는 pin이 없고, 그 턴에 `Sanitize` 룰이 걸리면 뒤 룰 재스캔에서 DFA를 한 번 더 빌드한다(결과는 같고 비용만 추가, `prompt_guard.rs` 모듈 doc에 기록). 배선에서는 `install_guardrails_from_config`이 **부팅 시** `SharedEngine::new`를 호출하므로 슬롯이 첫 턴 전에 등록되어 PII의 `engine_guard()`와 같은 효과를 낸다. 즉 `compile_shared` 경로에서는 이 문제가 없다. 남는 경우는 (1) `CoreConfig.prompt_guard` 경로(argo-tizen 전환 전), (2) `turn_guard()` 밖에서 `evaluate`를 직접 부르는 호출자 — 둘 다 없어지면 자연히 해소되고, 그 전에 없애려면 `evaluate`가 진입 시 엔진 `Arc`를 한 번 붙들고 재스캔까지 쓰는 국소 수정(`PatternFilter`에 hold 헬퍼 + `build_count` 단언 테스트)을 넣는다.
 - 툴 결과 층에 `labels`로 warn 룰의 라벨(`InvisibleChars`)을 지정하면 경고 후 무시한다. 스팬을 내지 않는 룰은 차단 목록에 있어도 의미가 없다.
 - `PromptInjectionLabel`은 `serde(rename_all = "snake_case")`라 TOML 값은 `override`, `embedded_directive`… 이다.
 
