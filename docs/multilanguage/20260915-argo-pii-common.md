@@ -1,6 +1,6 @@
 # ARGO PII 공통 항목과 구현 순서 (13개국 종합)
 
-이 문서는 13개 국가별 PII 근거 문서(`docs/20260914-argo-pii-en_US.md`, `docs/20260915-argo-pii-<locale>.md` 12개)가 반복해서 위임한 **공통 요소**를 한곳에 모으고, 구현 순서를 제안한다. 국가별 판단의 근거는 각 문서에 있으며 여기서는 옮겨 적지 않는다. 대상 locale 은 en_US, ko_KR, en_GB, de_DE, fr_FR, it_IT, es_ES, en_IN, pt_BR, es_MX, vi_VN, th_TH, pl_PL 이고, `pii_type` 접두는 ISO 3166 국가 코드(`us`, `kr`, `gb`, `de`, `fr`, `it`, `es`, `in`, `br`, `mx`, `vn`, `th`, `pl`)를 쓴다.
+이 문서는 13개 국가별 PII 근거 문서(`docs/multilanguage/20260914-argo-pii-en_US.md`, `docs/multilanguage/20260915-argo-pii-<locale>.md` 12개)가 반복해서 위임한 **공통 요소**를 한곳에 모으고, 구현 순서를 제안한다. 국가별 판단의 근거는 각 문서에 있으며 여기서는 옮겨 적지 않는다. 대상 locale 은 en_US, ko_KR, en_GB, de_DE, fr_FR, it_IT, es_ES, en_IN, pt_BR, es_MX, vi_VN, th_TH, pl_PL 이고, `pii_type` 접두는 ISO 3166 국가 코드(`us`, `kr`, `gb`, `de`, `fr`, `it`, `es`, `in`, `br`, `mx`, `vn`, `th`, `pl`)를 쓴다.
 
 ## 1. 집계
 

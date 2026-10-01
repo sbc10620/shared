@@ -16,14 +16,14 @@ into YAML + validators. This skill fixes the shape and the verification steps.
 
 Reference material — read both before writing anything:
 
-- Template: `~/Works/shared/docs/_template-argo-pii-locale.md`. Section 0 is
+- Template: `~/Works/shared/docs/multilanguage/_template-argo-pii-locale.md`. Section 0 is
   common to every locale and is copied verbatim. Sections 1–5 are filled in.
-- Finished example: `~/Works/shared/docs/20260914-argo-pii-en_US.md`. Match
+- Finished example: `~/Works/shared/docs/multilanguage/20260914-argo-pii-en_US.md`. Match
   its depth per item, not just its headings.
 
 Standing decisions the user has already made (do not re-ask):
 
-- The document lives ONLY in `~/Works/shared/docs/YYYYMMDD-argo-pii-<locale>.md`.
+- The document lives ONLY in `~/Works/shared/docs/multilanguage/YYYYMMDD-argo-pii-<locale>.md`.
   Do not create a copy inside the ARGO repository.
 - Prose is Korean; `pii_type` keys, regex, statute names, and code identifiers
   stay in their original form.

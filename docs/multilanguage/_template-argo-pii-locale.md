@@ -2,9 +2,9 @@
 
 <!--
   이 파일은 국가별 PII 근거 문서의 템플릿이다. 새 국가 문서를 만들 때 이 파일을 복사해
-  docs/YYYYMMDD-argo-pii-{LOCALE}.md 로 저장하고, {…} 자리를 채운 뒤 이 주석 블록과
+  docs/multilanguage/YYYYMMDD-argo-pii-{LOCALE}.md 로 저장하고, {…} 자리를 채운 뒤 이 주석 블록과
   "작성 체크리스트" 절은 삭제한다. 0절은 국가와 무관한 공통 내용이므로 수정하지 않는다.
-  작성 절차는 skills/argo-pii-locale/SKILL.md 를 따른다. 완성된 예시는 docs/20260914-argo-pii-en_US.md 이다.
+  작성 절차는 skills/argo-pii-locale/SKILL.md 를 따른다. 완성된 예시는 docs/multilanguage/20260914-argo-pii-en_US.md 이다.
 -->
 
 이 문서는 `tinicore/src/guardrails/config/pii_filter_config.yaml` 에 {국가명}({LOCALE}) 고유 PII recognizer 가 포함되어야 하는 근거를 기록한다. 이미 YAML 에 있는 항목도 근거를 남기기 위해 포함하며, 국가에 종속되지 않는 항목(카드번호, API 키, 비밀번호, 이메일, IP 주소 등)은 다루지 않는다.
