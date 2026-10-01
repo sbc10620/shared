@@ -250,7 +250,23 @@ action = "block"            # block | warn
 - **검증(부팅 중단):** 내장 규칙과 같거나 서로 중복된 id, 알 수 없는 action·label, 컴파일되지 않는 패턴. mode 가 `"off"` 인데 규칙 섹션이 있으면 경고 후 무시합니다.
 - **주의:** 두 엔진 모두 ASCII 모드라 `\s`, `\b`, `(?i)` 가 ASCII 기준이고 lazy 수량자가 greedy 처럼 동작합니다. 비ASCII 문자 클래스에는 `(?u)` 가 필요합니다. config 문서에 반드시 적어야 합니다.
 
-### 7.5 작업 목록
+### 7.5 prompt injection 규칙 파싱 결과의 상주 제거
+
+prompt injection 쪽은 파싱한 규칙을 프로세스가 끝날 때까지 보관하지만, PII 는 엔진을 빌드한 직후 파싱 결과를 버립니다.
+
+| | prompt injection | PII |
+| --- | --- | --- |
+| 원본 YAML | `include_str!` 상수 | 같음 |
+| 파싱 결과 보관 | **예.** `static RULES: LazyLock<Vec<Rule>>`(`prompt_injection/mod.rs:232`) 가 처음 접근할 때 파싱하고 프로세스 끝까지 보관 | **아니요.** `compile_from_yaml` 이 엔진을 빌드한 뒤 `EngineConfig` 를 버림(`pii/shared.rs:22-24`) |
+| 엔진 빌드 | 턴마다 YAML 을 다시 파싱해서 빌드(`prompt_injection/shared.rs:28`) | 같음 |
+| 엔진 수명 | turn slot (턴이 끝나면 해제) | 같음 |
+
+- 엔진 빌드는 `RULES` 를 쓰지 않습니다. `RULES` 를 쓰는 곳은 `SharedEngine::new`(규칙 순서·action·layer 표 생성)와 `baseline_rules()` 두 곳뿐이며, 둘 다 부팅 때 한 번씩 호출됩니다.
+- 상주 크기는 규칙 11개 남짓, 패턴 문자열 약 3.2 KB 에 `RecognizerConfig` 의 다른 필드가 더해져 **수 KB 로 추정**합니다(측정하지 않음).
+- **할 일:** `LazyLock` 을 없애고 필요할 때 `parse_rules(RULES_YAML)` 을 호출해 PII 와 같은 방식으로 맞춥니다. 호출은 부팅 때 두세 번이라 파싱 비용은 문제가 되지 않습니다. `SharedEngine` 이 가진 규칙 표(id·action·layer)는 tool output 가드레일이 매치를 처리할 때 필요하므로 남깁니다.
+- **7.4 와의 관계:** tool output 추가 규칙을 "합친 `EngineConfig` 를 `Arc` 로 보관"하는 방식으로 구현하면 같은 성격의 상주 비용이 다시 생깁니다. PII 방식에 맞추려면 파싱 결과 대신 원본 문자열(내장 YAML, 추가 규칙의 패턴)만 보관하고, 턴마다 다시 파싱해 빌드한 뒤 버리도록 합니다.
+
+### 7.6 작업 목록
 
 | # | 작업 | 바뀌는 곳 | 규모 |
 | --- | --- | --- | --- |
@@ -259,3 +275,4 @@ action = "block"            # block | warn
 | 3 | user input 추가 규칙 | tinicli | 작음 |
 | 4 | tool output 추가 규칙 API + config 섹션 | tinicore(`SharedEngine`, label 표), tinicli | 중간 |
 | 5 | `CoreConfig.prompt_guard` 문서 정정 | tinicore | 작음 |
+| 6 | prompt injection `RULES` `LazyLock` 제거 (7.5) | tinicore | 작음 |
