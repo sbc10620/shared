@@ -60,6 +60,22 @@ time ─────────────────────────
                                    at this moment, CoreConfig [B] does not exist yet
 ```
 
+`cli_entry::run()` 안에서 보면 다음과 같습니다.
+
+```
+cli_entry::run()
+ ├─ :420  to_core_config           (tool-output config; mode typo → exit)
+ ├─ :431  compile_inbound_guard    (user-input rules: build + compile → exit on error)
+ ├─ :435  parse_pii_mode
+ ├─ :442  install_guardrails_from_config   ← [A] global slots
+ │        (all of the above sit in ONE #[cfg(feature = "guardrails")] block)
+ │
+ └─ :556~ build_context            ← [B] CoreConfig; prompt_guard filled here
+                                      (inbound_guard_config called again)
+```
+
+`compile_inbound_guard` 는 install 과 같은 cfg 블록 안에 있을 뿐 install 의 일부가 아닙니다. 그래서 `inbound_guard_config` 가 두 번 호출됩니다. 한 번은 검증과 캐시 등록을 위해(`:431`), 한 번은 `CoreConfig` 에 값을 넣기 위해(`build_context`) 호출됩니다.
+
 1. **부팅 검증:** install 직전, 같은 `#[cfg(feature = "guardrails")]` 블록 안에서 `compile_inbound_guard`(`tinicli/src/cli_entry.rs:431`) 가 `inbound_guard_config` 를 한 번 호출해 규칙을 컴파일해 봅니다. user input mode 오타나 규칙 오류가 있으면 부팅을 중단합니다(tool output mode 오타는 그보다 앞선 `to_core_config`, `:420` 에서 걸립니다). 컴파일된 guard 는 `compile_cached` 캐시에 남습니다.
 2. **설정 채우기:** ③ `build_context` 가 `CoreConfig` 를 조립하면서 `inbound_guard_config` 를 다시 호출해 `core.prompt_guard` 를 채웁니다(`tinicli/src/context_builder.rs:1154`). 이어서 `Arc::new(core)`(`:1419`) 로 감싸 `RuntimeContext::with_required(config_arc, ...)`(`:1513`) 에 넘깁니다.
 3. **턴마다:** `gate()`(REPL/TUI 저장 전), gateway handler 의 `admit`(`tinicore/src/gateway/handler.rs:744`), `agent_loop` 안의 `apply_inbound_prompt_guard`(`tinicore/src/agent/loop_.rs:691`) 가 `ctx.config.prompt_guard` 를 읽습니다. 규칙 목록은 부팅 때 고정되고, 패턴 엔진만 턴마다 turn slot 에서 빌드되었다가 턴이 끝나면 해제됩니다.
@@ -119,7 +135,9 @@ pub fn prompt_guard_config_for_mode(mode, additional) -> PromptGuardConfig {
 
 주의: argo-tizen 은 mode 가 모든 규칙의 action 을 덮어씁니다. block 모드에서 `invisible_payload`(warn) 까지 block 이 되면, ZWJ 가 들어간 이모지만 보내도 메시지가 거부됩니다. 이 규칙은 action 을 덮어쓰지 말고 warn 으로 유지해야 합니다.
 
-## 5. 개선 방향: install 이 prompt guard 설정을 "돌려주는" 형태
+## 5. 검토했으나 채택하지 않은 안: install 이 prompt guard 설정을 "돌려주는" 형태
+
+> **결정 (2026-10-01): 채택하지 않음.** install 이 `CoreConfig` 설정용 값을 돌려주면 `GuardrailsConfig`·`GuardrailsInstall` 에 파라미터만 늘어납니다. 지금처럼 host 가 `CoreConfig.prompt_guard` 를 직접 채우고, 대신 7절처럼 함수 이름과 기능 게이트 범위를 정리합니다. 아래는 검토 기록으로 남깁니다.
 
 ```
 ② install ──returns──▶ PromptGuardConfig (validated)
@@ -156,3 +174,88 @@ PR #3454 는 수정하지 않기로 했으므로 아래는 모두 별도 작업�
    - `baseline_rules` → `user_input_prompt_injection_rules` 권장. 이 함수는 prompt injection 규칙 전체가 아니라 `prompt_guard` 레이어 7개만 돌려주며, config 키 `user_input_prompt_injection_mode` 와 짝이 맞습니다.
    - `inbound_guard_config` → `prompt_guard_config`, `compile_inbound_guard` → `compile_prompt_guard` (argo-tizen `prompt_guard_config_for_mode` 와 대응. tinicli 에는 mode enum 이 없어 `_for_mode` 는 생략).
 5. **문서 정정:** `CoreConfig.prompt_guard` 문서의 "Core ships none" 은 이제 tinicore 가 `baseline_rules()` 를 제공하므로 부정확합니다. "Core installs none by default; a host may opt into `guardrails::baseline_rules()`" 정도로 고치면 됩니다.
+
+## 7. 결정 사항 (2026-10-01)
+
+6절의 후속 과제를 아래처럼 구체화했습니다. 모두 PR #3454 밖의 별도 작업입니다.
+
+### 7.1 `compile_inbound_guard` 를 없애고 `build_context` 에서 한 번만 호출
+
+검증(`compile_cached`)을 `prompt_guard_config` 안으로 합칩니다. `build_context` 의 대입부(`context_builder.rs:1154`)에는 이미 `Err` 면 부팅을 중단하는 처리가 있으므로, 별도 검증 함수와 `cli_entry.rs:431` 의 호출이 필요 없어집니다.
+
+```
+build_context (no feature gate)
+ └─ prompt_guard_config(cfg)
+      ├─ layer_on(user_input mode)        typo → Err
+      ├─ baseline_rules()                 #[cfg(feature = "guardrails")] only
+      ├─ [[user_input_prompt_injection_rules]]
+      ├─ compile_cached(&config)          validate + warm the cache → Err
+      └─ Ok(config) → core.prompt_guard
+```
+
+한 번만 호출해도 되는지 확인했습니다. install(`:442`) 부터 `build_context` 안의 대입 지점까지 실행되는 코드는 다음과 같습니다.
+
+| 구간 | 하는 일 | 부팅이 중단될 때의 영향 |
+| --- | --- | --- |
+| `cli_entry.rs` | locale 초기화 | 없음 |
+| | `--connect` 분기 | 이 경로는 여기서 종료하며 `build_context` 를 거치지 않음 |
+| | 문서 디렉터리 생성, SQLite DB 열기 | 디렉터리만 남고 다음 실행에 문제 없음 |
+| daemon 경로만 | 로거 설치, `DaemonLock` 획득 | `fd-lock`(flock) 이라 프로세스가 끝나면 OS 가 잠금을 해제 |
+| `build_context` 앞부분 | node/python 탐지, template cache 저장소 열기 | 없음 |
+
+daemon 이 연결을 받기 시작하는 `run_daemon` 도 `build_context` 다음입니다. 따라서 규칙 오류로 부팅이 멈춰도 처리 중인 요청은 없습니다.
+
+달라지는 점:
+
+- 규칙 오류로 부팅이 멈추는 시점이 조금 늦어져, 다른 경고(node 없음 등)가 먼저 출력될 수 있습니다.
+- `--connect`, `--setup`, `--onboard` 처럼 `build_context` 를 거치지 않는 경로는 규칙을 검증하지 않습니다. 이 경로들은 로컬에서 턴을 실행하지 않으므로 문제가 없습니다.
+- 오류 문구 "the built-in prompt-injection rules did not compile" 은 config.toml 규칙도 포함하도록 고쳐야 합니다.
+
+### 7.2 이름 변경
+
+| 위치 | 현재 | 변경 |
+| --- | --- | --- |
+| tinicore `guardrails` | `baseline_rules` | `user_input_prompt_injection_rules` (권장안) |
+| tinicli | `inbound_guard_config` | `prompt_guard_config` |
+| tinicli | `compile_inbound_guard` | 없앰 (7.1) |
+
+### 7.3 guardrails 기능 범위 축소 (tinicli)
+
+- user input 쪽(`layer_on`, `prompt_guard_config`, `gate()`/`GateDecision`)을 기능 밖으로 옮기고, `baseline_rules()` 호출에만 `#[cfg(feature = "guardrails")]` 를 겁니다.
+- tool output 쪽(`to_core_config`)은 tinicore guardrails 타입을 쓰므로 기능 안에 남습니다.
+- 기능이 없는 빌드에서의 동작이 바뀝니다. user input mode 오타는 부팅을 중단하고, `"on"` 이면 "내장 규칙이 이 빌드에 없다"는 경고와 함께 config 규칙만으로 실행합니다. tool output 키는 지금처럼 경고 후 무시합니다.
+
+### 7.4 config.toml 추가 규칙 (두 레이어 모두)
+
+```toml
+user_input_prompt_injection_mode = "on"
+tool_output_prompt_injection_mode = "on"
+
+[[user_input_prompt_injection_rules]]
+id = "ko_ignore_prior"
+pattern = '(이전|앞의)\s*(지시|명령)(을|를)?\s*(무시|잊어)'
+action = "block"            # block | warn
+
+[[tool_output_prompt_injection_rules]]
+id = "turn_context_forgery"
+pattern = '(?i)</?turn-context\b'
+label = "override"          # existing PromptInjectionLabel
+action = "block"            # block | warn
+```
+
+- **형식:** config.toml 섹션으로 받습니다. YAML 파일은 보류합니다. tinicore 는 타입이 있는 규칙 목록 API 만 두고, 파싱은 host 가 맡습니다. argo-tizen 은 제품 규칙(`GuardRule`)을 같은 타입으로 넘기면 됩니다.
+- **action:** block 과 warn 을 모두 허용합니다. tool output 의 warn 은 `tracing::warn!` 로그 한 줄이며, span 으로 보고하지 않아 차단하지 않습니다(`detector.rs:192-207`). warn 과 block 이 겹쳐도 block 이 적용됩니다.
+- **user input:** `prompt_guard_config` 안에서 읽어 baseline 뒤에 붙입니다. 엔진은 `PromptGuardConfig` 로 빌드되므로 tinicore 변경이 필요 없습니다.
+- **tool output:** tinicore 변경이 필요합니다. 부팅 때 내장 규칙과 추가 규칙을 `EngineConfig` 하나로 합쳐 `Arc` 로 보관하고, `SharedEngine` 이 `id → label` 표를 갖도록 합니다. 추가 규칙의 layer 는 `tool_output` 으로 고정합니다. `tool_output_prompt_injection_labels` 로 범위를 좁히는 기능은 추가 규칙에도 적용됩니다.
+- **검증(부팅 중단):** 내장 규칙과 같거나 서로 중복된 id, 알 수 없는 action·label, 컴파일되지 않는 패턴. mode 가 `"off"` 인데 규칙 섹션이 있으면 경고 후 무시합니다.
+- **주의:** 두 엔진 모두 ASCII 모드라 `\s`, `\b`, `(?i)` 가 ASCII 기준이고 lazy 수량자가 greedy 처럼 동작합니다. 비ASCII 문자 클래스에는 `(?u)` 가 필요합니다. config 문서에 반드시 적어야 합니다.
+
+### 7.5 작업 목록
+
+| # | 작업 | 바뀌는 곳 | 규모 |
+| --- | --- | --- | --- |
+| 1 | 이름 변경 | tinicore, tinicli | 작음 |
+| 2 | 기능 게이트 축소 (`gate()` 포함) + `compile_inbound_guard` 통합 | tinicli | 작음 |
+| 3 | user input 추가 규칙 | tinicli | 작음 |
+| 4 | tool output 추가 규칙 API + config 섹션 | tinicore(`SharedEngine`, label 표), tinicli | 중간 |
+| 5 | `CoreConfig.prompt_guard` 문서 정정 | tinicore | 작음 |
