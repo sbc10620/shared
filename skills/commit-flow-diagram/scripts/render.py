@@ -112,72 +112,116 @@ def edges_of(n):
             yield ln, t, (kinds[i] if isinstance(kinds, list) else kinds)
 
 
-def assign_columns(nodes, by_id):
-    """Fill missing `col`: functions by call depth from the roots, data boxes
-    one column right of their first user. Explicit `col` values win."""
-    if all("col" in n for n in nodes):
-        return
-    calls = {n["id"]: [t for _, t, k in edges_of(n) if k in ("call", "defer")] for n in nodes}
-    called = {t for ts in calls.values() for t in ts}
-    depth = {}
+def visit_order(nodes, by_id):
+    """Deterministic box order: depth-first from each root (a function box no
+    edge calls), following call lines in source order; a type/data box comes
+    right after its first user. Boxes nothing reaches keep spec order."""
+    called = {t for n in nodes for _, t, k in edges_of(n) if k != "use"}
+    order, seen = [], set()
 
-    def visit(nid, d, seen):
-        if nid in seen:
+    def dfs(nid):
+        if nid in seen or nid not in by_id:
             return
-        if depth.get(nid, -1) >= d:
-            return
-        depth[nid] = d
-        for t in calls.get(nid, []):
-            visit(t, d + 1, seen | {nid})
+        seen.add(nid)
+        order.append(by_id[nid])
+        for _, t, k in edges_of(by_id[nid]):
+            if k == "use" and t not in seen and t in by_id:
+                seen.add(t)
+                order.append(by_id[t])
+        for _, t, k in edges_of(by_id[nid]):
+            if k != "use":
+                dfs(t)
 
     for n in nodes:
         if n["kind"] not in DATA_KINDS and n["id"] not in called:
-            visit(n["id"], 0, set())
-    for n in nodes:
+            dfs(n["id"])
+    order += [n for n in nodes if n["id"] not in seen]
+    return order
+
+
+def assign_columns(order):
+    """Column = longest call depth from a root (so every call arrow points
+    right); a type/data box sits one column right of its first user."""
+    by_id = {n["id"]: n for n in order}
+    depth = {}
+
+    def calls_of(nid):
+        return [t for _, t, k in edges_of(by_id[nid]) if k != "use" and t in by_id]
+
+    def pass_through(nid):
+        # An unchanged box that only forwards the path (one call, nothing
+        # else drawn) — a chain of these stacks in one column.
+        return by_id[nid].get("status") == "same" and len(calls_of(nid)) == 1
+
+    def walk(nid, d, stack):
+        if nid in stack or depth.get(nid, -1) >= d:
+            return
+        depth[nid] = d
+        for t in calls_of(nid):
+            step = 0 if pass_through(nid) and pass_through(t) else 1
+            walk(t, d + step, stack | {nid})
+
+    called = {t for n in order for _, t, k in edges_of(n) if k != "use"}
+    for n in order:
+        if n["kind"] not in DATA_KINDS and n["id"] not in called:
+            walk(n["id"], 0, frozenset())
+    for n in order:
         if "col" not in n and n["id"] in depth:
             n["col"] = depth[n["id"]]
-    for n in nodes:
+    for n in order:
         if "col" not in n:
-            users = [m["col"] for m in nodes if "col" in m and any(t == n["id"] for _, t, _ in edges_of(m))]
-            n["col"] = (min(users) + 1) if users else 0
+            users = [m["col"] for m in order if "col" in m and any(t == n["id"] for _, t, _ in edges_of(m))]
+            n["col"] = (users[0] + 1) if users else 0
 
 
 def node_size(n):
+    """Box size, and each line's vertical offset (`_dy`) inside the box."""
     widths = [text_width(n["kind"] + " " + n["name"], 13) + 70, text_width(n.get("file", ""), 10) + 70]
     if n.get("desc"):
         widths.append(text_width(n["desc"], 11) + 2 * PAD)
-    rows = 0
+    cy = HEAD_H + (18 if n.get("desc") else 0) + 6
     for ln in n.get("lines", []):
         if ln.get("note"):
             widths.append(text_width("// " + ln["note"]) + GUTTER + 14)
-            rows += 1
+            cy += LH
         widths.append(text_width(ln.get("code", "...")) + GUTTER + 14)
-        rows += 1
+        cy += LH
+        ln["_dy"] = cy - LH / 2 - 1
     w = max(widths) + 2 * PAD
-    h = HEAD_H + (18 if n.get("desc") else 0) + rows * LH + PAD + 4
-    return max(w, 170), h
+    return max(w, 170), cy + PAD + 4
 
 
 def layout(nodes):
+    """Place every box. Nothing here depends on how the spec was written
+    beyond its boxes and edges, so the same boxes always give the same
+    picture. (`col` / `align_to` in a spec still override, for old specs.)"""
     by_id = {n["id"]: n for n in nodes}
-    assign_columns(nodes, by_id)
-    for n in nodes:
+    order = visit_order(nodes, by_id)
+    assign_columns(order)
+    for n in order:
         n["w"], n["h"] = node_size(n)
-    cols = sorted({n["col"] for n in nodes})
+    cols = sorted({n["col"] for n in order})
     x = MARGIN
     col_x = {}
     for c in cols:
         col_x[c] = x
-        x += max(n["w"] for n in nodes if n["col"] == c) + COL_GAP
+        x += max(n["w"] for n in order if n["col"] == c) + COL_GAP
     total_w = x - COL_GAP + MARGIN
     top0 = MARGIN + 70
     col_bottom = {c: top0 for c in cols}
     for c in cols:
-        for n in [m for m in nodes if m["col"] == c]:
+        for n in [m for m in order if m["col"] == c]:
             y = col_bottom[c]
             a = n.get("align_to")
             if a and "y" in by_id.get(a, {}):
                 y = max(y, by_id[a]["y"])
+            elif "align_to" not in n:
+                # Line the box's header up with the first placed line that
+                # points at it, so arrows run as flat as the column allows.
+                srcs = [m["y"] + ln["_dy"] for m in order if "y" in m
+                        for ln, t, _ in edges_of(m) if t == n["id"]]
+                if srcs:
+                    y = max(y, srcs[0] - 20)
             n["x"], n["y"] = col_x[c], y
             col_bottom[c] = y + n["h"] + ROW_GAP
     return total_w, max(col_bottom.values()), by_id
@@ -189,7 +233,8 @@ def code_tspans(code, bold, dim):
     parts = []
     for kind, text in tokens(code):
         color = "#94a3b8" if dim else HL[kind]
-        weight = ' font-weight="700"' if (kind == "fn" or kind == "plain") and text in bold else ""
+        weight = (' font-weight="700" font-style="italic"'
+                  if (kind == "fn" or kind == "plain") and text in bold else "")
         parts.append(f'<tspan fill="{color}"{weight}>{escape(text)}</tspan>')
     return "".join(parts)
 
@@ -309,7 +354,7 @@ def render_legend(x, y, out):
         cx += 46
     cx += 10
     out.append(f'<path d="M{cx},{y-4} h40" stroke="#1e3a8a" stroke-width="1.5" marker-end="url(#arrow)"/>')
-    cx = label(cx + 48, "호출 (굵은 글씨가 호출되는 함수)")
+    cx = label(cx + 48, "호출 (굵은 기울임 글씨가 호출되는 함수)")
     out.append(f'<path d="M{cx},{y-4} h40" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="8 5" '
                f'marker-end="url(#arrow-defer)"/>')
     cx = label(cx + 48, "나중에 실행(클로저 등록)")

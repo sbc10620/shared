@@ -1,6 +1,6 @@
 ---
 name: commit-flow-diagram
-description: Draw what a commit — or a commit range / PR-sized span — changed as a code-flow picture, starting at the program entry point (main) and following the calls down into the changed functions. Each function, struct, enum, static or trait is a box holding its REAL code (verbatim, syntax-highlighted, unrelated parts elided with `...`), with call arrows leaving from the exact call line. Output is always the same fixed format: one directory per change holding one SVG (+PNG) per topic and one index.html. Use when the user asks to show, draw, diagram or visualize the code flow / call flow of a commit, a range, a branch or a PR ("코드 흐름 그림", "호출 흐름을 그려줘", "커밋 흐름도").
+description: Draw what a commit — or a commit range / PR-sized span — changed as a code-flow picture, starting at the program entry point (main) and following the calls down into the changed functions. Each function, struct, enum, static or trait is a box holding its REAL code (verbatim, syntax-highlighted, unrelated parts elided with `...`), with call arrows leaving from the exact call line. Output is always the same fixed format, whatever agent or LLM runs it: one directory per change holding one SVG (+PNG) per topic and one index.html. Use when the user asks to show, draw, diagram or visualize the code flow / call flow of a commit, a range, a branch or a PR ("코드 흐름 그림", "호출 흐름을 그려줘", "커밋 흐름도").
 user-invocable: true
 allowed-tools: Bash, Read, Grep, Glob, Write, Edit
 ---
@@ -24,11 +24,27 @@ Every group this skill produces must look the same, whoever runs it and on whate
 | Status | badge + outline color: `신규` green (new in the range), `변경` orange (changed), `기존` gray (unchanged, on the path) |
 | Code | verbatim source, syntax-highlighted; `...` = elided code |
 | Added/changed line | yellow band + `+` in the gutter |
-| Called function | its name is **bold** on the calling line |
+| Called function | its name is ***bold italic*** on the calling line |
 | Call | solid navy arrow from the calling line's right-edge dot to the callee box |
 | Deferred run | dashed purple arrow (closure/callback registered now, run later), with a label |
 | Uses a type/data | dotted gray line, no arrowhead |
 | Note | one green `// …` line above the call it explains |
+
+## Same result on any agent or LLM
+
+Two runs of this skill on the same change — by different agents, models or people — must produce the same group. Everything that can be computed is computed by the scripts, and everything left to judgment follows a mechanical rule below:
+
+| Decided by | What |
+| --- | --- |
+| scripts (never the spec) | box order, columns, vertical positions, colors, highlighting, bold-italic callee names, legend, directory name, file names, page |
+| Step 1 algorithm | which boxes exist |
+| Step 3 rules | which lines each box keeps, where `...` goes, which lines carry notes |
+| Step 2 rule | how figures split |
+| free wording (keep it short and literal) | note text, figure titles and captions, page title |
+
+`verify_spec.py` refuses a spec that sets layout or names by hand, leaves a call line without a note, has a note over 40 characters, holds a box not reachable from the entry box, shows a long type box whole, or puts more than 18 boxes in one figure. Only the free wording may differ between runs, so write it plainly: notes say what the call is for at that line (`국가 목록을 프로세스 전역에 고정`), not commentary.
+
+Only `bash`, `git` and `python3` (standard library) are needed, so any agent with a shell can run it; a Chrome/Chromium, if present, adds PNG previews.
 
 ## Step 0 — Resolve the input into before / after
 
@@ -43,16 +59,18 @@ Same rules as `commit-explain` Step 0, repeated here so this skill stands alone:
 
 State the resolved pair to the user in one line before drawing. Read every commit message in `git log before..after` — they say *why*, and they name the topics the figures will split by.
 
-## Step 1 — Find the paths to draw
+## Step 1 — Choose the boxes (mechanical)
 
-1. List the changed functions/types: `git diff --stat before after`, then read each hunk. Tests, benches, docs and generated files are not drawn.
-2. Find the program entry point of the binary that runs the changed code (`fn main`, `main()`, `Application.onCreate`, a request handler for a server…). If the change is in a library with several hosts, pick the host the user cares about; if unclear, ask.
-3. Walk from the entry point to each changed function with `grep -rn "<fn>("` — every caller you draw must be a call site you found, never a guess. Unchanged functions on the way are kept to the single call that continues the path.
-4. Follow each changed function down to the changed functions it calls, and to the types/data it reads or writes that the change touches.
+1. **Changed set C** — every function, method, struct, enum, static/const and trait whose definition has an added or removed line in `git diff before after`, excluding tests (`#[cfg(test)]`, `tests/`, `*_test.*`), benches, examples, docs and generated files.
+2. **Entry box** — the `main` of the binary that runs C (`fn main`, `main()`, `Application.onCreate`, a server's request handler). Several binaries: the one whose name matches the repository's product binary; still ambiguous: ask the user once.
+3. **Path boxes** — for each function in C, the call chain from the entry box to it, found with `grep -rn "<name>("` and followed caller by caller. Where two callers exist, take the first in `git grep` order. Every function on a chain is a box; never draw a call site you did not find.
+4. **Callee boxes** — every function in C that a drawn box calls.
+5. **Type boxes** — every type/data item in C that a drawn line reads, writes or constructs, linked with a `use` edge from the first such line.
+6. Nothing else. An unchanged function off the path is not drawn even if interesting; an unchanged callee is not drawn (its call line stays, plain).
 
 ## Step 2 — Split into figures by topic
 
-One figure per topic, all in one group. Split when a figure would exceed about **14 boxes or 6 columns**, or when the change has two independent stories (e.g. "decide the setting" vs "build the engine with it"). A boundary call that continues in the next figure keeps its line, with the note ending `→ 그림 N`; the next figure starts from that same call line (dimmed lines show the context it came from).
+One figure if all boxes fit in **18**. Otherwise split at the topmost changed function on the path (the first box in C reached from the entry): its call lines that lead to boxes, in source order, are taken one by one; each call's subtree goes into the current figure until adding the next would pass 18, then a new figure starts. Figure 1 keeps the entry chain; a later figure starts with that topmost function again, showing only the call lines it continues from (earlier ones `dim`), so every figure still begins at a box the reader has seen. A call continued in a later figure keeps its line in the earlier one with the note ending `→ 그림 N`.
 
 ## Step 3 — Write the spec (`group.json`)
 
@@ -64,14 +82,13 @@ One figure per topic, all in one group. Split when a figure would exceed about *
 - **What must stay:** every line on the path to the next box, every line the range added or changed that the path runs, and every early exit that changes the result — `return Err(…)`, `refuse_to_start(…)`, `exit`, a `?` that aborts, a fallback `return default`.
 - **Unchanged function on the path:** `...`, the one call line that continues the path, `...`.
 - **Struct / enum / static / const boxes show only what the flow uses:** the declaration line, the fields/variants/entries the drawn code reads, writes or the range changed, and `...` for the rest. Short types (about 6 lines or fewer) may be shown whole.
-- **Notes:** one short note (user's language) above each call line that leads to another box, saying why it is called *here*; optionally above a deciding branch. Not on every line.
+- **Notes:** exactly one note (user's language, at most 40 characters) on every call line that leads to another box — on the line itself or, for a call split over lines, the line just above — saying why it is called *here*. Also one on each kept early exit (`…이면 부팅 중단`). Nowhere else.
 - **Header:** `name` is the item's name as a reader would search for it (`cli_entry::run()`, `PiiCountry::parse()`, `PiiConfig`); `file` is `path:line` of the declaration at `after`.
 
 ### Spec format
 
 ```json
 {
-  "slug": "YYYYMMDD-<topic>",            // the group directory name
   "title": "<page title, user's language>",
   "repo": "/abs/path/to/repo", "before": "<ref>", "after": "<ref>",
   "range": "<repo> · before..after · <entry point>",
@@ -82,8 +99,6 @@ One figure per topic, all in one group. Split when a figure would exceed about *
     "nodes": [{
       "id": "run", "kind": "fn|struct|enum|static|trait", "status": "new|changed|same",
       "name": "cli_entry::run()", "file": "tinicli/src/cli_entry.rs:157",
-      "col": 1,                  // optional; default = call depth from the entry box
-      "align_to": "other_id",    // optional; top no higher than that box (keeps arrows short)
       "desc": "…",               // optional one-line summary under the header
       "lines": [
         {"elide": true, "indent": 0},
@@ -103,7 +118,7 @@ One figure per topic, all in one group. Split when a figure would exceed about *
 - `mark: "+"` on lines added or changed in the range — `verify_spec.py` checks you got them right.
 - `dim: true` for context lines that are not part of this figure's story (shown gray).
 - `callee`: name(s) to bold when the callee box's name differs from the identifier on the line.
-- Order nodes as they should stack inside each column (top to bottom). Put a type box right after the box that uses it.
+- Node order in the file does not matter: the renderer orders, places and aligns boxes from the edges. Do not add `col`, `align_to` or `slug` — the verifier refuses them.
 
 Keep the spec in a file; `examples/argo-pii-locales.json` is a complete two-figure example.
 
@@ -112,12 +127,13 @@ Keep the spec in a file; `examples/argo-pii-locales.json` is a complete two-figu
 ```bash
 SKILL_DIR=<directory of this file>
 python3 "$SKILL_DIR/scripts/verify_spec.py" group.json        # must print "0 problem(s)"
-python3 "$SKILL_DIR/scripts/build_group.py" group.json <parent-dir>
+python3 "$SKILL_DIR/scripts/build_group.py" group.json [<parent-dir>]
 ```
 
 - `verify_spec.py` checks every code line is verbatim at `after`, every `+` matches the diff (and no added line lacks one), and every arrow names a box. Fix the spec until it passes; `build_group.py` refuses to build otherwise.
-- `build_group.py` writes `<parent-dir>/<slug>/` with `index.html`, `figN-<slug>.svg`, `figN-<slug>.png` (when a Chrome/Chromium is installed) and `spec.json`. One change = one directory, so groups stay apart when several sit side by side.
-- `<parent-dir>` is where the user keeps pictures; ask once if you do not know it.
+- `build_group.py` writes `<parent-dir>/<YYYYMMDD>-<repo>-<sha>/` — the `after` commit's date, the repository name (from `origin`), its short sha — with `index.html`, `figN-<slug>.svg`, `figN-<slug>.png` (when a Chrome/Chromium is installed) and `spec.json`. One change = one directory, and the same change always lands in the same directory (a rebuild overwrites it).
+- `<parent-dir>`: the directory the user names; else `$COMMIT_FLOW_DIR`; else `~/code-flow-diagrams`. Tell the user the full path you wrote.
+- `index.html` is self-contained: every figure inline, with zoom, fit, actual size, drag to pan, and a full-screen button (browser full screen where allowed, otherwise the figure fills the window; Esc closes).
 
 ## Step 5 — Look once, then deliver
 
@@ -126,10 +142,11 @@ Open one PNG (or screenshot `index.html`) and check for overlapping boxes, arrow
 ## Pre-send checklist
 
 - [ ] Resolved before/after stated to the user.
-- [ ] Every drawn caller came from a grep, starting at the real entry point.
+- [ ] Boxes chosen by the Step 1 algorithm; every drawn caller came from a grep, starting at the real entry point.
 - [ ] `verify_spec.py` printed `0 problem(s)` for the final spec.
 - [ ] No paraphrased code; every skip shows `...`; early exits that change the result are still there.
 - [ ] Struct/enum/static boxes show only what the flow uses.
-- [ ] Every call line leading to a box has a note and its callee shows bold.
-- [ ] Figures split by topic when large; boundary calls point to `→ 그림 N`.
+- [ ] Every call line leading to a box has one note (≤ 40 chars); no other notes except kept early exits.
+- [ ] Figures split by the Step 2 rule when over 18 boxes; boundary calls point to `→ 그림 N`.
+- [ ] No `col`, `align_to` or `slug` in the spec.
 - [ ] Output is one group directory built by `build_group.py`, unedited.

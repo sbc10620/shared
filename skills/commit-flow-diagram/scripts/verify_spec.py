@@ -9,7 +9,13 @@ Checks, per box line (elided lines skipped):
   2. "+" marks — a marked line is an added line of `git diff <before> <after>`
                  for that file, and an unmarked line is not (lines shorter
                  than 4 characters, such as braces, are not judged);
-  3. edges     — every `to` names a box of the same figure.
+  3. edges     — every `to` names a box of the same figure;
+  4. sameness   — the rules that make two agents produce the same group:
+                 no hand layout (`col`, `align_to`) or hand-picked `slug`;
+                 every call/defer line has a note and no note exceeds 40
+                 characters; every box is reachable from the figure's entry
+                 box; a type/data box over 8 lines shows `...`; a figure
+                 holds at most 18 boxes.
 Exit 1 with a list on any failure.
 """
 import json
@@ -26,8 +32,45 @@ def main():
     repo, before, after = group["repo"], group["before"], group["after"]
     sources, diffs = {}, {}
     problems = []
+    if "slug" in group:
+        problems.append("group: remove `slug` — build_group.py derives the directory name")
     for fi, fig in enumerate(group["figures"]):
         ids = {n["id"] for n in fig["nodes"]}
+        if len(ids) > 18:
+            problems.append(f"fig{fi+1}: {len(ids)} boxes — split the figure (at most 18)")
+        targets = {}
+        for n in fig["nodes"]:
+            for ln in n.get("lines", []):
+                t = ln.get("to")
+                for x in ([t] if isinstance(t, str) else t or []):
+                    targets.setdefault(n["id"], []).append(x)
+        called = {x for xs in targets.values() for x in xs}
+        roots = [n["id"] for n in fig["nodes"] if n["id"] not in called]
+        reach, todo = set(), roots[:1]
+        while todo:
+            cur = todo.pop()
+            if cur not in reach:
+                reach.add(cur)
+                todo += targets.get(cur, [])
+        for n in fig["nodes"]:
+            if n["id"] not in reach:
+                problems.append(f"fig{fi+1} {n['id']}: not reachable from the entry box {roots[:1]}")
+            for key in ("col", "align_to"):
+                if key in n:
+                    problems.append(f"fig{fi+1} {n['id']}: remove `{key}` — layout is computed")
+            if n["kind"] in ("struct", "enum", "static", "trait") and len(n.get("lines", [])) > 8 \
+                    and not any(ln.get("elide") for ln in n["lines"]):
+                problems.append(f"fig{fi+1} {n['id']}: type box over 8 lines must show only what the flow uses (`...`)")
+            prev = {}
+            for ln in n.get("lines", []):
+                kinds = ln.get("edge", "call")
+                kinds = kinds if isinstance(kinds, list) else [kinds]
+                # A call split over lines may carry its note on the line above.
+                if ln.get("to") and any(k != "use" for k in kinds) and not (ln.get("note") or prev.get("note")):
+                    problems.append(f"fig{fi+1} {n['id']}: call line needs a note: {ln.get('code', '')!r}")
+                prev = ln
+                if ln.get("note") and len(ln["note"]) > 40:
+                    problems.append(f"fig{fi+1} {n['id']}: note over 40 characters: {ln['note']!r}")
         for n in fig["nodes"]:
             path = n["file"].split(":")[0]
             if path not in sources:

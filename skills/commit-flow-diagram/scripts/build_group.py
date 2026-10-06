@@ -2,9 +2,14 @@
 """Build one commit-flow GROUP: a directory holding every figure of one
 change, as SVG (+ PNG when a Chrome/Chromium is found) plus one index.html.
 
-usage: build_group.py <group.json> <parent-dir> [--skip-verify] [--no-png]
+usage: build_group.py <group.json> [<parent-dir>] [--skip-verify] [--no-png]
 
-Output (the group directory name is `group["slug"]`):
+<parent-dir> defaults to $COMMIT_FLOW_DIR, else ~/code-flow-diagrams. The
+group directory name is derived, never chosen: <YYYYMMDD of the `after`
+commit>-<repo name from origin, else its directory name>-<after short sha>, so the same change always
+lands in the same place.
+
+Output (the group directory name is derived, see above):
   <parent-dir>/<slug>/
     index.html             every figure inline, zoom/fit/drag, self-contained
     fig1-<fig slug>.svg    one file per figure
@@ -46,13 +51,24 @@ def git(repo, *args):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
-    spec_path, parent = args
+    spec_path = args[0]
+    parent = args[1] if len(args) > 1 else (
+        os.environ.get("COMMIT_FLOW_DIR") or os.path.expanduser("~/code-flow-diagrams"))
     group = json.load(open(spec_path, encoding="utf-8"))
     here = os.path.dirname(os.path.abspath(__file__))
     if "--skip-verify" not in flags:
         r = subprocess.run([sys.executable, os.path.join(here, "verify_spec.py"), spec_path])
         if r.returncode:
             sys.exit("verify_spec failed; fix the spec (or pass --skip-verify knowingly)")
+    repo, after = group["repo"], group["after"]
+    day = git(repo, "show", "-s", "--format=%cd", "--date=format:%Y%m%d", after).strip()
+    sha = git(repo, "rev-parse", "--short=10", after).strip()
+    try:  # the repository's own name, the same from every clone or worktree
+        url = git(repo, "remote", "get-url", "origin").strip()
+        name = re.sub(r"\.git$", "", re.split(r"[/:]", url.rstrip("/"))[-1])
+    except subprocess.CalledProcessError:
+        name = os.path.basename(git(repo, "rev-parse", "--show-toplevel").strip())
+    group["slug"] = f"{day}-{name}-{sha}"
     out_dir = os.path.join(parent, group["slug"])
     os.makedirs(out_dir, exist_ok=True)
     if not group.get("commits"):
@@ -101,6 +117,7 @@ def page(group, figures):
       <button type="button" data-act="in" aria-label="확대">+</button>
       <button type="button" data-act="fit">화면 맞춤</button>
       <button type="button" data-act="one">실제 크기</button>
+      <button type="button" data-act="full" class="full-btn">전체 화면</button>
     </div>
   </header>
   <div class="canvas" tabindex="0">{svg}</div>
@@ -170,6 +187,15 @@ h1 {{ font-size: clamp(22px, 3vw, 30px); line-height: 1.3; margin: 0; text-wrap:
 }}
 .canvas.dragging {{ cursor: grabbing; user-select: none; }}
 .canvas svg {{ display: block; }}
+/* Full screen: the browser's own when the frame allows it, else the figure
+   fills the window (the same look either way). */
+.fig:fullscreen, .fig.is-max {{
+  position: fixed; inset: 0; z-index: 50; border-radius: 0; border: 0;
+  display: flex; flex-direction: column; background: var(--surface);
+}}
+.fig.is-max {{ padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }}
+.fig:fullscreen .canvas, .fig.is-max .canvas {{ max-height: none; flex: 1; min-height: 0; }}
+body.has-max {{ overflow: hidden; }}
 </style>
 
 <main class="wrap">
@@ -206,6 +232,7 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     if (act === 'out') scale = Math.max(0.15, scale / 1.25);
     if (act === 'one') scale = 1;
     if (act === 'fit') return fit();
+    if (act === 'full') return toggleFull();
     apply();
   }});
   let drag = null;
@@ -220,6 +247,27 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     canvas.scrollTop = drag.t - (e.clientY - drag.y);
   }});
   window.addEventListener('pointerup', () => {{ drag = null; canvas.classList.remove('dragging'); }});
+  const fullBtn = fig.querySelector('.full-btn');
+  const isFull = () => document.fullscreenElement === fig || fig.classList.contains('is-max');
+  const sync = () => {{
+    fullBtn.textContent = isFull() ? '전체 화면 닫기' : '전체 화면';
+    requestAnimationFrame(fit);
+  }};
+  const toggleFull = () => {{
+    if (isFull()) {{
+      if (document.fullscreenElement === fig) document.exitFullscreen().catch(() => {{}});
+      fig.classList.remove('is-max');
+      document.body.classList.remove('has-max');
+      return sync();
+    }}
+    const fallback = () => {{ fig.classList.add('is-max'); document.body.classList.add('has-max'); sync(); }};
+    if (fig.requestFullscreen) fig.requestFullscreen().then(sync, fallback);
+    else fallback();
+  }};
+  document.addEventListener('fullscreenchange', sync);
+  document.addEventListener('keydown', (e) => {{
+    if (e.key === 'Escape' && fig.classList.contains('is-max')) toggleFull();
+  }});
   fit();
 }});
 </script>

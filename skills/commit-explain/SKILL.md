@@ -111,12 +111,32 @@ For every item worth walking through, in this exact shape:
 - ...
 
 **호출 흐름:** (optional — see below; a small visual diagram, not a bullet list)
-```
+```text
 <caller 1> ──"<condition/arg>"──┐
                                  ├─▶ <shared callee>
 <caller 2> ──"<condition/arg>"──┘
 ```
 ```
+
+**Code highlighting — required, in every CLI.** Terminal and chat renderers (Claude Code, Codex CLI, Gemini CLI, Cursor, GitHub, VS Code, most markdown viewers) highlight a fenced block only when the opening fence names its language, so every fence in the answer carries a language tag — never a bare ` ``` `:
+
+- `Before`/`After` blocks: the language of the file the code came from, chosen by extension from this table (first match wins). Keep that tag even though `After` lines carry `+` markers — do NOT switch to `diff`, which drops the language colors.
+
+  | Extension | Tag | Extension | Tag |
+  | --- | --- | --- | --- |
+  | `.rs` | `rust` | `.py` | `python` |
+  | `.c` `.h` | `c` | `.cc` `.cpp` `.hpp` | `cpp` |
+  | `.java` | `java` | `.kt` `.kts` | `kotlin` |
+  | `.swift` | `swift` | `.go` | `go` |
+  | `.ts` `.tsx` | `typescript` | `.js` `.jsx` `.mjs` | `javascript` |
+  | `.sh` `.bash` | `bash` | `.toml` | `toml` |
+  | `.yaml` `.yml` | `yaml` | `.json` | `json` |
+  | `.md` | `markdown` | `.sql` | `sql` |
+  | `Cargo.lock`, other lockfiles | `toml` / `json` by format | anything else | `text` |
+
+- A block showing raw `git diff` output: `diff`.
+- Shell commands: `bash`. The **호출 흐름** diagram: `text` (plain, so box-drawing characters are not colored as code).
+- Nested fences in this document's templates are illustrative; in the real answer, write each fence at top level with its tag.
 
 **Before/After blocks must be verbatim.** Every line inside a `Before`/`After` fence is real source pulled from `git diff`/`git show` — never replace an actual line (or a whole match arm, function body, etc.) with a prose summary of what it does and present that inside the fence as if it were code. If a block is too long to show in full, elide the untouched middle explicitly (`// ... unchanged ...`) rather than substituting a paraphrase, or show the full block anyway — do not silently swap code for commentary. This applies even when the paraphrase is accurate; the reader must be able to trust that anything inside a fenced block is copy-pasteable from the real file. The line annotations below are the one sanctioned addition on top of verbatim source — they append a marker/comment, they never replace or reword the underlying code text.
 
@@ -159,6 +179,7 @@ Before sending the final answer, verify it against each of these (they point bac
 
 - [ ] Step 0: resolved `before_ref`/`after_ref` stated to the user up front.
 - [ ] Step 2: every item's header carries `[확인됨]` or `[추정]`, and every `[추정]` block's reconstruction is labeled as such, not presented as `git show` output.
+- [ ] Step 4 code highlighting: every fence has a language tag from the table (`text` for the call-flow diagram) — no bare ``` fence anywhere in the answer.
 - [ ] Step 4 verbatim rule: every line inside a Before/After fence is real — none swapped for a prose summary.
 - [ ] Step 4 line annotations: `+` markers correct on every added line (and absent from `Before`), function calls carry a purpose comment, function declarations carry a one-line summary above them, and trivial lines are left uncommented.
 - [ ] Step 4 self-check: every **변경된 내용** bullet is backed by a line actually visible in that item's Before/After.
