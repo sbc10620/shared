@@ -121,6 +121,7 @@ def page(group, figures):
     </div>
   </header>
   <div class="canvas" tabindex="0">{svg}</div>
+  <button type="button" class="full-close" aria-label="전체 화면 닫기" title="닫기 (Esc)">✕</button>
 </section>''' for i, f, svg in figures)
     return f'''<title>{escape(page_title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -195,6 +196,19 @@ h1 {{ font-size: clamp(22px, 3vw, 30px); line-height: 1.3; margin: 0; text-wrap:
 }}
 .fig.is-max {{ padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }}
 .fig:fullscreen .canvas, .fig.is-max .canvas {{ max-height: none; flex: 1; min-height: 0; }}
+/* In full screen only the figure shows: no title bar, no buttons. A small
+   close mark stays in the corner for touch screens; Esc also closes, and
+   + / - / 0 zoom, zoom out and fit. */
+.fig:fullscreen .fig-head, .fig.is-max .fig-head {{ display: none; }}
+.fig {{ position: relative; }}
+.full-close {{ display: none; }}
+.fig:fullscreen .full-close, .fig.is-max .full-close {{
+  display: block; position: absolute; z-index: 2;
+  top: calc(env(safe-area-inset-top, 0px) + 10px); right: 14px;
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, .85); color: #334155; font-size: 15px; cursor: pointer; opacity: .55;
+}}
+.full-close:hover, .full-close:focus-visible {{ opacity: 1; }}
 body.has-max {{ overflow: hidden; }}
 </style>
 
@@ -225,7 +239,11 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     svg.setAttribute('height', Math.round(h * scale));
     out.textContent = Math.round(scale * 100) + '%';
   }};
-  const fit = () => {{ scale = Math.min(1, (canvas.clientWidth - 2) / w); apply(); }};
+  // Fit the width; in full screen fit the whole figure (width and height).
+  const fit = () => {{
+    const byH = isFull() ? (canvas.clientHeight - 2) / h : Infinity;
+    scale = Math.min(1, (canvas.clientWidth - 2) / w, byH); apply();
+  }};
   fig.querySelector('.tools').addEventListener('click', (e) => {{
     const act = e.target.closest('button')?.dataset.act;
     if (act === 'in') scale = Math.min(3, scale * 1.25);
@@ -265,8 +283,13 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     else fallback();
   }};
   document.addEventListener('fullscreenchange', sync);
+  fig.querySelector('.full-close').addEventListener('click', toggleFull);
   document.addEventListener('keydown', (e) => {{
+    if (!isFull()) return;
     if (e.key === 'Escape' && fig.classList.contains('is-max')) toggleFull();
+    else if (e.key === '+' || e.key === '=') {{ scale = Math.min(3, scale * 1.25); apply(); }}
+    else if (e.key === '-') {{ scale = Math.max(0.15, scale / 1.25); apply(); }}
+    else if (e.key === '0') fit();
   }});
   fit();
 }});

@@ -229,14 +229,16 @@ def layout(nodes):
 
 # --- drawing -------------------------------------------------------------
 
-def code_tspans(code, bold, dim):
+def code_tspans(code, callees, dim, call_line):
+    """Highlighted code. A line that calls another box is bold italic as a
+    whole, and the called name inside it is also underlined."""
     parts = []
     for kind, text in tokens(code):
         color = "#94a3b8" if dim else HL[kind]
-        weight = (' font-weight="700" font-style="italic"'
-                  if (kind == "fn" or kind == "plain") and text in bold else "")
-        parts.append(f'<tspan fill="{color}"{weight}>{escape(text)}</tspan>')
-    return "".join(parts)
+        extra = ' text-decoration="underline"' if call_line and kind in ("fn", "plain") and text in callees else ""
+        parts.append(f'<tspan fill="{color}"{extra}>{escape(text)}</tspan>')
+    style = ' font-weight="700" font-style="italic"' if call_line else ""
+    return style, "".join(parts)
 
 
 def render_node(n, by_id, out):
@@ -285,9 +287,10 @@ def render_node(n, by_id, out):
             out.append(f'<rect x="{x+2}" y="{cy-LH+1}" width="{w-4}" height="{LH}" fill="#fef9c3" fill-opacity="0.8"/>')
             out.append(f'<text x="{x+PAD}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}" font-weight="700" '
                        f'fill="#a16207">+</text>')
-        body = (f'<tspan fill="#94a3b8">{escape(code)}</tspan>' if elide
-                else code_tspans(code, callee_names(ln, by_id), dim))
-        out.append(f'<text x="{x+PAD+GUTTER}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}" '
+        call_line = any(k in ("call", "defer") for _, _, k in edges_of({"lines": [ln]}))
+        style, body = (("", f'<tspan fill="#94a3b8">{escape(code)}</tspan>') if elide
+                       else code_tspans(code, callee_names(ln, by_id), dim, call_line))
+        out.append(f'<text x="{x+PAD+GUTTER}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}"{style} '
                    f'xml:space="preserve">{body}</text>')
         ln["_y"] = cy - LH / 2 - 1
         if ln.get("to"):
@@ -354,7 +357,7 @@ def render_legend(x, y, out):
         cx += 46
     cx += 10
     out.append(f'<path d="M{cx},{y-4} h40" stroke="#1e3a8a" stroke-width="1.5" marker-end="url(#arrow)"/>')
-    cx = label(cx + 48, "호출 (굵은 기울임 글씨가 호출되는 함수)")
+    cx = label(cx + 48, "호출 (호출 줄은 굵은 기울임, 호출되는 함수는 밑줄)")
     out.append(f'<path d="M{cx},{y-4} h40" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="8 5" '
                f'marker-end="url(#arrow-defer)"/>')
     cx = label(cx + 48, "나중에 실행(클로저 등록)")

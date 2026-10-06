@@ -24,7 +24,7 @@ Every group this skill produces must look the same, whoever runs it and on whate
 | Status | badge + outline color: `신규` green (new in the range), `변경` orange (changed), `기존` gray (unchanged, on the path) |
 | Code | verbatim source, syntax-highlighted; `...` = elided code |
 | Added/changed line | yellow band + `+` in the gutter |
-| Called function | its name is ***bold italic*** on the calling line |
+| Call line | the whole line that calls another box is ***bold italic***; the called name in it is also underlined |
 | Call | solid navy arrow from the calling line's right-edge dot to the callee box |
 | Deferred run | dashed purple arrow (closure/callback registered now, run later), with a label |
 | Uses a type/data | dotted gray line, no arrowhead |
@@ -36,7 +36,7 @@ Two runs of this skill on the same change — by different agents, models or peo
 
 | Decided by | What |
 | --- | --- |
-| scripts (never the spec) | box order, columns, vertical positions, colors, highlighting, bold-italic callee names, legend, directory name, file names, page |
+| scripts (never the spec) | box order, columns, vertical positions, colors, highlighting, bold-italic call lines, legend, directory name, file names, page |
 | Step 1 algorithm | which boxes exist |
 | Step 3 rules | which lines each box keeps, where `...` goes, which lines carry notes |
 | Step 2 rule | how figures split |
@@ -133,7 +133,7 @@ python3 "$SKILL_DIR/scripts/build_group.py" group.json [<parent-dir>]
 - `verify_spec.py` checks every code line is verbatim at `after`, every `+` matches the diff (and no added line lacks one), and every arrow names a box. Fix the spec until it passes; `build_group.py` refuses to build otherwise.
 - `build_group.py` writes `<parent-dir>/<YYYYMMDD>-<repo>-<sha>/` — the `after` commit's date, the repository name (from `origin`), its short sha — with `index.html`, `figN-<slug>.svg`, `figN-<slug>.png` (when a Chrome/Chromium is installed) and `spec.json`. One change = one directory, and the same change always lands in the same directory (a rebuild overwrites it).
 - `<parent-dir>`: the directory the user names; else `$COMMIT_FLOW_DIR`; else `~/code-flow-diagrams`. Tell the user the full path you wrote.
-- `index.html` is self-contained: every figure inline, with zoom, fit, actual size, drag to pan, and a full-screen button (browser full screen where allowed, otherwise the figure fills the window; Esc closes).
+- `index.html` is self-contained: every figure inline, with zoom, fit, actual size, drag to pan, and a full-screen button. Full screen shows the figure alone, fitted whole (no title bar or buttons; browser full screen where allowed, otherwise the figure fills the window); a faint ✕ in the corner or Esc closes it, and `+` / `-` / `0` zoom in, zoom out and fit.
 
 ## Step 5 — Look once, then deliver
 
