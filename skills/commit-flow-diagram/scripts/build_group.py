@@ -94,7 +94,8 @@ def main():
     json.dump(group, open(os.path.join(out_dir, "spec.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8").write(page(group, figures))
     print(out_dir)
-    print("png:", "written" if chrome else "skipped (no Chrome/Chromium found)")
+    print("png:", "written" if chrome else
+          "skipped (--no-png)" if "--no-png" in flags else "skipped (no Chrome/Chromium found)")
 
 
 def page(group, figures):
@@ -146,7 +147,7 @@ body {{
   background: var(--bg); color: var(--ink); font-family: var(--font-text);
   font-size: 15px; line-height: 1.6; padding-inline: 16px; padding-block: 28px 48px;
 }}
-.wrap {{ max-width: 1600px; margin: 0 auto; display: grid; gap: 28px; }}
+.wrap {{ display: grid; gap: 28px; }}
 .intro {{ display: grid; gap: 14px; max-width: 72ch; }}
 .eyebrow {{ font-family: var(--font-code); font-size: 12px; letter-spacing: .04em; color: var(--muted); }}
 h1 {{ font-size: clamp(22px, 3vw, 30px); line-height: 1.3; margin: 0; text-wrap: balance; }}
