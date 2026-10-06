@@ -85,6 +85,82 @@ def tokens(code):
     return out
 
 
+PARAMS_MAX = 48  # longer parameter lists keep only what the box's code uses
+
+
+def signature_params(lines, start):
+    """The parameter list of the declaration at lines[start], verbatim
+    pieces joined with ", " — read across lines up to the closing paren."""
+    text = "\n".join(lines[start:start + 40])
+    m = DECL_NAME_RE.search(text)
+    if not m:
+        return None
+    i = text.find("(", m.end())
+    if i < 0 or "{" in text[m.end():i] or ";" in text[m.end():i]:
+        return None
+    depth, buf, parts = 0, "", []
+    for j in range(i + 1, len(text)):
+        ch = text[j]
+        prev = text[j - 1]
+        if ch in "([{" or (ch == "<"):
+            depth += 1
+        elif ch in ")]}" or (ch == ">" and prev != "-"):
+            if depth == 0 and ch == ")":
+                parts.append(buf)
+                break
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append(buf)
+            buf = ""
+            continue
+        buf += ch
+    parts = [" ".join(p.split()) for p in parts if p.strip()]
+    return parts
+
+
+def param_name(part):
+    """`mut x: T` -> x, `&self` -> self, `T x` -> x, `x int` -> x."""
+    head = part.split("=")[0]
+    if ":" in head and "::" not in head.split(":")[0]:
+        head = head.split(":")[0]
+        toks = re.findall(r"[A-Za-z_]\w*", head)
+        return toks[-1] if toks else head.strip()
+    toks = re.findall(r"[A-Za-z_]\w*", head)
+    if not toks:
+        return head.strip()
+    # Go puts the name first (`x int`), C-like languages last (`int x`).
+    return toks[0] if len(toks) == 2 and toks[1][0].islower() and toks[1] in GO_TYPES else toks[-1]
+
+
+GO_TYPES = {"int", "string", "bool", "error", "byte", "rune", "float64", "int64", "uint", "any"}
+DECL_NAME_RE = re.compile(r"\b(?:fn|def|func|fun|function)\s+(?:\([^)]*\)\s*)?(?:<[^>]*>\s*)?(?:[\w.]+\.)?[A-Za-z_]\w*"
+                          r"(?:<[^(]*?>)?")
+
+
+def header_params(parts, used_code):
+    """Full list when short; otherwise only the parameters the box's code
+    uses (and `self`), with `…` for the rest."""
+    if parts is None:
+        return None
+    full = ", ".join(parts)
+    if len(full) <= PARAMS_MAX:
+        return full
+    keep, out = set(), []
+    for p in parts:
+        name = param_name(p)
+        if name in ("self", "this") or re.search(rf"\b{re.escape(name)}\b", used_code):
+            keep.add(p)
+    skipped = False
+    for p in parts:
+        if p in keep:
+            out.append(p)
+            skipped = False
+        elif not skipped:
+            out.append("…")
+            skipped = True
+    return ", ".join(out)
+
+
 def text_width(s, size=FS):
     return sum(size * (1.02 if ord(ch) > 0x1100 else 0.61) for ch in s)
 
@@ -180,7 +256,7 @@ def assign_columns(order):
 
 def node_size(n):
     """Box size, and each line's vertical offset (`_dy`) inside the box."""
-    widths = [text_width(n["kind"] + " " + n["name"], 13) + 70, text_width(n.get("file", ""), 10) + 70]
+    widths = [text_width(n["kind"] + " " + display_name(n), 13) + 70, text_width(n.get("file", ""), 10) + 70]
     if n.get("desc"):
         widths.append(text_width(n["desc"], 11) + 2 * PAD)
     cy = HEAD_H + (18 if n.get("desc") else 0) + 6
@@ -262,6 +338,14 @@ def code_tspans(code, callees, call_line):
     return style, "".join(parts)
 
 
+def display_name(n):
+    """Box header: the name, with the parameter list when one was read."""
+    if n["kind"] != "fn" or n.get("params") is None:
+        return n["name"]
+    base = re.sub(r"\(\)\s*$", "", n["name"])
+    return f"{base}({n['params']})"
+
+
 def render_node(n, by_id, out):
     st = STATUS[n.get("status", "same")]
     kind = n["kind"]
@@ -281,7 +365,7 @@ def render_node(n, by_id, out):
     out.append(f'<path d="M{x+inset},{y+HEAD_H} H{x+w-inset}" stroke="{st["stroke"]}" stroke-opacity="0.35"/>')
     out.append(f'<text x="{x+PAD}" y="{y+18}" font-family="{CODE_FONT}" font-size="13" font-weight="700" '
                f'fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">{kind} </tspan>'
-               f'{escape(n["name"])}</text>')
+               f'{escape(display_name(n))}</text>')
     if n.get("file"):
         out.append(f'<text x="{x+PAD}" y="{y+33}" font-family="{CODE_FONT}" font-size="10" fill="#9da7b3">'
                    f'{escape(n["file"])}</text>')

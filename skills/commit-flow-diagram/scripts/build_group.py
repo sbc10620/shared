@@ -78,6 +78,19 @@ def main():
     if not group.get("commits"):
         log = git(group["repo"], "log", "--format=%h%x09%s", f'{group["before"]}..{group["after"]}')
         group["commits"] = [l.split("\t", 1) for l in log.splitlines()][::-1]
+    # Function headers show their parameters, read from the source at
+    # `after` (never written in the spec), trimmed to what the box uses
+    # when the list is long.
+    files = {}
+    for fig in group["figures"]:
+        for n in fig["nodes"]:
+            if n["kind"] != "fn":
+                continue
+            path, _, line = n["file"].partition(":")
+            if path not in files:
+                files[path] = git(repo, "show", f"{after}:{path}").splitlines()
+            used = "\n".join(ln.get("code", "") for ln in n.get("lines", []) if not ln.get("elide"))
+            n["params"] = render.header_params(render.signature_params(files[path], int(line) - 1), used)
     chrome = None if "--no-png" in flags else find_chrome()
     figures = []
     for i, fig in enumerate(group["figures"]):
@@ -95,7 +108,12 @@ def main():
         inline = svg.replace(m.group(0), f'data-w="{w:.0f}" data-h="{h:.0f}"', 1)
         inline = inline.replace("<svg ", f'<svg role="img" aria-label="{escape(fig["title"])}" ', 1)
         figures.append((i, fig, inline))
-    json.dump(group, open(os.path.join(out_dir, "spec.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    clean = json.loads(json.dumps(group))
+    clean.pop("slug", None)  # derived at build time, refused in a spec
+    for fig in clean["figures"]:
+        for n in fig["nodes"]:
+            n.pop("params", None)  # derived at build time, not part of the spec
+    json.dump(clean, open(os.path.join(out_dir, "spec.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8").write(page(group, figures))
     print(out_dir)
     print("png:", "written" if chrome else

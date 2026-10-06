@@ -1227,7 +1227,6 @@
   "layer_filter_for_countries": "테스트에서만 호출, main() 에서 닿지 않음",
   "build_filters_with_params": "벤치·테스트에서만 호출, main() 에서 닿지 않음"
  },
- "slug": "20261006-ARGO-d5c6429cc2",
  "commits": [
   [
    "ddc75c6e77",

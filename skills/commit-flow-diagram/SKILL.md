@@ -17,7 +17,7 @@ Every group this skill produces must look the same, whoever runs it and on whate
 
 | Element | Fixed rendering |
 | --- | --- |
-| Function box | solid outline, rounded corners |
+| Function box | solid outline, rounded corners; header `fn name(params)` with the parameters read from the source (never written in the spec). A list over 48 characters keeps only the parameters the box's code uses (and `self`), with `…` for the rest |
 | Struct / enum box | long-dash outline, square corners |
 | Static / const box | dotted outline, square corners |
 | Trait box | double outline, rounded corners |
@@ -86,7 +86,7 @@ One figure if all boxes fit in **18** — the verifier refuses a split below tha
 - **`+` marks:** on every line the range added or changed in content. A line that only moved or was re-indented is not changed — the verifier compares lines without surrounding whitespace, and it refuses both a missing and a wrong `+`.
 - **Struct / enum / static / const boxes show only what the flow uses:** the declaration line, the fields/variants/entries the drawn code reads, writes or the range changed, and `...` for the rest. A type of 6 lines or fewer may be shown whole; longer ones must elide.
 - **Notes:** one short note (user's language, at most 40 characters) saying why, written in plain words. Required on every call line that leads to another box (on the line itself or, for a call split over lines, the line just above). Allowed only on: those call lines, a `+` line, an early exit or the condition line right above one, a call continued in a later figure (ending `→ 그림 N`), and lines of type boxes. The verifier refuses a note anywhere else.
-- **Header:** `name` is the item's name as a reader would search for it (`cli_entry::run()`, `PiiCountry::parse()`, `PiiConfig`); `file` is `path:line` of the declaration line itself (`fn …`, `struct …`) at `after` — the verifier reads that line and checks it declares that name.
+- **Header:** `name` is the item's name as a reader would search for it, ending in `()` for functions (`cli_entry::run()`, `PiiCountry::parse()`, `PiiConfig`) — the build fills the parameters in from the declaration; `file` is `path:line` of the declaration line itself (`fn …`, `struct …`) at `after` — the verifier reads that line and checks it declares that name.
 - **Status:** `new` (the declaration did not exist at `before`), `changed` (it existed and the range touched it), `same` (not touched). The verifier computes it from the diff and refuses any other value.
 - **Arrows:** a call arrow leaves the line that calls the target (or the line just above it, for a call split over lines), and that line must contain the target's name. When the code calls it under another name (an `as` import, a re-export), add `"callee": "<name on the line>"` to that line.
 
