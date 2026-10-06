@@ -220,19 +220,17 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     svg.setAttribute('height', Math.round(h * scale));
     out.textContent = Math.round(scale * 100) + '%';
   }};
-  // Fit the whole figure, width and height, into the space it may take:
-  // the window in full screen, else the canvas's 82vh cap. The page opens
-  // fitted and stays fitted on resize until the reader zooms by hand.
-  let fitted = true;
+  // The page never rescales on its own: a figure opens at actual size and
+  // keeps whatever scale it has, so the browser's own zoom (Ctrl/Cmd +/-)
+  // is what sizes it. "화면 맞춤" fits the whole figure only when asked.
   const fit = () => {{
     const room = isFull() ? canvas.clientHeight : window.innerHeight * 0.82;
     if (!canvas.clientWidth || !room) return;
     scale = Math.min(1, (canvas.clientWidth - 2) / w, (room - 2) / h);
-    fitted = true; apply();
+    apply();
   }};
   fig.querySelector('.tools').addEventListener('click', (e) => {{
     const act = e.target.closest('button')?.dataset.act;
-    fitted = false;
     if (act === 'in') scale = Math.min(10, scale * 1.25);
     if (act === 'out') scale = Math.max(0.05, scale / 1.25);
     if (act === 'one') scale = 1;
@@ -256,7 +254,6 @@ document.querySelectorAll('.fig').forEach((fig) => {{
   const isFull = () => document.fullscreenElement === fig || fig.classList.contains('is-max');
   const sync = () => {{
     fullBtn.textContent = isFull() ? '전체 화면 닫기' : '전체 화면';
-    requestAnimationFrame(fit);
   }};
   const toggleFull = () => {{
     if (isFull()) {{
@@ -273,14 +270,11 @@ document.querySelectorAll('.fig').forEach((fig) => {{
   document.addEventListener('keydown', (e) => {{
     if (!isFull()) return;
     if (e.key === 'Escape' && fig.classList.contains('is-max')) toggleFull();
-    else if (e.key === '+' || e.key === '=') {{ fitted = false; scale = Math.min(10, scale * 1.25); apply(); }}
-    else if (e.key === '-') {{ fitted = false; scale = Math.max(0.05, scale / 1.25); apply(); }}
+    else if (e.key === '+' || e.key === '=') {{ scale = Math.min(10, scale * 1.25); apply(); }}
+    else if (e.key === '-') {{ scale = Math.max(0.05, scale / 1.25); apply(); }}
     else if (e.key === '0') fit();
   }});
-  fit();
-  requestAnimationFrame(fit);            // after layout settles
-  window.addEventListener('load', fit);  // after web fonts
-  window.addEventListener('resize', () => {{ if (fitted) fit(); }});
+  apply();
 }});
 </script>
 '''
