@@ -1,6 +1,6 @@
 ---
 name: argo-tizen-e2e
-description: Verify an argo-tizen (argot) change by RUNNING the real `argot` daemon against a deterministic mock LLM — prompt-guard modes and their events, PII refusal and outbound masking, boot refusal on a bad guardrail key, and an automation fire that resumes after a daemon crash — each case judged automatically. Use when asked for an actual run / real-execution check ("실제 실행 검증", "mock LLM으로 돌려봐", "e2e로 확인") of guardrails, prompt guard, PII or config-loading behaviour in an argo-tizen checkout. For ARGO (tinicli) use argo-release-e2e instead.
+description: Verify an argo-tizen (argot) change by RUNNING the real `argot` daemon against a deterministic mock LLM — prompt-guard modes and their events, PII refusal and outbound masking, boot refusal on a bad guardrail key, and an automation fire that resumes after a daemon crash — each case judged automatically. Use when asked for an actual run / real-execution check ("실제 실행 검증", "mock LLM으로 돌려봐", "e2e로 확인") of guardrails, prompt guard, PII or config-loading behaviour in an argo-tizen checkout. For ARGO (tinicli) use argo-e2e instead.
 ---
 
 # argo-tizen end-to-end run

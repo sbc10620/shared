@@ -1,5 +1,5 @@
 ---
-name: argo-release-e2e
+name: argo-e2e
 description: Verify an ARGO change by RUNNING the real release `argo` binaries (with and without the `guardrails` feature) against a deterministic mock LLM — single-shot, daemon (/api/v1/chat) and boot-refusal cases, judged automatically. Use when asked for an actual run / real-execution check ("실제 실행 검증", "mock LLM으로 돌려봐", "release 빌드로 확인") of guardrails, prompt guard, PII or config-loading behaviour in an ARGO checkout.
 ---
 
