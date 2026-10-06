@@ -23,10 +23,14 @@ COL_GAP = 110
 ROW_GAP = 26
 MARGIN = 30
 
+# Dark-gray theme, fixed for every figure (easy on the eyes, prints the
+# same on any viewer). CANVAS is the picture ground, BOX the box face.
+CANVAS = "#2a2c30"
+BOX = "#35383e"
 STATUS = {
-    "new": {"stroke": "#15803d", "head": "#dcfce7", "badge": "신규"},
-    "changed": {"stroke": "#c2410c", "head": "#ffedd5", "badge": "변경"},
-    "same": {"stroke": "#64748b", "head": "#f1f5f9", "badge": "기존"},
+    "new": {"stroke": "#3fb950", "head": "#21382a", "badge": "신규"},
+    "changed": {"stroke": "#f0883e", "head": "#47301f", "badge": "변경"},
+    "same": {"stroke": "#8b949e", "head": "#40444b", "badge": "기존"},
 }
 KIND_DASH = {"fn": "", "trait": "", "struct": "7 4", "enum": "7 4", "static": "2 3"}
 DATA_KINDS = {"struct", "enum", "static", "trait"}
@@ -35,9 +39,9 @@ DATA_KINDS = {"struct", "enum", "static", "trait"}
 # One palette for every language; the token rules are deliberately small
 # (C-family shape: Rust, C/C++, Java, Kotlin, Go, TS/JS, Swift).
 HL = {
-    "kw": "#cf222e", "str": "#0a3069", "num": "#0550ae", "type": "#953800",
-    "fn": "#8250df", "macro": "#0550ae", "com": "#6e7781", "attr": "#6e7781",
-    "life": "#953800", "plain": "#1f2328",
+    "kw": "#ff7b72", "str": "#a5d6ff", "num": "#79c0ff", "type": "#ffa657",
+    "fn": "#d2a8ff", "macro": "#79c0ff", "com": "#8b949e", "attr": "#8b949e",
+    "life": "#ffa657", "plain": "#e6edf3",
 }
 KEYWORDS = set("""
 as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod
@@ -234,7 +238,7 @@ def code_tspans(code, callees, dim, call_line):
     whole, and the called name inside it is also underlined."""
     parts = []
     for kind, text in tokens(code):
-        color = "#94a3b8" if dim else HL[kind]
+        color = "#7d8590" if dim else HL[kind]
         extra = ' text-decoration="underline"' if call_line and kind in ("fn", "plain") and text in callees else ""
         parts.append(f'<tspan fill="{color}"{extra}>{escape(text)}</tspan>')
     style = ' font-weight="700" font-style="italic"' if call_line else ""
@@ -249,28 +253,28 @@ def render_node(n, by_id, out):
     dash = KIND_DASH[kind]
     dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
     out.append(f'<g class="node" id="n-{escape(n["id"])}">')
-    out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="#ffffff" '
+    out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{BOX}" '
                f'stroke="{st["stroke"]}" stroke-width="{2.0 if kind == "static" else 1.8}"{dash_attr}/>')
     inset = 5 if kind == "trait" else 1
     if kind == "trait":
         out.append(f'<rect x="{x+4}" y="{y+4}" width="{w-8}" height="{h-8}" rx="{rx-3}" fill="none" '
                    f'stroke="{st["stroke"]}" stroke-width="1.2"/>')
     out.append(f'<rect x="{x+inset}" y="{y+inset}" width="{w-2*inset}" height="{HEAD_H-inset}" '
-               f'rx="{max(rx-2, 0)}" fill="{st["head"]}" fill-opacity="0.85"/>')
+               f'rx="{max(rx-2, 0)}" fill="{st["head"]}" />')
     out.append(f'<path d="M{x+inset},{y+HEAD_H} H{x+w-inset}" stroke="{st["stroke"]}" stroke-opacity="0.35"/>')
     out.append(f'<text x="{x+PAD}" y="{y+18}" font-family="{CODE_FONT}" font-size="13" font-weight="700" '
-               f'fill="#0f172a" xml:space="preserve"><tspan fill="#64748b" font-weight="400">{kind} </tspan>'
+               f'fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">{kind} </tspan>'
                f'{escape(n["name"])}</text>')
     if n.get("file"):
-        out.append(f'<text x="{x+PAD}" y="{y+33}" font-family="{CODE_FONT}" font-size="10" fill="#64748b">'
+        out.append(f'<text x="{x+PAD}" y="{y+33}" font-family="{CODE_FONT}" font-size="10" fill="#9da7b3">'
                    f'{escape(n["file"])}</text>')
     bw = 34
     out.append(f'<rect x="{x+w-bw-8}" y="{y+8}" width="{bw}" height="18" rx="9" fill="{st["stroke"]}"/>')
     out.append(f'<text x="{x+w-8-bw/2}" y="{y+21}" text-anchor="middle" font-family="{TEXT_FONT}" font-size="11" '
-               f'font-weight="700" fill="#ffffff">{st["badge"]}</text>')
+               f'font-weight="700" fill="#16181c">{st["badge"]}</text>')
     cy = y + HEAD_H
     if n.get("desc"):
-        out.append(f'<text x="{x+PAD}" y="{cy+15}" font-family="{TEXT_FONT}" font-size="11" fill="#334155">'
+        out.append(f'<text x="{x+PAD}" y="{cy+15}" font-family="{TEXT_FONT}" font-size="11" fill="#c9d1d9">'
                    f'{escape(n["desc"])}</text>')
         cy += 18
     cy += 6
@@ -278,17 +282,17 @@ def render_node(n, by_id, out):
         if ln.get("note"):
             cy += LH
             out.append(f'<text x="{x+PAD+GUTTER}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}" '
-                       f'fill="#15803d" xml:space="preserve">// {escape(ln["note"])}</text>')
+                       f'fill="#8fd694" xml:space="preserve">// {escape(ln["note"])}</text>')
         cy += LH
         elide = ln.get("elide")
         code = (" " * ln.get("indent", 0)) + "..." if elide else ln["code"]
         dim = bool(ln.get("dim") or elide)
         if ln.get("mark"):
-            out.append(f'<rect x="{x+2}" y="{cy-LH+1}" width="{w-4}" height="{LH}" fill="#fef9c3" fill-opacity="0.8"/>')
+            out.append(f'<rect x="{x+2}" y="{cy-LH+1}" width="{w-4}" height="{LH}" fill="#4b4220"/>')
             out.append(f'<text x="{x+PAD}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}" font-weight="700" '
-                       f'fill="#a16207">+</text>')
+                       f'fill="#e3b341">+</text>')
         call_line = any(k in ("call", "defer") for _, _, k in edges_of({"lines": [ln]}))
-        style, body = (("", f'<tspan fill="#94a3b8">{escape(code)}</tspan>') if elide
+        style, body = (("", f'<tspan fill="#7d8590">{escape(code)}</tspan>') if elide
                        else code_tspans(code, callee_names(ln, by_id), dim, call_line))
         out.append(f'<text x="{x+PAD+GUTTER}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}"{style} '
                    f'xml:space="preserve">{body}</text>')
@@ -315,18 +319,18 @@ def render_edges(nodes, by_id, out):
                 dx = max(40, (x2 - x1) * 0.5)
                 d = f"M{x1},{y1} C{x1+dx},{y1} {x2-dx},{y2} {x2-2},{y2}"
             if kind == "use":
-                attrs = 'stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"'
+                attrs = 'stroke="#7d8590" stroke-width="1.4" stroke-dasharray="2 4" fill="none"'
             elif kind == "defer":
-                attrs = ('stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="8 5" fill="none" '
+                attrs = ('stroke="#c297ff" stroke-width="1.6" stroke-dasharray="8 5" fill="none" '
                          'marker-end="url(#arrow-defer)"')
             else:
-                attrs = 'stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"'
+                attrs = 'stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"'
             out.append(f'<path d="{d}" {attrs}/>')
             if ln.get("label"):
                 lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6
                 tw = text_width(ln["label"], 11) + 10
-                col = "#7c3aed" if kind == "defer" else "#1e3a8a"
-                out.append(f'<rect x="{lx-tw/2}" y="{ly-12}" width="{tw}" height="17" rx="4" fill="#ffffff" '
+                col = "#c297ff" if kind == "defer" else "#79a8ff"
+                out.append(f'<rect x="{lx-tw/2}" y="{ly-12}" width="{tw}" height="17" rx="4" fill="{BOX}" '
                            f'stroke="{col}" stroke-width="0.8"/>')
                 out.append(f'<text x="{lx}" y="{ly+1}" text-anchor="middle" font-family="{TEXT_FONT}" '
                            f'font-size="11" fill="{col}">{escape(ln["label"])}</text>')
@@ -334,38 +338,38 @@ def render_edges(nodes, by_id, out):
 
 def render_legend(x, y, out):
     def label(cx, s):
-        out.append(f'<text x="{cx}" y="{y}" font-family="{TEXT_FONT}" font-size="12" fill="#334155">{s}</text>')
+        out.append(f'<text x="{cx}" y="{y}" font-family="{TEXT_FONT}" font-size="12" fill="#c9d1d9">{s}</text>')
         return cx + text_width(s, 12) + 22
 
     out.append(f'<text x="{x}" y="{y}" font-family="{TEXT_FONT}" font-size="12" font-weight="700" '
-               f'fill="#0f172a">범례</text>')
+               f'fill="#e6edf3">범례</text>')
     cx = x + 40
     for kind, name in (("fn", "함수"), ("struct", "구조체 · enum"), ("static", "static · const"), ("trait", "트레잇")):
         dash = f' stroke-dasharray="{KIND_DASH[kind]}"' if KIND_DASH[kind] else ""
         rx = 6 if kind in ("fn", "trait") else 0
-        out.append(f'<rect x="{cx}" y="{y-13}" width="34" height="18" rx="{rx}" fill="#ffffff" stroke="#334155" '
+        out.append(f'<rect x="{cx}" y="{y-13}" width="34" height="18" rx="{rx}" fill="{BOX}" stroke="#c9d1d9" '
                    f'stroke-width="1.6"{dash}/>')
         if kind == "trait":
-            out.append(f'<rect x="{cx+3}" y="{y-10}" width="28" height="12" rx="3" fill="none" stroke="#334155" '
+            out.append(f'<rect x="{cx+3}" y="{y-10}" width="28" height="12" rx="3" fill="none" stroke="#c9d1d9" '
                        f'stroke-width="1"/>')
         cx = label(cx + 42, name)
     for key in ("new", "changed", "same"):
         st = STATUS[key]
         out.append(f'<rect x="{cx}" y="{y-13}" width="34" height="18" rx="9" fill="{st["stroke"]}"/>')
         out.append(f'<text x="{cx+17}" y="{y}" text-anchor="middle" font-family="{TEXT_FONT}" font-size="11" '
-                   f'font-weight="700" fill="#ffffff">{st["badge"]}</text>')
+                   f'font-weight="700" fill="#16181c">{st["badge"]}</text>')
         cx += 46
     cx += 10
-    out.append(f'<path d="M{cx},{y-4} h40" stroke="#1e3a8a" stroke-width="1.5" marker-end="url(#arrow)"/>')
+    out.append(f'<path d="M{cx},{y-4} h40" stroke="#79a8ff" stroke-width="1.5" marker-end="url(#arrow)"/>')
     cx = label(cx + 48, "호출 (호출 줄은 굵은 기울임, 호출되는 함수는 밑줄)")
-    out.append(f'<path d="M{cx},{y-4} h40" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="8 5" '
+    out.append(f'<path d="M{cx},{y-4} h40" stroke="#c297ff" stroke-width="1.6" stroke-dasharray="8 5" '
                f'marker-end="url(#arrow-defer)"/>')
     cx = label(cx + 48, "나중에 실행(클로저 등록)")
-    out.append(f'<path d="M{cx},{y-4} h40" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4"/>')
+    out.append(f'<path d="M{cx},{y-4} h40" stroke="#7d8590" stroke-width="1.4" stroke-dasharray="2 4"/>')
     cx = label(cx + 48, "타입 · 데이터 사용")
-    out.append(f'<rect x="{cx}" y="{y-13}" width="34" height="18" fill="#fef9c3" stroke="#eab308" stroke-width="0.8"/>')
+    out.append(f'<rect x="{cx}" y="{y-13}" width="34" height="18" fill="#4b4220" stroke="#e3b341" stroke-width="0.8"/>')
     out.append(f'<text x="{cx+5}" y="{y}" font-family="{CODE_FONT}" font-size="12" font-weight="700" '
-               f'fill="#a16207">+</text>')
+               f'fill="#e3b341">+</text>')
     label(cx + 42, "이 범위에서 추가 · 수정된 줄     ...  생략한 코드")
 
 
@@ -379,9 +383,9 @@ def render(group, fig):
         render_node(n, by_id, body)
     render_edges(nodes, by_id, edges)
     head.append(f'<text x="{MARGIN}" y="{MARGIN+4}" font-family="{TEXT_FONT}" font-size="18" font-weight="700" '
-                f'fill="#0f172a">{escape(fig["title"])}</text>')
+                f'fill="#e6edf3">{escape(fig["title"])}</text>')
     sub = "  ·  ".join(s for s in (group.get("range"), fig.get("caption")) if s)
-    head.append(f'<text x="{MARGIN}" y="{MARGIN+24}" font-family="{CODE_FONT}" font-size="11" fill="#475569">'
+    head.append(f'<text x="{MARGIN}" y="{MARGIN+24}" font-family="{CODE_FONT}" font-size="11" fill="#9da7b3">'
                 f'{escape(sub)}</text>')
     render_legend(MARGIN, MARGIN + 52, head)
     return "\n".join([
@@ -389,11 +393,11 @@ def render(group, fig):
         f'viewBox="0 0 {total_w:.0f} {total_h:.0f}">',
         '<defs>'
         '<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" '
-        'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1e3a8a"/></marker>'
+        'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#79a8ff"/></marker>'
         '<marker id="arrow-defer" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" '
-        'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>'
+        'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c297ff"/></marker>'
         '</defs>',
-        '<rect width="100%" height="100%" fill="#ffffff"/>',
+        f'<rect width="100%" height="100%" fill="{CANVAS}"/>',
         *head, *edges, *body, '</svg>',
     ])
 

@@ -121,7 +121,6 @@ def page(group, figures):
     </div>
   </header>
   <div class="canvas" tabindex="0">{svg}</div>
-  <button type="button" class="full-close" aria-label="전체 화면 닫기" title="닫기 (Esc)">✕</button>
 </section>''' for i, f, svg in figures)
     return f'''<title>{escape(page_title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -130,25 +129,17 @@ def page(group, figures):
 <style>
 /* Layout: a narrow reading column for the summary, full-bleed scrollable canvases for the diagrams. */
 :root {{
-  --bg: #eef1f4;
-  --surface: #ffffff;
-  --ink: #18212b;
-  --muted: #566372;
-  --line: #cfd6de;
-  --accent: #1e3a8a;
-  --paper: #ffffff;
+  /* One deliberate dark-gray look, the same for every viewer and theme. */
+  --bg: #1f2124;
+  --surface: #26282c;
+  --ink: #e6edf3;
+  --muted: #9da7b3;
+  --line: #3a3d43;
+  --accent: #79a8ff;
+  --paper: #2a2c30;
   --font-text: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
   --font-code: 'JetBrains Mono', Menlo, Consolas, monospace;
-}}
-@media (prefers-color-scheme: dark) {{
-  :root:not([data-theme="light"]) {{
-    --bg: #12171d; --surface: #1b222b; --ink: #e4e9ef; --muted: #9aa7b6; --line: #2f3a46;
-    --accent: #8fb0ff; --paper: #ffffff; color-scheme: dark;
-  }}
-}}
-:root[data-theme="dark"] {{
-  --bg: #12171d; --surface: #1b222b; --ink: #e4e9ef; --muted: #9aa7b6; --line: #2f3a46;
-  --accent: #8fb0ff; --paper: #ffffff; color-scheme: dark;
+  color-scheme: dark;
 }}
 * {{ box-sizing: border-box; }}
 body {{
@@ -196,19 +187,9 @@ h1 {{ font-size: clamp(22px, 3vw, 30px); line-height: 1.3; margin: 0; text-wrap:
 }}
 .fig.is-max {{ padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }}
 .fig:fullscreen .canvas, .fig.is-max .canvas {{ max-height: none; flex: 1; min-height: 0; }}
-/* In full screen only the figure shows: no title bar, no buttons. A small
-   close mark stays in the corner for touch screens; Esc also closes, and
-   + / - / 0 zoom, zoom out and fit. */
+/* In full screen only the figure shows: no title bar, no buttons. Esc
+   closes; + / - / 0 zoom in, zoom out and fit. */
 .fig:fullscreen .fig-head, .fig.is-max .fig-head {{ display: none; }}
-.fig {{ position: relative; }}
-.full-close {{ display: none; }}
-.fig:fullscreen .full-close, .fig.is-max .full-close {{
-  display: block; position: absolute; z-index: 2;
-  top: calc(env(safe-area-inset-top, 0px) + 10px); right: 14px;
-  width: 32px; height: 32px; border-radius: 50%; border: 1px solid #cbd5e1;
-  background: rgba(255, 255, 255, .85); color: #334155; font-size: 15px; cursor: pointer; opacity: .55;
-}}
-.full-close:hover, .full-close:focus-visible {{ opacity: 1; }}
 body.has-max {{ overflow: hidden; }}
 </style>
 
@@ -219,7 +200,7 @@ body.has-max {{ overflow: hidden; }}
     <ul class="commits">{commits}</ul>
     <ol class="rules">
       <li>박스 안의 코드는 실제 소스를 그대로 옮겼습니다. <code>...</code> 은 생략한 구간이고, 원래 있던 영어 주석은 빼고 한글 설명(초록 <code>//</code>)으로 바꿨습니다.</li>
-      <li>노란 줄과 <code>+</code> 는 이 커밋 범위에서 추가·수정된 줄입니다. 박스 오른쪽 위 배지는 함수 단위의 신규·변경·기존을 뜻합니다.</li>
+      <li>황토색 줄과 <code>+</code> 는 이 커밋 범위에서 추가·수정된 줄입니다. 박스 오른쪽 위 배지는 함수 단위의 신규·변경·기존을 뜻합니다.</li>
       <li>호출하는 줄의 오른쪽 점에서 화살표가 나갑니다. 그림은 드래그하거나 스크롤해서 움직일 수 있습니다.</li>
     </ol>
     <nav class="toc">{toc}</nav>
@@ -246,8 +227,8 @@ document.querySelectorAll('.fig').forEach((fig) => {{
   }};
   fig.querySelector('.tools').addEventListener('click', (e) => {{
     const act = e.target.closest('button')?.dataset.act;
-    if (act === 'in') scale = Math.min(3, scale * 1.25);
-    if (act === 'out') scale = Math.max(0.15, scale / 1.25);
+    if (act === 'in') scale = Math.min(10, scale * 1.25);
+    if (act === 'out') scale = Math.max(0.05, scale / 1.25);
     if (act === 'one') scale = 1;
     if (act === 'fit') return fit();
     if (act === 'full') return toggleFull();
@@ -283,12 +264,11 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     else fallback();
   }};
   document.addEventListener('fullscreenchange', sync);
-  fig.querySelector('.full-close').addEventListener('click', toggleFull);
   document.addEventListener('keydown', (e) => {{
     if (!isFull()) return;
     if (e.key === 'Escape' && fig.classList.contains('is-max')) toggleFull();
-    else if (e.key === '+' || e.key === '=') {{ scale = Math.min(3, scale * 1.25); apply(); }}
-    else if (e.key === '-') {{ scale = Math.max(0.15, scale / 1.25); apply(); }}
+    else if (e.key === '+' || e.key === '=') {{ scale = Math.min(10, scale * 1.25); apply(); }}
+    else if (e.key === '-') {{ scale = Math.max(0.05, scale / 1.25); apply(); }}
     else if (e.key === '0') fit();
   }});
   fit();
