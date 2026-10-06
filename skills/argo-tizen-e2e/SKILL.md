@@ -30,6 +30,8 @@ Python 3.8+ scripts. Paths below are relative to this skill's directory
   with its non-system texts; a request offering `tools` is an agent turn.
 - `scripts/argot_e2e.py` — the driver. The spec schema is in its docstring.
 - `specs/guardrails.json` — the current guardrail matrix:
+  - `defaults`: with no guard sections, the prompt guard and the
+    tool-output guard are both on (refusal, withheld tool result).
   - `pg-off|on|warn|block`: tinicore built-in rules (old baseline phrase,
     a rule Argot never had, `invisible_payload`), Argot's forged
     `<turn-context>` / `<argot-context>` tags (incl. a Hangul letter right
@@ -83,6 +85,10 @@ Python 3.8+ scripts. Paths below are relative to this skill's directory
 - Processes are stopped by PID only. Never `pkill -f` a pattern.
 
 ## Known behaviour (when writing expectations)
+
+- `[safety.prompt_guard]` and `[safety.tool_output_guard]` default to `on`
+  (since argo-tizen `ac1e2c62`). A suite that tests one layer alone must set
+  the other to `off`, or a user prompt carrying the payload is refused first.
 
 - The guard refusal reply is the neutral `I can't help with that request.`
   for both prompt-guard and PII refusals.
