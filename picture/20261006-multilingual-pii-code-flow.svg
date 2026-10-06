@@ -1,0 +1,425 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3377.4799999999987" height="1750" viewBox="0 0 3377.4799999999987 1750">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1e3a8a"/></marker><marker id="arrow-defer" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="30" y="34" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="18" font-weight="700" fill="#0f172a">PII 국가 선택(pii_locales) 코드 흐름</text>
+<text x="30" y="54" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="11" fill="#475569">ARGO  origin/main(8ead9197ca)..d5c6429cc2  ·  커밋 3개(tinicore 분리 · tinicli pii_locales · 문서)  ·  argo 바이너리 main 부터</text>
+<text x="30" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" font-weight="700" fill="#0f172a">범례</text>
+<rect x="70" y="69" width="34" height="18" rx="6" fill="#fff" stroke="#334155" stroke-width="1.6"/>
+<text x="112" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">함수</text>
+<rect x="160.48000000000002" y="69" width="34" height="18" rx="0" fill="#fff" stroke="#334155" stroke-width="1.6" stroke-dasharray="7 4"/>
+<text x="202.48000000000002" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">구조체 · enum</text>
+<rect x="314.44" y="69" width="34" height="18" rx="0" fill="#fff" stroke="#334155" stroke-width="1.6" stroke-dasharray="2 3"/>
+<text x="356.44" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">static · const</text>
+<rect x="482.91999999999996" y="69" width="34" height="18" rx="6" fill="#fff" stroke="#334155" stroke-width="1.6"/>
+<rect x="485.91999999999996" y="72" width="28" height="12" rx="3" fill="none" stroke="#334155" stroke-width="1"/>
+<text x="524.92" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">트레잇</text>
+<rect x="585.64" y="69" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="602.64" y="82" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#fff">신규</text>
+<rect x="631.64" y="69" width="34" height="18" rx="9" fill="#c2410c"/>
+<text x="648.64" y="82" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#fff">변경</text>
+<rect x="677.64" y="69" width="34" height="18" rx="9" fill="#64748b"/>
+<text x="694.64" y="82" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#fff">기존</text>
+<path d="M733.64,78 h40" stroke="#1e3a8a" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="781.64" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">호출</text>
+<path d="M823.64,78 h40" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="8 5" marker-end="url(#arrow-defer)"/>
+<text x="871.64" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">나중에 실행(클로저 등록)</text>
+<path d="M1047.32,78 h40" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4"/>
+<text x="1095.32" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">타입·데이터 사용</text>
+<rect x="1219.6399999999999" y="69" width="34" height="18" fill="#fef9c3" stroke="#eab308" stroke-width="0.8"/>
+<text x="1261.6399999999999" y="82" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#334155">이 커밋에서 추가·수정된 줄</text>
+<path d="M338.8399999999998,170.5 H366.8399999999998 V236 H268.74000000000007" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M266.74000000000007,286.5 C357.78999999999996,286.5 357.78999999999996,120 446.8399999999998,120" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M877.4399999999996,188.5 C932.4399999999996,188.5 932.4399999999996,120 985.4399999999996,120" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M877.4399999999996,222.5 C932.4399999999996,222.5 932.4399999999996,270 985.4399999999996,270" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M877.4399999999996,256.5 C932.4399999999996,256.5 932.4399999999996,403 985.4399999999996,403" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M877.4399999999996,290.5 C932.4399999999996,290.5 932.4399999999996,536 985.4399999999996,536" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M877.4399999999996,341.5 C932.4399999999996,341.5 932.4399999999996,823 985.4399999999996,823" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M877.4399999999996,358.5 C932.4399999999996,358.5 932.4399999999996,1059 985.4399999999996,1059" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<path d="M1288.9599999999994,170.5 C1425.7399999999993,170.5 1425.7399999999993,386 1560.5199999999993,386" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<path d="M1288.9599999999994,204.5 C1425.7399999999993,204.5 1425.7399999999993,120 1560.5199999999993,120" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1418.3199999999993,621.5 C1490.4199999999992,621.5 1490.4199999999992,536 1560.5199999999993,536" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1418.3199999999993,672.5 C1490.4199999999992,672.5 1490.4199999999992,686 1560.5199999999993,686" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1418.3199999999993,689.5 C1490.4199999999992,689.5 1490.4199999999992,952 1560.5199999999993,952" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<path d="M1394.6799999999996,942.5 C1478.5999999999995,942.5 1478.5999999999995,1068 1560.5199999999993,1068" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1394.6799999999996,976.5 C1478.5999999999995,976.5 1478.5999999999995,1334 1560.5199999999993,1334" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1964.119999999999,170.5 H1992.119999999999 V236 H1890.3199999999993" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<path d="M1961.7199999999991,736.5 H1989.7199999999991 V819 H1890.3199999999993" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<path d="M1902.3499999999995,1118.5 H1930.3499999999995 V1235 H1822.7199999999993" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<path d="M1882.2199999999991,1384.5 C1978.1699999999992,1384.5 1978.1699999999992,1334 2072.119999999999,1334" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M2417.159999999999,1384.5 C2472.159999999999,1384.5 2472.159999999999,1235 2525.159999999999,1235" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M2417.159999999999,1435.5 C2472.159999999999,1435.5 2472.159999999999,1351 2525.159999999999,1351" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="8 5" fill="none" marker-end="url(#arrow-defer)"/>
+<rect x="2406.604999999999" y="1375.25" width="131.10999999999999" height="17" rx="4" fill="#ffffff" stroke="#7c3aed" stroke-width="0.8"/>
+<text x="2472.159999999999" y="1388.25" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" fill="#7c3aed">턴마다 필요할 때 실행</text>
+<path d="M2850.6399999999985,1285.5 C2890.6399999999985,1285.5 1522.5199999999993,1235 1560.5199999999993,1235" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<path d="M2899.4799999999987,1419.5 C2954.4799999999987,1419.5 2954.4799999999987,1351 3007.4799999999987,1351" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M2899.4799999999987,1453.5 C2954.4799999999987,1453.5 2954.4799999999987,1501 3007.4799999999987,1501" stroke="#1e3a8a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M3329.1799999999985,1435.5 H3357.1799999999985 V1617 H3287.869999999999" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="2 4" fill="none"/>
+<g class="node" id="n-main">
+<rect x="30" y="100" width="308.8399999999998" height="90" rx="10" fill="#ffffff" stroke="#64748b" stroke-width="1.8"/>
+<path d="M31,140 H337.8399999999998" stroke="#64748b" stroke-opacity="0.35"/>
+<rect x="31" y="101" width="306.8399999999998" height="39" rx="8" fill="#f1f5f9" fill-opacity="0.85"/>
+<text x="42" y="118" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>main()</text>
+<text x="42" y="133" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">argo-cli/src/main.rs</text>
+<rect x="296.8399999999998" y="108" width="34" height="18" rx="9" fill="#64748b"/>
+<text x="313.8399999999998" y="121" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">기존</text>
+<text x="42" y="159" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// tokio 런타임에서 CLI 실행</text>
+<text x="42" y="176" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">runtime.block_on(tinicli::run_cli());</text>
+<circle cx="338.8399999999998" cy="170.5" r="3.5" fill="#64748b"/>
+</g>
+<g class="node" id="n-run_cli">
+<rect x="30" y="216" width="236.74000000000007" height="90" rx="10" fill="#ffffff" stroke="#64748b" stroke-width="1.8"/>
+<path d="M31,256 H265.74000000000007" stroke="#64748b" stroke-opacity="0.35"/>
+<rect x="31" y="217" width="234.74000000000007" height="39" rx="8" fill="#f1f5f9" fill-opacity="0.85"/>
+<text x="42" y="234" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>tinicli::run_cli()</text>
+<text x="42" y="249" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/lib.rs</text>
+<rect x="224.74000000000007" y="224" width="34" height="18" rx="9" fill="#64748b"/>
+<text x="241.74000000000007" y="237" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">기존</text>
+<text x="42" y="275" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 설정 읽고 부팅 시작</text>
+<text x="42" y="292" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">cli_entry::run().await;</text>
+<circle cx="266.74000000000007" cy="286.5" r="3.5" fill="#64748b"/>
+</g>
+<g class="node" id="n-run">
+<rect x="448.8399999999998" y="100" width="428.5999999999998" height="312" rx="10" fill="#ffffff" stroke="#c2410c" stroke-width="1.8"/>
+<path d="M449.8399999999998,140 H876.4399999999996" stroke="#c2410c" stroke-opacity="0.35"/>
+<rect x="449.8399999999998" y="101" width="426.5999999999998" height="39" rx="8" fill="#ffedd5" fill-opacity="0.85"/>
+<text x="460.8399999999998" y="118" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>cli_entry::run()</text>
+<text x="460.8399999999998" y="133" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/cli_entry.rs</text>
+<rect x="835.4399999999996" y="108" width="34" height="18" rx="9" fill="#c2410c"/>
+<text x="852.4399999999996" y="121" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">변경</text>
+<text x="460.8399999999998" y="155" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" fill="#334155">config.toml 을 읽고 guardrail 을 설치한 뒤 REPL/daemon 으로 진입</text>
+<text x="460.8399999999998" y="177" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// config.toml 파싱 + 잘못 놓인 키 수집</text>
+<text x="460.8399999999998" y="194" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let mut cfg = load_config(&amp;config_path);</text>
+<circle cx="877.4399999999996" cy="188.5" r="3.5" fill="#c2410c"/>
+<text x="460.8399999999998" y="211" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 잘못 놓인 guardrail 키가 있으면 거부</text>
+<text x="460.8399999999998" y="228" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">check_guardrail_keys(&amp;cfg)  // Err → 부팅 중단</text>
+<circle cx="877.4399999999996" cy="222.5" r="3.5" fill="#c2410c"/>
+<text x="460.8399999999998" y="245" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// OS locale 문자열 읽기</text>
+<rect x="450.8399999999998" y="250" width="424.5999999999998" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="460.8399999999998" y="262" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let device_locale = device_locale();</text>
+<circle cx="877.4399999999996" cy="256.5" r="3.5" fill="#c2410c"/>
+<text x="460.8399999999998" y="279" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 설정 → device → US 순서로 국가 결정</text>
+<rect x="450.8399999999998" y="284" width="424.5999999999998" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="460.8399999999998" y="296" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let pii_countries = resolve_pii_countries(</text>
+<circle cx="877.4399999999996" cy="290.5" r="3.5" fill="#c2410c"/>
+<rect x="450.8399999999998" y="301" width="424.5999999999998" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="460.8399999999998" y="313" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    cfg.pii_locales, device_locale) // Err → 부팅 중단</text>
+<text x="460.8399999999998" y="330" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 고른 국가를 넘겨 guardrail 설치</text>
+<text x="460.8399999999998" y="347" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">install_guardrails_from_config(GuardrailsConfig {</text>
+<circle cx="877.4399999999996" cy="341.5" r="3.5" fill="#c2410c"/>
+<text x="460.8399999999998" y="364" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    pii: PiiConfig { mode, …,</text>
+<circle cx="877.4399999999996" cy="358.5" r="3.5" fill="#c2410c"/>
+<rect x="450.8399999999998" y="369" width="424.5999999999998" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="460.8399999999998" y="381" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">        countries: Some(pii_countries) }, … })</text>
+<text x="460.8399999999998" y="398" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#94a3b8" xml:space="preserve">// 이후 REPL / daemon 진입 (변경 없음)</text>
+</g>
+<g class="node" id="n-load_config">
+<rect x="987.4399999999996" y="100" width="301.5199999999998" height="124" rx="10" fill="#ffffff" stroke="#64748b" stroke-width="1.8"/>
+<path d="M988.4399999999996,140 H1287.9599999999994" stroke="#64748b" stroke-opacity="0.35"/>
+<rect x="988.4399999999996" y="101" width="299.5199999999998" height="39" rx="8" fill="#f1f5f9" fill-opacity="0.85"/>
+<text x="999.4399999999996" y="118" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>config::load_config()</text>
+<text x="999.4399999999996" y="133" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/config.rs</text>
+<rect x="1246.9599999999994" y="108" width="34" height="18" rx="9" fill="#64748b"/>
+<text x="1263.9599999999994" y="121" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">기존</text>
+<text x="999.4399999999996" y="159" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// pii_locales 필드도 여기서 채워짐</text>
+<text x="999.4399999999996" y="176" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">toml::from_str::&lt;CliConfig&gt;(&amp;text)</text>
+<circle cx="1288.9599999999994" cy="170.5" r="3.5" fill="#64748b"/>
+<text x="999.4399999999996" y="193" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// [table] 아래에 쓴 guardrail 키 찾기</text>
+<text x="999.4399999999996" y="210" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">find_misplaced_guardrail_keys(&amp;text)</text>
+<circle cx="1288.9599999999994" cy="204.5" r="3.5" fill="#64748b"/>
+</g>
+<g class="node" id="n-check_keys">
+<rect x="987.4399999999996" y="250" width="465.0799999999997" height="107" rx="10" fill="#ffffff" stroke="#64748b" stroke-width="1.8"/>
+<path d="M988.4399999999996,290 H1451.5199999999993" stroke="#64748b" stroke-opacity="0.35"/>
+<rect x="988.4399999999996" y="251" width="463.0799999999997" height="39" rx="8" fill="#f1f5f9" fill-opacity="0.85"/>
+<text x="999.4399999999996" y="268" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>check_guardrail_keys()</text>
+<text x="999.4399999999996" y="283" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/guardrails/prompt_guard.rs</text>
+<rect x="1410.5199999999993" y="258" width="34" height="18" rx="9" fill="#64748b"/>
+<text x="1427.5199999999993" y="271" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">기존</text>
+<text x="999.4399999999996" y="309" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 수집된 키가 하나라도 있으면</text>
+<text x="999.4399999999996" y="326" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">if let Some(path) = cfg.misplaced_guardrail_keys.first()</text>
+<text x="999.4399999999996" y="343" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    return Err("… `hub.pii_locales` is inside a table …")</text>
+</g>
+<g class="node" id="n-device_locale">
+<rect x="987.4399999999996" y="383" width="286.8799999999998" height="107" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M988.4399999999996,423 H1273.3199999999995" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="988.4399999999996" y="384" width="284.8799999999998" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="999.4399999999996" y="401" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>device_locale()</text>
+<text x="999.4399999999996" y="416" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/guardrails/pii.rs</text>
+<rect x="1232.3199999999995" y="391" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1249.3199999999995" y="404" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="999.4399999999996" y="442" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// OS API 우선, 없으면 환경 변수</text>
+<text x="999.4399999999996" y="459" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">locale_native::current_locale()</text>
+<text x="999.4399999999996" y="476" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    .or_else(LANG).or_else(LC_ALL)</text>
+</g>
+<g class="node" id="n-resolve">
+<rect x="987.4399999999996" y="516" width="430.8799999999997" height="261" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M988.4399999999996,556 H1417.3199999999993" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="988.4399999999996" y="517" width="428.8799999999997" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="999.4399999999996" y="534" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>resolve_pii_countries()</text>
+<text x="999.4399999999996" y="549" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/guardrails/pii.rs</text>
+<rect x="1376.3199999999993" y="524" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1393.3199999999993" y="537" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="999.4399999999996" y="571" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" fill="#334155">어느 국가의 PII recognizer 를 켤지 정한다</text>
+<text x="999.4399999999996" y="593" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 1) pii_locales 가 있으면 그 값만 사용</text>
+<text x="999.4399999999996" y="610" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">if let Some(values) = configured {</text>
+<text x="999.4399999999996" y="627" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    return parse_pii_countries(values)  // → Config</text>
+<circle cx="1418.3199999999993" cy="621.5" r="3.5" fill="#15803d"/>
+<text x="999.4399999999996" y="644" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">}</text>
+<text x="999.4399999999996" y="661" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 2) device locale 의 지역(KR, US …)</text>
+<text x="999.4399999999996" y="678" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">match PiiCountry::from_locale_tag(device) {</text>
+<circle cx="1418.3199999999993" cy="672.5" r="3.5" fill="#15803d"/>
+<text x="999.4399999999996" y="695" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    Ok(c)  =&gt; vec![c]               // → Device</text>
+<circle cx="1418.3199999999993" cy="689.5" r="3.5" fill="#15803d"/>
+<text x="999.4399999999996" y="712" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    Unsupported =&gt; Err(…)           // 부팅 중단</text>
+<text x="999.4399999999996" y="729" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 3) 지역이 없으면 기본값</text>
+<text x="999.4399999999996" y="746" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    _ =&gt; DEFAULT_PII_COUNTRIES      // → Default (US)</text>
+<text x="999.4399999999996" y="763" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">}</text>
+</g>
+<g class="node" id="n-install">
+<rect x="987.4399999999996" y="803" width="407.24" height="210" rx="10" fill="#ffffff" stroke="#c2410c" stroke-width="1.8"/>
+<path d="M988.4399999999996,843 H1393.6799999999996" stroke="#c2410c" stroke-opacity="0.35"/>
+<rect x="988.4399999999996" y="804" width="405.24" height="39" rx="8" fill="#ffedd5" fill-opacity="0.85"/>
+<text x="999.4399999999996" y="821" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>install_guardrails_from_config()</text>
+<text x="999.4399999999996" y="836" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/install.rs</text>
+<rect x="1352.6799999999996" y="811" width="34" height="18" rx="9" fill="#c2410c"/>
+<text x="1369.6799999999996" y="824" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">변경</text>
+<text x="999.4399999999996" y="858" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" fill="#334155">부팅 시 한 번: 모든 guardrail 을 만들어 프로세스 전역에 설치</text>
+<rect x="989.4399999999996" y="868" width="403.24" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="999.4399999999996" y="880" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let requested = config.pii.countries</text>
+<text x="999.4399999999996" y="897" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 호스트가 안 넘기면 US</text>
+<rect x="989.4399999999996" y="902" width="403.24" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="999.4399999999996" y="914" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    .unwrap_or(DEFAULT_COUNTRIES);</text>
+<text x="999.4399999999996" y="931" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 국가 목록을 프로세스 전역에 고정 (엔진 slot 보다 먼저)</text>
+<rect x="989.4399999999996" y="936" width="403.24" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="999.4399999999996" y="948" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">select_countries(&amp;requested)?;</text>
+<circle cx="1394.6799999999996" cy="942.5" r="3.5" fill="#c2410c"/>
+<text x="999.4399999999996" y="965" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 공유 엔진 slot 생성 + 설치 동안 고정</text>
+<text x="999.4399999999996" y="982" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let _engine = engine_guard();</text>
+<circle cx="1394.6799999999996" cy="976.5" r="3.5" fill="#c2410c"/>
+<text x="999.4399999999996" y="999" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#94a3b8" xml:space="preserve">build_pii(config.pii, …)  // PII 레이어 구성(기존)</text>
+</g>
+<g class="node" id="n-PiiConfig">
+<rect x="987.4399999999996" y="1039" width="325.79999999999984" height="124" rx="0" fill="#ffffff" stroke="#c2410c" stroke-width="1.8" stroke-dasharray="7 4"/>
+<path d="M988.4399999999996,1079 H1312.2399999999993" stroke="#c2410c" stroke-opacity="0.35"/>
+<rect x="988.4399999999996" y="1040" width="323.79999999999984" height="39" rx="0" fill="#ffedd5" fill-opacity="0.85"/>
+<text x="999.4399999999996" y="1057" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">struct </tspan>PiiConfig</text>
+<text x="999.4399999999996" y="1072" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/install.rs</text>
+<rect x="1271.2399999999993" y="1047" width="34" height="18" rx="9" fill="#c2410c"/>
+<text x="1288.2399999999993" y="1060" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">변경</text>
+<text x="999.4399999999996" y="1098" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">mode: PiiMode</text>
+<text x="999.4399999999996" y="1115" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">tool_args, filter_labels</text>
+<text x="999.4399999999996" y="1132" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// None 이면 DEFAULT_COUNTRIES</text>
+<rect x="989.4399999999996" y="1137" width="321.79999999999984" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="999.4399999999996" y="1149" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">countries: Option&lt;Vec&lt;PiiCountry&gt;&gt;</text>
+</g>
+<g class="node" id="n-find_misplaced">
+<rect x="1562.5199999999993" y="100" width="401.59999999999974" height="90" rx="10" fill="#ffffff" stroke="#64748b" stroke-width="1.8"/>
+<path d="M1563.5199999999993,140 H1963.119999999999" stroke="#64748b" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="101" width="399.59999999999974" height="39" rx="8" fill="#f1f5f9" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="118" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>find_misplaced_guardrail_keys()</text>
+<text x="1574.5199999999993" y="133" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/guardrails/prompt_guard.rs</text>
+<rect x="1922.119999999999" y="108" width="34" height="18" rx="9" fill="#64748b"/>
+<text x="1939.119999999999" y="121" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">기존</text>
+<text x="1574.5199999999993" y="159" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 목록에 있는 키만 '잘못 놓임'으로 판정</text>
+<text x="1574.5199999999993" y="176" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">if GUARDRAIL_KEYS.contains(key) { found.push(…) }</text>
+<circle cx="1964.119999999999" cy="170.5" r="3.5" fill="#64748b"/>
+</g>
+<g class="node" id="n-GUARDRAIL_KEYS">
+<rect x="1562.5199999999993" y="216" width="325.79999999999984" height="124" rx="0" fill="#ffffff" stroke="#c2410c" stroke-width="2.0" stroke-dasharray="2 3"/>
+<path d="M1563.5199999999993,256 H1887.3199999999993" stroke="#c2410c" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="217" width="323.79999999999984" height="39" rx="0" fill="#ffedd5" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="234" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">static </tspan>GUARDRAIL_KEYS: [&amp;str; 9]</text>
+<text x="1574.5199999999993" y="249" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/guardrails/prompt_guard.rs</text>
+<rect x="1846.3199999999993" y="224" width="34" height="18" rx="9" fill="#c2410c"/>
+<text x="1863.3199999999993" y="237" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">변경</text>
+<text x="1574.5199999999993" y="275" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">"pii_mode", "pii_demask_tool_args",</text>
+<text x="1574.5199999999993" y="292" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">"pii_filter_labels",</text>
+<rect x="1564.5199999999993" y="297" width="321.79999999999984" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="1574.5199999999993" y="309" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">"pii_locales",</text>
+<text x="1574.5199999999993" y="326" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#94a3b8" xml:space="preserve">"user_input_…", "tool_output_…" (5개)</text>
+</g>
+<g class="node" id="n-CliConfig">
+<rect x="1562.5199999999993" y="366" width="272.23999999999984" height="90" rx="0" fill="#ffffff" stroke="#c2410c" stroke-width="1.8" stroke-dasharray="7 4"/>
+<path d="M1563.5199999999993,406 H1833.759999999999" stroke="#c2410c" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="367" width="270.23999999999984" height="39" rx="0" fill="#ffedd5" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="384" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">struct </tspan>CliConfig</text>
+<text x="1574.5199999999993" y="399" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/config.rs</text>
+<rect x="1792.759999999999" y="374" width="34" height="18" rx="9" fill="#c2410c"/>
+<text x="1809.759999999999" y="387" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">변경</text>
+<text x="1574.5199999999993" y="425" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#94a3b8" xml:space="preserve">pii_mode, pii_filter_labels, …</text>
+<rect x="1564.5199999999993" y="430" width="268.23999999999984" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="1574.5199999999993" y="442" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">pii_locales: Option&lt;Vec&lt;String&gt;&gt;</text>
+</g>
+<g class="node" id="n-parse_countries">
+<rect x="1562.5199999999993" y="516" width="343.2799999999999" height="124" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M1563.5199999999993,556 H1904.7999999999993" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="517" width="341.2799999999999" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="534" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>parse_countries()</text>
+<text x="1574.5199999999993" y="549" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/country.rs</text>
+<rect x="1863.7999999999993" y="524" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1880.7999999999993" y="537" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="1574.5199999999993" y="575" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// "kr" · "ko_KR" · "en-US" 모두 국가로 변환</text>
+<text x="1574.5199999999993" y="592" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">values.map(PiiCountry::from_locale_tag)</text>
+<text x="1574.5199999999993" y="609" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 빈 목록은 거부</text>
+<text x="1574.5199999999993" y="626" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">빈 목록 → Err(Empty)</text>
+</g>
+<g class="node" id="n-from_tag">
+<rect x="1562.5199999999993" y="666" width="399.19999999999976" height="107" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M1563.5199999999993,706 H1960.7199999999991" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="667" width="397.19999999999976" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="684" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>PiiCountry::from_locale_tag()</text>
+<text x="1574.5199999999993" y="699" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/country.rs</text>
+<rect x="1919.7199999999991" y="674" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1936.7199999999991" y="687" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="1574.5199999999993" y="725" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// _ 와 - 둘 다 허용</text>
+<text x="1574.5199999999993" y="742" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">"ko-KR" → 지역 "KR" → PiiCountry::Kr</text>
+<circle cx="1961.7199999999991" cy="736.5" r="3.5" fill="#15803d"/>
+<text x="1574.5199999999993" y="759" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">"ja-JP" → Err(Unsupported)  "ko" → Err(NoRegion)</text>
+</g>
+<g class="node" id="n-PiiCountry">
+<rect x="1562.5199999999993" y="799" width="325.79999999999984" height="107" rx="0" fill="#ffffff" stroke="#15803d" stroke-width="1.8" stroke-dasharray="7 4"/>
+<path d="M1563.5199999999993,839 H1887.3199999999993" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="800" width="323.79999999999984" height="39" rx="0" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="817" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">enum </tspan>PiiCountry</text>
+<text x="1574.5199999999993" y="832" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/country.rs</text>
+<rect x="1846.3199999999993" y="807" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1863.3199999999993" y="820" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="1574.5199999999993" y="858" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">Kr  → config/kr.yaml</text>
+<text x="1574.5199999999993" y="875" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">Us  → config/us.yaml</text>
+<text x="1574.5199999999993" y="892" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">DEFAULT_COUNTRIES = [Us]</text>
+</g>
+<g class="node" id="n-Source">
+<rect x="1562.5199999999993" y="932" width="270.8999999999999" height="90" rx="0" fill="#ffffff" stroke="#15803d" stroke-width="1.8" stroke-dasharray="7 4"/>
+<path d="M1563.5199999999993,972 H1832.4199999999992" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="933" width="268.8999999999999" height="39" rx="0" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="950" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">enum </tspan>PiiCountrySource</text>
+<text x="1574.5199999999993" y="965" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicli/src/guardrails/pii.rs</text>
+<rect x="1791.4199999999992" y="940" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1808.4199999999992" y="953" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="1574.5199999999993" y="991" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 부팅 로그에 출처 표시용</text>
+<text x="1574.5199999999993" y="1008" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">Config | Device | Default</text>
+</g>
+<g class="node" id="n-select">
+<rect x="1562.5199999999993" y="1048" width="339.83000000000015" height="141" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M1563.5199999999993,1088 H1901.3499999999995" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="1049" width="337.83000000000015" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="1066" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>pii::shared::select_countries()</text>
+<text x="1574.5199999999993" y="1081" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/shared.rs</text>
+<rect x="1860.3499999999995" y="1056" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1877.3499999999995" y="1069" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="1574.5199999999993" y="1107" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 처음 호출이면 이 목록으로 고정</text>
+<text x="1574.5199999999993" y="1124" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let fixed = SELECTED_COUNTRIES</text>
+<circle cx="1902.3499999999995" cy="1118.5" r="3.5" fill="#15803d"/>
+<text x="1574.5199999999993" y="1141" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">    .get_or_init(|| wanted);</text>
+<text x="1574.5199999999993" y="1158" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 이미 다른 목록이면 설치 실패</text>
+<text x="1574.5199999999993" y="1175" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">fixed != wanted → Err(PiiCountriesFixed)</text>
+</g>
+<g class="node" id="n-SELECTED">
+<rect x="1562.5199999999993" y="1215" width="258.20000000000005" height="73" rx="0" fill="#ffffff" stroke="#15803d" stroke-width="2.0" stroke-dasharray="2 3"/>
+<path d="M1563.5199999999993,1255 H1819.7199999999993" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="1216" width="256.20000000000005" height="39" rx="0" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="1233" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">static </tspan>SELECTED_COUNTRIES</text>
+<text x="1574.5199999999993" y="1248" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">OnceLock&lt;Vec&lt;PiiCountry&gt;&gt;</text>
+<rect x="1778.7199999999993" y="1223" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="1795.7199999999993" y="1236" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="1574.5199999999993" y="1274" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">프로세스당 한 번 정해지는 국가 목록</text>
+</g>
+<g class="node" id="n-engine_guard">
+<rect x="1562.5199999999993" y="1314" width="319.6999999999999" height="107" rx="10" fill="#ffffff" stroke="#64748b" stroke-width="1.8"/>
+<path d="M1563.5199999999993,1354 H1881.2199999999991" stroke="#64748b" stroke-opacity="0.35"/>
+<rect x="1563.5199999999993" y="1315" width="317.6999999999999" height="39" rx="8" fill="#f1f5f9" fill-opacity="0.85"/>
+<text x="1574.5199999999993" y="1332" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>pii::shared::engine_guard()</text>
+<text x="1574.5199999999993" y="1347" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/shared.rs</text>
+<rect x="1840.2199999999991" y="1322" width="34" height="18" rx="9" fill="#64748b"/>
+<text x="1857.2199999999991" y="1335" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">기존</text>
+<text x="1574.5199999999993" y="1373" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// slot 을 먼저 등록해 둠</text>
+<text x="1574.5199999999993" y="1390" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let _ = shared_slot();</text>
+<circle cx="1882.2199999999991" cy="1384.5" r="3.5" fill="#64748b"/>
+<text x="1574.5199999999993" y="1407" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#94a3b8" xml:space="preserve">turn_guard()</text>
+</g>
+<g class="node" id="n-shared_slot">
+<rect x="2074.119999999999" y="1314" width="343.0399999999998" height="141" rx="10" fill="#ffffff" stroke="#c2410c" stroke-width="1.8"/>
+<path d="M2075.119999999999,1354 H2416.159999999999" stroke="#c2410c" stroke-opacity="0.35"/>
+<rect x="2075.119999999999" y="1315" width="341.0399999999998" height="39" rx="8" fill="#ffedd5" fill-opacity="0.85"/>
+<text x="2086.119999999999" y="1332" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>shared_slot()</text>
+<text x="2086.119999999999" y="1347" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/shared.rs</text>
+<rect x="2375.159999999999" y="1322" width="34" height="18" rx="9" fill="#c2410c"/>
+<text x="2392.159999999999" y="1335" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">변경</text>
+<text x="2086.119999999999" y="1373" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 고정된 국가 목록 읽기</text>
+<rect x="2076.119999999999" y="1378" width="339.0399999999998" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="2086.119999999999" y="1390" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let countries = selected_countries();</text>
+<circle cx="2417.159999999999" cy="1384.5" r="3.5" fill="#c2410c"/>
+<text x="2086.119999999999" y="1407" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 엔진은 지금 만들지 않고 빌드 함수만 등록</text>
+<text x="2086.119999999999" y="1424" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">TurnSlot::new("guardrails:pii:embedded",</text>
+<rect x="2076.119999999999" y="1429" width="339.0399999999998" height="17" fill="#fef9c3" fill-opacity="0.8"/>
+<text x="2086.119999999999" y="1441" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">  || compile_for_countries(countries, …))</text>
+<circle cx="2417.159999999999" cy="1435.5" r="3.5" fill="#c2410c"/>
+</g>
+<g class="node" id="n-selected">
+<rect x="2527.159999999999" y="1215" width="323.4799999999998" height="90" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M2528.159999999999,1255 H2849.6399999999985" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="2528.159999999999" y="1216" width="321.4799999999998" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="2539.159999999999" y="1233" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>selected_countries()</text>
+<text x="2539.159999999999" y="1248" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/shared.rs</text>
+<rect x="2808.6399999999985" y="1223" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="2825.6399999999985" y="1236" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="2539.159999999999" y="1274" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 설치 전에 읽히면 US 로 고정</text>
+<text x="2539.159999999999" y="1291" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">SELECTED_COUNTRIES.get_or_init(DEFAULT)</text>
+<circle cx="2850.6399999999985" cy="1285.5" r="3.5" fill="#15803d"/>
+</g>
+<g class="node" id="n-compile">
+<rect x="2527.159999999999" y="1331" width="372.31999999999977" height="176" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M2528.159999999999,1371 H2898.4799999999987" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="2528.159999999999" y="1332" width="370.31999999999977" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="2539.159999999999" y="1349" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>compile_for_countries()</text>
+<text x="2539.159999999999" y="1364" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/shared.rs</text>
+<rect x="2857.4799999999987" y="1339" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="2874.4799999999987" y="1352" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="2539.159999999999" y="1386" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" fill="#334155">common + 선택 국가 YAML 을 하나의 엔진으로 컴파일</text>
+<text x="2539.159999999999" y="1408" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 합칠 YAML 목록 만들기</text>
+<text x="2539.159999999999" y="1425" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">let docs = rule_documents(countries);</text>
+<circle cx="2899.4799999999987" cy="1419.5" r="3.5" fill="#15803d"/>
+<text x="2539.159999999999" y="1442" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 여러 YAML 을 한 설정으로 병합</text>
+<text x="2539.159999999999" y="1459" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">EngineConfig::from_yamls(&amp;docs)?</text>
+<circle cx="2899.4799999999987" cy="1453.5" r="3.5" fill="#15803d"/>
+<text x="2539.159999999999" y="1476" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// DFA 엔진 빌드(기존)</text>
+<text x="2539.159999999999" y="1493" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#94a3b8" xml:space="preserve">PatternEngine::from_config_with_chunk_size(…)</text>
+</g>
+<g class="node" id="n-rule_docs">
+<rect x="3009.4799999999987" y="1331" width="319.6999999999999" height="124" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M3010.4799999999987,1371 H3328.1799999999985" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="3010.4799999999987" y="1332" width="317.6999999999999" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="3021.4799999999987" y="1349" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>rule_documents()</text>
+<text x="3021.4799999999987" y="1364" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/pii/shared.rs</text>
+<rect x="3287.1799999999985" y="1339" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="3304.1799999999985" y="1352" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="3021.4799999999987" y="1390" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 국가 공통(카드·API 키 등) 항상 포함</text>
+<text x="3021.4799999999987" y="1407" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">once(COMMON_CONFIG_YAML)</text>
+<text x="3021.4799999999987" y="1424" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 선택 국가 파일만 추가</text>
+<text x="3021.4799999999987" y="1441" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">  .chain(countries.map(rule_yaml))</text>
+<circle cx="3329.1799999999985" cy="1435.5" r="3.5" fill="#15803d"/>
+</g>
+<g class="node" id="n-from_yamls">
+<rect x="3009.4799999999987" y="1481" width="337.9999999999999" height="90" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M3010.4799999999987,1521 H3346.4799999999987" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="3010.4799999999987" y="1482" width="335.9999999999999" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="3021.4799999999987" y="1499" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>EngineConfig::from_yamls()</text>
+<text x="3021.4799999999987" y="1514" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">tinicore/src/guardrails/engine/config.rs</text>
+<rect x="3305.4799999999987" y="1489" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="3322.4799999999987" y="1502" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="3021.4799999999987" y="1540" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#15803d">// 같은 키가 두 파일에 있으면 Err</text>
+<text x="3021.4799999999987" y="1557" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">각 YAML 파싱 → recognizer 합치기</text>
+</g>
+<g class="node" id="n-PiiCountry2">
+<rect x="3009.4799999999987" y="1597" width="276.3900000000001" height="107" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="1.8"/>
+<path d="M3010.4799999999987,1637 H3284.869999999999" stroke="#15803d" stroke-opacity="0.35"/>
+<rect x="3010.4799999999987" y="1598" width="274.3900000000001" height="39" rx="8" fill="#dcfce7" fill-opacity="0.85"/>
+<text x="3021.4799999999987" y="1615" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#0f172a"><tspan fill="#64748b" font-weight="400">fn </tspan>PiiCountry::rule_yaml()</text>
+<text x="3021.4799999999987" y="1630" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#64748b">include_str! 로 내장된 YAML</text>
+<rect x="3243.869999999999" y="1605" width="34" height="18" rx="9" fill="#15803d"/>
+<text x="3260.869999999999" y="1618" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">신규</text>
+<text x="3021.4799999999987" y="1656" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">common.yaml  40개 (항상)</text>
+<text x="3021.4799999999987" y="1673" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">kr.yaml       5개</text>
+<text x="3021.4799999999987" y="1690" font-family="Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#0f172a" xml:space="preserve">us.yaml       4개</text>
+</g>
+</svg>
