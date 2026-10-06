@@ -1,9 +1,9 @@
 {
  "title": "PII 국가 선택(pii_locales) 코드 흐름",
  "repo": "/Users/byungchulso/Works/ARGO-multilingual-support",
- "before": "origin/main",
+ "before": "8ead9197ca",
  "after": "d5c6429cc2",
- "range": "ARGO · origin/main(8ead9197ca)..d5c6429cc2 · argo 바이너리 main() 부터",
+ "range": "ARGO · 8ead9197ca..d5c6429cc2 · argo 바이너리 main() 부터",
  "figures": [
   {
    "title": "그림 1 · 부팅할 때 PII 국가를 정하는 흐름",

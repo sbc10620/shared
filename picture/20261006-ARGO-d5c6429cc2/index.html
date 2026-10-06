@@ -82,7 +82,7 @@ body.has-max { overflow: hidden; }
 
 <main class="wrap">
   <div class="intro">
-    <div class="eyebrow">ARGO · origin/main(8ead9197ca)..d5c6429cc2 · argo 바이너리 main() 부터</div>
+    <div class="eyebrow">ARGO · 8ead9197ca..d5c6429cc2 · argo 바이너리 main() 부터</div>
     <h1>PII 국가 선택(pii_locales) 코드 흐름</h1>
     <ul class="commits"><li><code>ddc75c6e77</code><span>feat(guardrails): split the PII rules by country and load only the selected ones</span></li><li><code>f8777c8bcc</code><span>feat(cli): select the PII countries from pii_locales or the device locale</span></li><li><code>d5c6429cc2</code><span>docs(guardrails): describe the per-country PII rule files and pii_locales</span></li></ul>
     <ol class="rules">
@@ -112,7 +112,7 @@ body.has-max { overflow: hidden; }
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#79a8ff"/></marker><marker id="arrow-defer" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c297ff"/></marker></defs>
 <rect width="100%" height="100%" fill="#2a2c30"/>
 <text x="30" y="34" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="18" font-weight="700" fill="#e6edf3">그림 1 · 부팅할 때 PII 국가를 정하는 흐름</text>
-<text x="30" y="54" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="11" fill="#9da7b3">ARGO · origin/main(8ead9197ca)..d5c6429cc2 · argo 바이너리 main() 부터  ·  config.toml 의 pii_locales → device locale → 기본값(US). 잘못 놓인 pii_locales 키 검사 포함</text>
+<text x="30" y="54" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="11" fill="#9da7b3">ARGO · 8ead9197ca..d5c6429cc2 · argo 바이너리 main() 부터  ·  config.toml 의 pii_locales → device locale → 기본값(US). 잘못 놓인 pii_locales 키 검사 포함</text>
 <text x="30" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" font-weight="700" fill="#e6edf3">범례</text>
 <rect x="70" y="69" width="34" height="18" rx="6" fill="#35383e" stroke="#c9d1d9" stroke-width="1.6"/>
 <text x="112" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">함수</text>
@@ -692,7 +692,7 @@ body.has-max { overflow: hidden; }
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#79a8ff"/></marker><marker id="arrow-defer" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c297ff"/></marker></defs>
 <rect width="100%" height="100%" fill="#2a2c30"/>
 <text x="30" y="34" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="18" font-weight="700" fill="#e6edf3">그림 2 · 고른 국가를 고정하고 PII 엔진을 만드는 흐름</text>
-<text x="30" y="54" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="11" fill="#9da7b3">ARGO · origin/main(8ead9197ca)..d5c6429cc2 · argo 바이너리 main() 부터  ·  install 에서 국가 목록을 프로세스 전역에 고정 → 턴마다 common + 선택 국가 YAML 로 엔진 빌드</text>
+<text x="30" y="54" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="11" fill="#9da7b3">ARGO · 8ead9197ca..d5c6429cc2 · argo 바이너리 main() 부터  ·  install 에서 국가 목록을 프로세스 전역에 고정 → 턴마다 common + 선택 국가 YAML 로 엔진 빌드</text>
 <text x="30" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" font-weight="700" fill="#e6edf3">범례</text>
 <rect x="70" y="69" width="34" height="18" rx="6" fill="#35383e" stroke="#c9d1d9" stroke-width="1.6"/>
 <text x="112" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">함수</text>
