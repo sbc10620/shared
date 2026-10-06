@@ -179,6 +179,9 @@ h1 {{ font-size: clamp(22px, 3vw, 30px); line-height: 1.3; margin: 0; text-wrap:
   overflow: auto; background: var(--paper); max-height: 82vh; cursor: grab;
 }}
 .canvas.dragging {{ cursor: grabbing; user-select: none; }}
+/* A figure scrolls with the wheel only while it has focus (click it); the
+   outline shows which one. Otherwise the wheel scrolls the page. */
+.canvas:focus {{ outline: 2px solid var(--accent); outline-offset: -2px; }}
 .canvas svg {{ display: block; }}
 /* Full screen: the browser's own when the frame allows it, else the figure
    fills the window (the same look either way). */
@@ -202,7 +205,7 @@ body.has-max {{ overflow: hidden; }}
     <ol class="rules">
       <li>박스 안의 코드는 실제 소스를 그대로 옮겼습니다. <code>...</code> 은 생략한 구간이고, 원래 있던 영어 주석은 빼고 한글 설명(초록 <code>//</code>)으로 바꿨습니다.</li>
       <li>황토색 줄과 <code>+</code> 는 이 커밋 범위에서 추가·수정된 줄입니다. 박스 오른쪽 위 배지는 함수 단위의 신규·변경·기존을 뜻합니다.</li>
-      <li>호출하는 줄의 오른쪽 점에서 화살표가 나갑니다. 그림은 드래그하거나 스크롤해서 움직일 수 있습니다.</li>
+      <li>호출하는 줄의 오른쪽 점에서 화살표가 나갑니다. 그림을 클릭하면 테두리가 생기고, 그때부터 휠이 그림 안을 스크롤합니다(그림 밖 클릭이나 Esc로 해제). 드래그로도 움직일 수 있습니다.</li>
     </ol>
     <nav class="toc">{toc}</nav>
   </div>
@@ -239,9 +242,21 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     if (act === 'full') return toggleFull();
     apply();
   }});
+  // Wheel: unless this figure has focus (or is full screen), scroll the
+  // page instead of the figure. Ctrl/Cmd + wheel is the browser's zoom.
+  canvas.addEventListener('wheel', (e) => {{
+    if (e.ctrlKey || e.metaKey || isFull() || document.activeElement === canvas) return;
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
+    window.scrollBy({{ top: e.deltaY * unit, left: 0 }});
+  }}, {{ passive: false }});
+  canvas.addEventListener('keydown', (e) => {{
+    if (e.key === 'Escape' && !isFull()) canvas.blur();
+  }});
   let drag = null;
   canvas.addEventListener('pointerdown', (e) => {{
     if (e.pointerType !== 'mouse') return;
+    canvas.focus({{ preventScroll: true }});
     drag = {{ x: e.clientX, y: e.clientY, l: canvas.scrollLeft, t: canvas.scrollTop }};
     canvas.classList.add('dragging');
   }});
