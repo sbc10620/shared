@@ -4,7 +4,7 @@ change, as SVG (+ PNG when a Chrome/Chromium is found) plus one index.html.
 
 usage: build_group.py <group.json> [<parent-dir>] [--no-png]
 
-<parent-dir> defaults to $COMMIT_FLOW_DIR, else ~/code-flow-diagrams. The
+<parent-dir> defaults to $COMMIT_FLOW_DIR, else ~/Documents/code-flow-diagrams. The
 group directory name is derived, never chosen: <YYYYMMDD of the `after`
 commit>-<repo name from origin, else its directory name>-<after short sha>, so the same change always
 lands in the same place.
@@ -56,7 +56,7 @@ def main():
         sys.exit(f"unknown option(s): {sorted(flags - {'--no-png'})} — the only option is --no-png")
     spec_path = args[0]
     parent = args[1] if len(args) > 1 else (
-        os.environ.get("COMMIT_FLOW_DIR") or os.path.expanduser("~/code-flow-diagrams"))
+        os.environ.get("COMMIT_FLOW_DIR") or os.path.expanduser("~/Documents/code-flow-diagrams"))
     group = json.load(open(spec_path, encoding="utf-8"))
     here = os.path.dirname(os.path.abspath(__file__))
     # Always verified; there is deliberately no way to skip it, because a
