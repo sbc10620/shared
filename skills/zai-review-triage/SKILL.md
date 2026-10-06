@@ -1,6 +1,6 @@
 ---
 name: zai-review-triage
-description: Triage a Z.ai (or any GitHub-Actions bot) code-review comment on a pull request — fetch the bot's latest comment, verify every finding against the actual code, grade each one A/B/C, and report a table plus a stop/continue verdict; code changes happen only for A-grade findings and only after the user approves. Use this whenever the user says a Z.ai review (or "bot review", "자동 리뷰", "Z.ai 리뷰") has been posted or updated on a PR, asks to "check the review", "review the review", or "respond to the review" — even if they do not name the bot. Do NOT use it for a human reviewer's comments or for reviewing the PR's own code from scratch.
+description: Triage a Z.ai (or any GitHub-Actions bot) code-review comment on a pull request — fetch the bot's latest comment, verify every finding against the actual code, classify each one (a defect to fix / true but no behavioural effect / not applicable or already handled), and report a table plus a stop/continue verdict using those plain labels, not bare letters; code changes happen only for defects to fix and only after the user approves. Response comments cover every finding, in the PR description's language. Use this whenever the user says a Z.ai review (or "bot review", "자동 리뷰", "Z.ai 리뷰") has been posted or updated on a PR, asks to "check the review", "review the review", or "respond to the review" — even if they do not name the bot. Do NOT use it for a human reviewer's comments or for reviewing the PR's own code from scratch.
 ---
 
 # Z.ai review triage
@@ -60,13 +60,17 @@ Keep a list of findings already answered in earlier rounds. The bot does not
 read its own history and repeats them; a repeat is graded C with "answered in
 round N" and no further work.
 
-## Step 3 — Grade A / B / C
+## Step 3 — Classify each finding
 
-| Grade | Definition | Action |
+The letters A / B / C below are shorthand for this file and its references
+only. **Never show a bare letter to the user or on the PR** — always use the
+plain label (column 2), or, if a letter appears anywhere, a legend next to it.
+
+| Grade | Plain label (what the user sees) | Definition | Action |
 | --- | --- | --- |
-| **A** | A runtime defect you can reproduce from the code, or a security fail-open (a path where a guard is silently skipped). | Fix — after approval. |
-| **B** | True, but no behavioural effect: doc accuracy, log level, test consistency, defensive checks on paths no current caller can reach, boot-time one-off costs. | Do not fix. List it. |
-| **C** | The code already handles it; the premise is wrong; it is outside the PR's scope (a `tinicore-traits` type change, another crate, a CI workflow); or it was answered in an earlier round. | List it with the one-line reason. |
+| **A** | 고칠 결함 (defect to fix) | A runtime defect you can reproduce from the code, or a security fail-open (a path where a guard is silently skipped). | Fix — after approval. |
+| **B** | 사실이지만 동작 영향 없음 (true, no behavioural effect) | True, but no behavioural effect: doc accuracy, log level, test consistency, defensive checks on paths no current caller can reach, boot-time one-off costs. | Do not fix. List it. |
+| **C** | 해당 없음·이미 처리됨 (not applicable / already handled) | The code already handles it; the premise is wrong; it is outside the PR's scope (a `tinicore-traits` type change, another crate, a CI workflow); or it was answered in an earlier round (say which). | List it with the one-line reason. |
 
 Two refinements the user set explicitly:
 
@@ -84,15 +88,20 @@ each line.
 
 ## Step 4 — Report, then STOP and wait
 
-Report in exactly this shape, in the user's language:
+Report in exactly this shape, in the user's language, with the plain labels
+from Step 3 — not bare A / B / C:
 
 ```
-결론: A <n>건 / B <n>건 / C <n>건 → <이 라운드에서 종료 가능 | A 수정 필요>
+결론: 고칠 결함 <n>건 / 사실이지만 동작 영향 없음 <n>건 / 해당 없음·이미 처리됨 <n>건
+      → <이 라운드에서 종료 가능 | 결함 수정 필요>
 
-| # | 지적 | 등급 | 확인 결과 (한 줄) |
+| # | 지적 | 판정 | 확인 결과 (한 줄) |
 | --- | --- | --- | --- |
-| 1 | … | C | … |
+| 1 | … | 해당 없음 (1차에서 답변) | … |
+| 2 | … | 동작 영향 없음 | … |
 ```
+
+Every finding gets a row — numbered items, "minor" notes and questions alike.
 
 Then:
 
@@ -122,7 +131,11 @@ Do not fold B items into the plan on your own. If the user picks one, fine.
 ## Step 6 — Comment, only when told
 
 Use `references/comment-template.md`. One comment per round, one table, one
-line per finding. Rounds 1–2 of #3392 were paragraphs and the user called
+line per finding — **every** finding the bot raised (numbered items, minor
+notes, questions), including the ones not changed, each with what was done
+or why not. Write the comment **in the same language as the PR description**
+(check `gh pr view <PR> --json body`), whatever language the conversation
+with the user is in. Rounds 1–2 of #3392 were paragraphs and the user called
 that too long; round 3's table was right. For follow-ups split out of the PR,
 cite an issue number if one exists — the bot will raise them again.
 
