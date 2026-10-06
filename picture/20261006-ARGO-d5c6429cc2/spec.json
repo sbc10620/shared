@@ -4,10 +4,18 @@
  "before": "8ead9197ca",
  "after": "d5c6429cc2",
  "range": "ARGO · 8ead9197ca..d5c6429cc2 · argo 바이너리 main() 부터",
+ "not_drawn": {
+  "GUARDRAIL_KEYS": "pii_locales 키 추가. 바뀌지 않은 load_config() → find_misplaced_guardrail_keys() 에서만 읽음",
+  "fmt": "PiiCountry · PiiCountryError · GuardrailsInstallError 의 문자열 변환(Display) 구현, 그린 코드에서 직접 호출하지 않음",
+  "join_countries": "PiiCountriesFixed 오류 문구에 국가 목록을 넣는 도우미",
+  "supported_list": "PiiCountryError 문구에 지원 국가를 나열하는 도우미",
+  "layer_filter_for_countries": "테스트에서만 호출, main() 에서 닿지 않음",
+  "build_filters_with_params": "벤치마크 예제·테스트에서만 호출, main() 에서 닿지 않음"
+ },
  "figures": [
   {
    "title": "그림 1 · 부팅할 때 PII 국가를 정하는 흐름",
-   "caption": "config.toml 의 pii_locales → device locale → 기본값(US). 잘못 놓인 pii_locales 키 검사 포함",
+   "caption": "config.toml 의 pii_locales → device locale 지역 → 기본값(US) 순서로 국가를 정하고, 정하지 못하면 부팅을 거부",
    "nodes": [
     {
      "id": "main",
@@ -18,16 +26,16 @@
      "lines": [
       {
        "elide": true,
-       "indent": 0
+       "indent": 4
       },
       {
-       "code": "runtime.block_on(tinicli::run_cli());",
-       "note": "tokio 런타임 위에서 CLI 본체 실행",
-       "to": "run_cli"
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "to": "run_cli",
+       "note": "tokio 런타임 위에서 CLI 본체 실행"
       },
       {
        "elide": true,
-       "indent": 0
+       "indent": 8
       }
      ]
     },
@@ -39,9 +47,9 @@
      "file": "tinicli/src/lib.rs:202",
      "lines": [
       {
-       "code": "cli_entry::run().await;",
-       "note": "설정을 읽고 부팅 절차 시작",
-       "to": "run"
+       "code": "    cli_entry::run().await;",
+       "to": "run",
+       "note": "설정을 읽고 부팅 절차 시작"
       }
      ]
     },
@@ -54,194 +62,132 @@
      "lines": [
       {
        "elide": true,
-       "indent": 0
-      },
-      {
-       "code": "let mut cfg = load_config(&config_path);",
-       "note": "config.toml 읽기 (잘못 놓인 guardrail 키도 수집)",
-       "to": "load_config"
-      },
-      {
-       "elide": true,
-       "indent": 0
-      },
-      {
-       "code": "if let Err(msg) = crate::guardrails::prompt_guard::check_guardrail_keys(&cfg) {",
-       "note": "잘못 놓인 guardrail 키가 있으면 부팅 중단",
-       "to": "check_keys"
-      },
-      {
-       "code": "    crate::guardrails::refuse_to_start(format_args!(\"{msg} (config.toml)\"));"
-      },
-      {
-       "code": "}"
-      },
-      {
-       "code": "#[cfg(feature = \"guardrails\")]"
-      },
-      {
-       "code": "{"
-      },
-      {
-       "elide": true,
        "indent": 4
       },
       {
-       "code": "    let device_locale = crate::guardrails::pii::device_locale();",
-       "note": "OS locale 문자열 읽기",
+       "code": "    if let Err(msg) = crate::guardrails::prompt_guard::check_guardrail_keys(&cfg) {",
+       "note": "잘못 쓴 guardrail 키가 있으면 부팅 중단"
+      },
+      {
+       "code": "        crate::guardrails::refuse_to_start(format_args!(\"{msg} (config.toml)\"));"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    #[cfg(feature = \"guardrails\")]"
+      },
+      {
+       "code": "    {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let prompt_injection = crate::guardrails::prompt_injection::to_core_config(&cfg)"
+      },
+      {
+       "code": "            .unwrap_or_else(|msg| refuse_to_start(format_args!(\"{msg} (config.toml)\")));",
+       "note": "prompt injection 설정 오류면 부팅 중단"
+      },
+      {
+       "code": "        let pii_mode = crate::guardrails::pii::parse_pii_mode(cfg.pii_mode.as_deref())"
+      },
+      {
+       "code": "            .unwrap_or_else(|msg| refuse_to_start(format_args!(\"{msg} (config.toml)\")));",
+       "note": "pii_mode 값 오류면 부팅 중단"
+      },
+      {
+       "code": "        let device_locale = crate::guardrails::pii::device_locale();",
+       "mark": "+",
        "to": "device_locale",
-       "mark": "+"
+       "note": "OS locale 문자열 읽기"
       },
       {
-       "code": "    let pii_countries = match crate::guardrails::pii::resolve_pii_countries(",
-       "note": "pii_locales → device → 기본값 순서로 국가 결정",
+       "code": "        let pii_countries = match crate::guardrails::pii::resolve_pii_countries(",
+       "mark": "+",
        "to": "resolve",
-       "mark": "+"
+       "note": "pii_locales → device → 기본값(US) 순서로 결정"
       },
       {
-       "code": "        cfg.pii_locales.as_deref(),",
-       "mark": "+"
-      },
-      {
-       "code": "        device_locale.as_deref(),",
-       "mark": "+"
-      },
-      {
-       "code": "    ) {",
-       "mark": "+"
-      },
-      {
-       "code": "        Ok((countries, source)) => {",
-       "mark": "+"
-      },
-      {
-       "code": "            log::info!(\"[guardrails] PII countries {countries:?} (from {source:?})\");",
-       "mark": "+"
-      },
-      {
-       "code": "            countries",
-       "mark": "+"
-      },
-      {
-       "code": "        }",
-       "mark": "+"
-      },
-      {
-       "code": "        Err(msg) => refuse_to_start(format_args!(\"{msg} (config.toml)\")),",
-       "note": "결정 실패면 부팅 중단",
-       "mark": "+"
-      },
-      {
-       "code": "    };",
-       "mark": "+"
-      },
-      {
-       "code": "    match install_guardrails_from_config(GuardrailsConfig {",
-       "note": "고른 국가로 guardrail 설치 → 그림 2"
-      },
-      {
-       "elide": true,
-       "indent": 4
-      },
-      {
-       "code": "}"
-      },
-      {
-       "elide": true,
-       "indent": 0
-      }
-     ]
-    },
-    {
-     "id": "load_config",
-     "kind": "fn",
-     "status": "same",
-     "name": "config::load_config()",
-     "file": "tinicli/src/config.rs:1586",
-     "lines": [
-      {
-       "code": "let text = match tinicore::manifest::path_util::read_manifest_file(path) {"
-      },
-      {
-       "code": "    Ok(t) => t,"
-      },
-      {
-       "code": "    Err(_) => return CliConfig::default(),",
-       "note": "파일이 없으면 기본 설정 (pii_locales 없음)"
-      },
-      {
-       "code": "};"
-      },
-      {
-       "elide": true,
-       "indent": 0
-      },
-      {
-       "code": "match toml::from_str::<CliConfig>(&text) {",
-       "note": "pii_locales 필드도 여기서 채워짐",
+       "code": "            cfg.pii_locales.as_deref(),",
+       "mark": "+",
        "to": "CliConfig",
        "edge": "use"
       },
       {
-       "code": "    Ok(mut cfg) => {"
+       "code": "            device_locale.as_deref(),",
+       "mark": "+"
       },
       {
-       "code": "        cfg.misplaced_guardrail_keys =",
-       "note": "테이블 아래에 잘못 쓴 guardrail 키 수집"
+       "code": "        ) {",
+       "mark": "+"
       },
       {
-       "code": "            crate::guardrails::prompt_guard::find_misplaced_guardrail_keys(&text);",
-       "to": "find_misplaced"
+       "code": "            Ok((countries, source)) => {",
+       "mark": "+"
       },
       {
-       "code": "        cfg"
+       "code": "                log::info!(\"[guardrails] PII countries {countries:?} (from {source:?})\");",
+       "mark": "+"
+      },
+      {
+       "code": "                countries",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            Err(msg) => refuse_to_start(format_args!(\"{msg} (config.toml)\")),",
+       "mark": "+",
+       "note": "국가를 정하지 못하면 부팅 중단"
+      },
+      {
+       "code": "        };",
+       "mark": "+"
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "고른 국가로 guardrail 설치 → 그림 2"
+      },
+      {
+       "elide": true,
+       "indent": 12
       },
       {
        "code": "    }"
       },
       {
        "elide": true,
-       "indent": 4
-      },
-      {
-       "code": "}"
+       "indent": 0
       }
      ]
     },
     {
-     "id": "check_keys",
-     "kind": "fn",
-     "status": "same",
-     "name": "check_guardrail_keys()",
-     "file": "tinicli/src/guardrails/prompt_guard.rs:372",
+     "id": "CliConfig",
+     "kind": "struct",
+     "status": "changed",
+     "name": "CliConfig",
+     "file": "tinicli/src/config.rs:9",
      "lines": [
       {
-       "elide": true,
-       "indent": 0
-      },
-      {
-       "code": "if let Some(path) = cfg.misplaced_guardrail_keys.first() {",
-       "note": "수집된 키가 하나라도 있으면 Err"
-      },
-      {
-       "code": "    return Err(format!("
-      },
-      {
-       "code": "        \"the guardrail key `{path}` is inside a table — a key written below a \\"
+       "code": "pub struct CliConfig {"
       },
       {
        "elide": true,
-       "indent": 9
+       "indent": 4
       },
       {
-       "code": "    ));"
-      },
-      {
-       "code": "}"
+       "code": "    pub pii_locales: Option<Vec<String>>,",
+       "mark": "+",
+       "note": "예: pii_locales = [\"ko_KR\", \"us\"]"
       },
       {
        "elide": true,
-       "indent": 0
+       "indent": 4
       }
      ]
     },
@@ -253,20 +199,20 @@
      "file": "tinicli/src/guardrails/pii.rs:113",
      "lines": [
       {
-       "code": "crate::adapters::locale_native::current_locale()",
-       "note": "OS API 값을 먼저, 없으면 LANG → LC_ALL",
+       "code": "    crate::adapters::locale_native::current_locale()",
+       "mark": "+",
+       "note": "OS API 값을 먼저, 없으면 LANG → LC_ALL"
+      },
+      {
+       "code": "        .or_else(|| std::env::var(\"LANG\").ok())",
        "mark": "+"
       },
       {
-       "code": "    .or_else(|| std::env::var(\"LANG\").ok())",
+       "code": "        .or_else(|| std::env::var(\"LC_ALL\").ok())",
        "mark": "+"
       },
       {
-       "code": "    .or_else(|| std::env::var(\"LC_ALL\").ok())",
-       "mark": "+"
-      },
-      {
-       "code": "    .filter(|raw| !raw.trim().is_empty())",
+       "code": "        .filter(|raw| !raw.trim().is_empty())",
        "mark": "+"
       }
      ]
@@ -279,283 +225,105 @@
      "file": "tinicli/src/guardrails/pii.rs:81",
      "lines": [
       {
-       "code": "if let Some(values) = configured {",
-       "note": "1) pii_locales 가 있으면 그 값만 사용",
-       "mark": "+"
-      },
-      {
-       "code": "    return parse_pii_countries(values)",
-       "to": "parse_countries",
+       "code": "    if let Some(values) = configured {",
        "mark": "+",
-       "callee": "parse_pii_countries"
+       "note": "1) pii_locales 가 있으면 그 값만 사용"
       },
       {
-       "code": "        .map(|countries| (countries, PiiCountrySource::Config))",
+       "code": "        return parse_pii_countries(values)",
+       "mark": "+",
+       "to": "parse_countries",
+       "callee": "parse_pii_countries",
+       "note": "설정값 목록을 국가 목록으로 변환"
+      },
+      {
+       "code": "            .map(|countries| (countries, PiiCountrySource::Config))",
+       "mark": "+",
        "to": "Source",
-       "edge": "use",
-       "mark": "+"
-      },
-      {
-       "code": "        .map_err(|e| format!(\"pii_locales: {e}\"));",
-       "mark": "+"
-      },
-      {
-       "code": "}",
-       "mark": "+"
-      },
-      {
-       "code": "let device = device_locale",
-       "note": "2) ko_KR.UTF-8 같은 값에서 .UTF-8 · @euro 떼기",
-       "mark": "+"
-      },
-      {
-       "code": "    .map(|raw| raw.split(['.', '@']).next().unwrap_or(raw).trim())",
-       "mark": "+"
-      },
-      {
-       "code": "    .filter(|tag| !tag.is_empty());",
-       "mark": "+"
-      },
-      {
-       "code": "let default = || (DEFAULT_PII_COUNTRIES.to_vec(), PiiCountrySource::Default);",
-       "note": "3) 지역을 알 수 없을 때 쓸 기본값(US)",
-       "to": "PiiCountry",
-       "edge": "use",
-       "mark": "+"
-      },
-      {
-       "code": "let Some(device) = device else {",
-       "mark": "+"
-      },
-      {
-       "code": "    return Ok(default());",
-       "mark": "+"
-      },
-      {
-       "code": "};",
-       "mark": "+"
-      },
-      {
-       "code": "match PiiCountry::from_locale_tag(device) {",
-       "note": "4) device 지역 → 국가",
-       "to": "from_tag",
-       "mark": "+"
-      },
-      {
-       "code": "    Ok(country) => Ok((vec![country], PiiCountrySource::Device)),",
-       "mark": "+"
-      },
-      {
-       "code": "    Err(e @ PiiCountryError::Unsupported { .. }) => Err(format!(",
-       "note": "지원하지 않는 지역이면 부팅 거부",
-       "mark": "+"
-      },
-      {
-       "code": "        \"pii_locales is unset and the device locale {e}; set pii_locales to the \\",
-       "mark": "+"
-      },
-      {
-       "code": "         countries whose PII to detect\"",
-       "mark": "+"
-      },
-      {
-       "code": "    )),",
-       "mark": "+"
-      },
-      {
-       "code": "    Err(_) => Ok(default()),",
-       "note": "지역이 없는 값(ko, C, POSIX)은 기본값",
-       "mark": "+"
-      },
-      {
-       "code": "}",
-       "mark": "+"
-      }
-     ]
-    },
-    {
-     "id": "find_misplaced",
-     "kind": "fn",
-     "status": "same",
-     "name": "find_misplaced_guardrail_keys()",
-     "file": "tinicli/src/guardrails/prompt_guard.rs:258",
-     "lines": [
-      {
-       "code": "fn walk(path: &str, table: &toml::Table, found: &mut Vec<String>) {"
-      },
-      {
-       "code": "    for (key, value) in table {"
-      },
-      {
-       "code": "        let here = format!(\"{path}.{key}\");"
-      },
-      {
-       "code": "        if GUARDRAIL_KEYS.contains(&key.as_str()) {",
-       "note": "목록에 있는 키만 '잘못 놓인 키'로 판정",
-       "to": "GUARDRAIL_KEYS",
        "edge": "use"
       },
       {
-       "code": "            found.push(here.clone());"
-      },
-      {
-       "code": "        }"
-      },
-      {
-       "elide": true,
-       "indent": 8
-      },
-      {
-       "code": "    }"
-      },
-      {
-       "code": "}"
-      },
-      {
-       "elide": true,
-       "indent": 0
-      }
-     ]
-    },
-    {
-     "id": "GUARDRAIL_KEYS",
-     "kind": "static",
-     "status": "changed",
-     "name": "GUARDRAIL_KEYS",
-     "file": "tinicli/src/guardrails/prompt_guard.rs:242",
-     "lines": [
-      {
-       "code": "pub(crate) const GUARDRAIL_KEYS: [&str; 9] = [",
+       "code": "            .map_err(|e| format!(\"pii_locales: {e}\"));",
        "mark": "+"
       },
       {
-       "elide": true,
-       "indent": 4
-      },
-      {
-       "code": "    \"pii_locales\",",
-       "note": "[hub] 아래에 써도 무시되지 않고 부팅 거부",
+       "code": "    }",
        "mark": "+"
       },
       {
-       "elide": true,
-       "indent": 4
+       "code": "    let device = device_locale",
+       "mark": "+",
+       "note": "2) ko_KR.UTF-8 에서 .UTF-8 · @euro 떼기"
       },
       {
-       "code": "];"
-      }
-     ]
-    },
-    {
-     "id": "CliConfig",
-     "kind": "struct",
-     "status": "changed",
-     "name": "CliConfig",
-     "file": "tinicli/src/config.rs:9",
-     "lines": [
-      {
-       "elide": true,
-       "indent": 0
-      },
-      {
-       "code": "pub pii_locales: Option<Vec<String>>,",
-       "note": "예: pii_locales = [\"ko_KR\", \"us\"]",
+       "code": "        .map(|raw| raw.split(['.', '@']).next().unwrap_or(raw).trim())",
        "mark": "+"
       },
       {
-       "elide": true,
-       "indent": 0
-      },
-      {
-       "code": "pub misplaced_guardrail_keys: Vec<String>,"
-      },
-      {
-       "elide": true,
-       "indent": 0
-      }
-     ]
-    },
-    {
-     "id": "parse_countries",
-     "kind": "fn",
-     "status": "new",
-     "name": "parse_countries()",
-     "file": "tinicore/src/guardrails/pii/country.rs:126",
-     "lines": [
-      {
-       "code": "if values.is_empty() {",
-       "note": "빈 목록은 부팅 거부",
+       "code": "        .filter(|tag| !tag.is_empty());",
        "mark": "+"
       },
       {
-       "code": "    return Err(PiiCountryError::Empty);",
+       "code": "    let default = || (DEFAULT_PII_COUNTRIES.to_vec(), PiiCountrySource::Default);",
+       "mark": "+",
+       "note": "3) 지역을 알 수 없을 때 쓸 기본값(US)"
+      },
+      {
+       "code": "    let Some(device) = device else {",
        "mark": "+"
       },
       {
-       "code": "}",
+       "code": "        return Ok(default());",
+       "mark": "+",
+       "note": "device locale 이 없으면 기본값"
+      },
+      {
+       "code": "    };",
        "mark": "+"
       },
       {
-       "code": "let mut countries = values",
+       "code": "    match PiiCountry::from_locale_tag(device) {",
+       "mark": "+",
+       "to": [
+        "PiiCountry",
+        "from_locale_tag"
+       ],
+       "edge": [
+        "use",
+        "call"
+       ],
+       "note": "4) device 지역을 국가로 변환"
+      },
+      {
+       "code": "        Ok(country) => Ok((vec![country], PiiCountrySource::Device)),",
        "mark": "+"
       },
       {
-       "code": "    .iter()",
+       "code": "        Err(e @ PiiCountryError::Unsupported { .. }) => Err(format!(",
+       "mark": "+",
+       "to": "PiiCountryError",
+       "edge": "use",
+       "note": "지원하지 않는 지역이면 부팅 거부"
+      },
+      {
+       "code": "            \"pii_locales is unset and the device locale {e}; set pii_locales to the \\",
        "mark": "+"
       },
       {
-       "code": "    .map(|value| PiiCountry::parse(value.as_ref()))",
-       "note": "값 하나하나를 국가로 변환",
-       "to": "parse",
+       "code": "             countries whose PII to detect\"",
        "mark": "+"
       },
       {
-       "code": "    .collect::<Result<Vec<_>, _>>()?;",
+       "code": "        )),",
        "mark": "+"
       },
       {
-       "code": "countries.sort_unstable();",
-       "mark": "+"
+       "code": "        Err(_) => Ok(default()),",
+       "mark": "+",
+       "note": "지역이 없는 값(ko, C, POSIX)은 기본값"
       },
       {
-       "code": "countries.dedup();",
-       "mark": "+"
-      },
-      {
-       "code": "Ok(countries)",
-       "mark": "+"
-      }
-     ]
-    },
-    {
-     "id": "parse",
-     "kind": "fn",
-     "status": "new",
-     "name": "PiiCountry::parse()",
-     "file": "tinicore/src/guardrails/pii/country.rs:73",
-     "lines": [
-      {
-       "code": "let trimmed = value.trim();",
-       "mark": "+"
-      },
-      {
-       "code": "if trimmed.len() == 2 && trimmed.chars().all(|c| c.is_ascii_alphabetic()) {",
-       "note": "두 글자(kr, US)는 국가 코드로 읽음",
-       "mark": "+"
-      },
-      {
-       "code": "    return Self::supported(trimmed, trimmed.to_ascii_uppercase());",
-       "to": "supported",
-       "mark": "+"
-      },
-      {
-       "code": "}",
-       "mark": "+"
-      },
-      {
-       "code": "Self::from_locale_tag(trimmed)",
-       "note": "그 밖(ko_KR, en-US)은 locale 태그로 읽음",
-       "to": "from_tag",
+       "code": "    }",
        "mark": "+"
       }
      ]
@@ -590,78 +358,6 @@
      ]
     },
     {
-     "id": "from_tag",
-     "kind": "fn",
-     "status": "new",
-     "name": "PiiCountry::from_locale_tag()",
-     "file": "tinicore/src/guardrails/pii/country.rs:91",
-     "lines": [
-      {
-       "code": "let trimmed = tag.trim();",
-       "mark": "+"
-      },
-      {
-       "code": "let langid = LanguageIdentifier::from_str(&trimmed.replace('_', \"-\"))",
-       "note": "ko_KR 과 ko-KR 을 같은 태그로 해석",
-       "mark": "+"
-      },
-      {
-       "code": "    .map_err(|_| PiiCountryError::Malformed(trimmed.to_string()))?;",
-       "mark": "+"
-      },
-      {
-       "code": "let region = langid",
-       "mark": "+"
-      },
-      {
-       "code": "    .region",
-       "mark": "+"
-      },
-      {
-       "code": "    .map(|region| region.as_str().to_ascii_uppercase())",
-       "mark": "+"
-      },
-      {
-       "code": "    .ok_or_else(|| PiiCountryError::NoRegion(trimmed.to_string()))?;",
-       "note": "지역이 없으면 NoRegion",
-       "mark": "+"
-      },
-      {
-       "code": "Self::supported(trimmed, region)",
-       "note": "지역을 지원 국가로 변환",
-       "to": "supported",
-       "mark": "+"
-      }
-     ]
-    },
-    {
-     "id": "supported",
-     "kind": "fn",
-     "status": "new",
-     "name": "PiiCountry::supported()",
-     "file": "tinicore/src/guardrails/pii/country.rs:105",
-     "lines": [
-      {
-       "code": "Self::from_region(&region).ok_or_else(|| PiiCountryError::Unsupported {",
-       "note": "KR · US 가 아니면 Unsupported",
-       "to": "from_region",
-       "mark": "+"
-      },
-      {
-       "code": "    value: value.to_string(),",
-       "mark": "+"
-      },
-      {
-       "code": "    region,",
-       "mark": "+"
-      },
-      {
-       "code": "})",
-       "mark": "+"
-      }
-     ]
-    },
-    {
      "id": "PiiCountry",
      "kind": "enum",
      "status": "new",
@@ -690,6 +386,220 @@
       },
       {
        "code": "pub const DEFAULT_COUNTRIES: &[PiiCountry] = &[PiiCountry::Us];",
+       "mark": "+",
+       "note": "pii_locales 도 device 지역도 없을 때 US"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      },
+      {
+       "code": "impl PiiCountry {",
+       "mark": "+"
+      },
+      {
+       "code": "    pub const ALL: &'static [Self] = &[Self::Kr, Self::Us];",
+       "mark": "+",
+       "note": "지원 국가 목록: KR, US"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "PiiCountryError",
+     "kind": "enum",
+     "status": "new",
+     "name": "PiiCountryError",
+     "file": "tinicore/src/guardrails/pii/country.rs:141",
+     "lines": [
+      {
+       "code": "pub enum PiiCountryError {",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    Unsupported {",
+       "mark": "+"
+      },
+      {
+       "code": "        value: String,",
+       "mark": "+"
+      },
+      {
+       "code": "        region: String,",
+       "mark": "+"
+      },
+      {
+       "code": "    },",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "parse_countries",
+     "kind": "fn",
+     "status": "new",
+     "name": "parse_countries()",
+     "file": "tinicore/src/guardrails/pii/country.rs:126",
+     "lines": [
+      {
+       "code": "    if values.is_empty() {",
+       "mark": "+",
+       "note": "빈 목록은 부팅 거부"
+      },
+      {
+       "code": "        return Err(PiiCountryError::Empty);",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut countries = values",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|value| PiiCountry::parse(value.as_ref()))",
+       "mark": "+",
+       "to": "parse",
+       "note": "값 하나하나를 국가로 변환"
+      },
+      {
+       "code": "        .collect::<Result<Vec<_>, _>>()?;",
+       "mark": "+"
+      },
+      {
+       "code": "    countries.sort_unstable();",
+       "mark": "+"
+      },
+      {
+       "code": "    countries.dedup();",
+       "mark": "+"
+      },
+      {
+       "code": "    Ok(countries)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "parse",
+     "kind": "fn",
+     "status": "new",
+     "name": "PiiCountry::parse()",
+     "file": "tinicore/src/guardrails/pii/country.rs:73",
+     "lines": [
+      {
+       "code": "        let trimmed = value.trim();",
+       "mark": "+"
+      },
+      {
+       "code": "        if trimmed.len() == 2 && trimmed.chars().all(|c| c.is_ascii_alphabetic()) {",
+       "mark": "+",
+       "note": "두 글자(kr, US)는 국가 코드로 읽음"
+      },
+      {
+       "code": "            return Self::supported(trimmed, trimmed.to_ascii_uppercase());",
+       "mark": "+",
+       "to": "supported",
+       "note": "국가 코드를 지원 국가로 확인"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        Self::from_locale_tag(trimmed)",
+       "mark": "+",
+       "to": "from_locale_tag",
+       "note": "그 밖(ko_KR, en-US)은 locale 태그로 읽음"
+      }
+     ]
+    },
+    {
+     "id": "from_locale_tag",
+     "kind": "fn",
+     "status": "new",
+     "name": "PiiCountry::from_locale_tag()",
+     "file": "tinicore/src/guardrails/pii/country.rs:91",
+     "lines": [
+      {
+       "code": "        let trimmed = tag.trim();",
+       "mark": "+"
+      },
+      {
+       "code": "        let langid = LanguageIdentifier::from_str(&trimmed.replace('_', \"-\"))",
+       "mark": "+",
+       "note": "ko_KR 과 ko-KR 을 같은 태그로 해석"
+      },
+      {
+       "code": "            .map_err(|_| PiiCountryError::Malformed(trimmed.to_string()))?;",
+       "mark": "+",
+       "note": "태그 형식이 아니면 Malformed"
+      },
+      {
+       "code": "        let region = langid",
+       "mark": "+"
+      },
+      {
+       "code": "            .region",
+       "mark": "+"
+      },
+      {
+       "code": "            .map(|region| region.as_str().to_ascii_uppercase())",
+       "mark": "+"
+      },
+      {
+       "code": "            .ok_or_else(|| PiiCountryError::NoRegion(trimmed.to_string()))?;",
+       "mark": "+",
+       "note": "지역이 없으면 NoRegion"
+      },
+      {
+       "code": "        Self::supported(trimmed, region)",
+       "mark": "+",
+       "to": "supported",
+       "note": "지역을 지원 국가로 확인"
+      }
+     ]
+    },
+    {
+     "id": "supported",
+     "kind": "fn",
+     "status": "new",
+     "name": "PiiCountry::supported()",
+     "file": "tinicore/src/guardrails/pii/country.rs:105",
+     "lines": [
+      {
+       "code": "        Self::from_region(&region).ok_or_else(|| PiiCountryError::Unsupported {",
+       "mark": "+",
+       "to": "from_region",
+       "note": "KR · US 가 아니면 Unsupported"
+      },
+      {
+       "code": "            value: value.to_string(),",
+       "mark": "+"
+      },
+      {
+       "code": "            region,",
+       "mark": "+"
+      },
+      {
+       "code": "        })",
        "mark": "+"
       }
      ]
@@ -702,20 +612,46 @@
      "file": "tinicore/src/guardrails/pii/country.rs:56",
      "lines": [
       {
-       "code": "Self::ALL",
-       "note": "지원 국가 목록에서 코드가 같은 것 찾기",
+       "code": "        Self::ALL",
        "mark": "+"
       },
       {
-       "code": "    .iter()",
+       "code": "            .iter()",
        "mark": "+"
       },
       {
-       "code": "    .copied()",
+       "code": "            .copied()",
        "mark": "+"
       },
       {
-       "code": "    .find(|country| country.code().eq_ignore_ascii_case(region))",
+       "code": "            .find(|country| country.code().eq_ignore_ascii_case(region))",
+       "mark": "+",
+       "to": "code",
+       "note": "코드가 같은 지원 국가 찾기"
+      }
+     ]
+    },
+    {
+     "id": "code",
+     "kind": "fn",
+     "status": "new",
+     "name": "PiiCountry::code()",
+     "file": "tinicore/src/guardrails/pii/country.rs:39",
+     "lines": [
+      {
+       "code": "        match self {",
+       "mark": "+"
+      },
+      {
+       "code": "            Self::Kr => \"kr\",",
+       "mark": "+"
+      },
+      {
+       "code": "            Self::Us => \"us\",",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
        "mark": "+"
       }
      ]
@@ -735,59 +671,96 @@
      "lines": [
       {
        "elide": true,
-       "indent": 0
-      },
-      {
-       "code": "let pii_countries = match crate::guardrails::pii::resolve_pii_countries(",
-       "note": "그림 1 에서 정한 국가 목록",
-       "mark": "+"
-      },
-      {
-       "elide": true,
        "indent": 4
       },
       {
-       "code": "match install_guardrails_from_config(GuardrailsConfig {",
-       "note": "국가 목록을 넘겨 guardrail 설치",
-       "to": "install"
+       "code": "        let pii_countries = match crate::guardrails::pii::resolve_pii_countries(",
+       "mark": "+",
+       "note": "그림 1 에서 정한 국가 목록"
       },
       {
-       "code": "    pii: PiiConfig {",
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "to": "install",
+       "note": "국가 목록을 넘겨 guardrail 설치"
+      },
+      {
+       "code": "            pii: PiiConfig {",
        "to": "PiiConfig",
        "edge": "use"
       },
       {
-       "code": "        mode: pii_mode,"
+       "code": "                mode: pii_mode,"
       },
       {
-       "code": "        tool_args: cfg.pii_demask_tool_args.clone(),"
+       "code": "                tool_args: cfg.pii_demask_tool_args.clone(),"
       },
       {
-       "code": "        filter_labels: cfg.pii_filter_labels.clone(),"
+       "code": "                filter_labels: cfg.pii_filter_labels.clone(),"
       },
       {
-       "code": "        countries: Some(pii_countries),",
+       "code": "                countries: Some(pii_countries),",
        "mark": "+"
       },
       {
-       "code": "    },"
+       "code": "            },"
       },
       {
-       "code": "    prompt_injection,"
+       "code": "            prompt_injection,"
       },
       {
-       "code": "}) {"
+       "code": "        }) {"
       },
       {
        "elide": true,
-       "indent": 4
+       "indent": 12
       },
       {
-       "code": "    Err(e) => refuse_to_start(e),",
+       "code": "            Err(e @ GuardrailsInstallError::LayerBuild { .. }) => {"
+      },
+      {
+       "code": "                refuse_to_start(format_args!(\"{e} (config.toml)\"))",
+       "note": "레이어 빌드 실패면 부팅 중단"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            Err(GuardrailsInstallError::PromptInjection { detail }) => {"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "                refuse_to_start(format_args!(",
+       "note": "prompt injection 빌드 실패면 부팅 중단"
+      },
+      {
+       "code": "                    \"the prompt-injection tool-output guardrail did not build: {detail}\\n{way_out}\""
+      },
+      {
+       "code": "                ))"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            Err(e) => refuse_to_start(e),",
        "note": "PiiCountriesFixed 도 여기서 부팅 중단"
       },
       {
-       "code": "}"
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 0
       }
      ]
     },
@@ -807,8 +780,8 @@
       },
       {
        "code": "    pub countries: Option<Vec<PiiCountry>>,",
-       "note": "None 이면 DEFAULT_COUNTRIES(US)",
-       "mark": "+"
+       "mark": "+",
+       "note": "None 이면 DEFAULT_COUNTRIES(US)"
       },
       {
        "code": "}"
@@ -823,69 +796,169 @@
      "file": "tinicore/src/guardrails/install.rs:201",
      "lines": [
       {
-       "code": "let requested = config",
-       "note": "호스트가 국가를 안 넘기면 US",
+       "code": "    let requested = config",
+       "mark": "+",
+       "note": "호스트가 국가를 안 넘기면 US"
+      },
+      {
+       "code": "        .pii",
        "mark": "+"
       },
       {
-       "code": "    .pii",
+       "code": "        .countries",
        "mark": "+"
       },
       {
-       "code": "    .countries",
+       "code": "        .clone()",
        "mark": "+"
       },
       {
-       "code": "    .clone()",
+       "code": "        .unwrap_or_else(|| super::pii::DEFAULT_COUNTRIES.to_vec());",
        "mark": "+"
       },
       {
-       "code": "    .unwrap_or_else(|| super::pii::DEFAULT_COUNTRIES.to_vec());",
-       "mark": "+"
-      },
-      {
-       "code": "super::pii::shared::select_countries(&requested).map_err(|fixed| {",
-       "note": "국가 목록을 프로세스 전역에 고정 (엔진 slot 보다 먼저)",
+       "code": "    super::pii::shared::select_countries(&requested).map_err(|fixed| {",
+       "mark": "+",
        "to": "select",
+       "note": "국가 목록을 프로세스 전역에 고정"
+      },
+      {
+       "code": "        GuardrailsInstallError::PiiCountriesFixed {",
+       "mark": "+",
+       "to": "GuardrailsInstallError",
+       "edge": "use",
+       "note": "이미 다른 목록이면 설치 실패"
+      },
+      {
+       "code": "            requested: requested.clone(),",
        "mark": "+"
       },
       {
-       "code": "    GuardrailsInstallError::PiiCountriesFixed {",
+       "code": "            fixed,",
        "mark": "+"
       },
       {
-       "code": "        requested: requested.clone(),",
+       "code": "        }",
        "mark": "+"
       },
       {
-       "code": "        fixed,",
+       "code": "    })?;",
        "mark": "+"
       },
       {
-       "code": "    }",
-       "mark": "+"
+       "code": "    let _engine = crate::guardrails::pii::shared::engine_guard();",
+       "to": "engine_guard",
+       "note": "엔진 slot 등록, 설치 동안 고정"
       },
       {
-       "code": "})?;",
-       "mark": "+"
+       "elide": true,
+       "indent": 4
       },
       {
-       "code": "let _engine = crate::guardrails::pii::shared::engine_guard();",
-       "note": "공유 엔진 slot 등록 + 설치 동안 고정",
-       "to": "engine_guard"
+       "code": "    let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;",
+       "to": "build_pii",
+       "note": "PII 레이어 구성 (countries 는 안 읽음)"
+      },
+      {
+       "code": "    let injection ="
+      },
+      {
+       "code": "        super::prompt_injection::install::build(config.prompt_injection, &mut warnings)?;",
+       "note": "prompt injection 빌드 실패면 Err"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    if !set.is_empty() {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let status = crate::agent::guardrails::install_guardrails(set);"
+      },
+      {
+       "code": "        if !status.fully_merged {"
+      },
+      {
+       "code": "            return Err(GuardrailsInstallError::GuardrailMerge);",
+       "note": "guardrail 병합 실패면 Err"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
       },
       {
        "elide": true,
        "indent": 0
       },
       {
-       "code": "let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;",
-       "note": "PII 레이어 구성 (countries 는 읽지 않음)",
-       "to": "build_pii"
+       "code": "    if let Some(m) = masking {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        if !install_sensitive_masking(m) {"
+      },
+      {
+       "code": "            return Err(GuardrailsInstallError::MaskingSlotTaken);",
+       "note": "마스킹 slot 이 이미 차 있으면 Err"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
       },
       {
        "elide": true,
        "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "GuardrailsInstallError",
+     "kind": "enum",
+     "status": "changed",
+     "name": "GuardrailsInstallError",
+     "file": "tinicore/src/guardrails/install.rs:73",
+     "lines": [
+      {
+       "code": "pub enum GuardrailsInstallError {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    PiiCountriesFixed {",
+       "mark": "+"
+      },
+      {
+       "code": "        requested: Vec<PiiCountry>,",
+       "mark": "+"
+      },
+      {
+       "code": "        fixed: Vec<PiiCountry>,",
+       "mark": "+"
+      },
+      {
+       "code": "    },",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
       }
      ]
     },
@@ -897,115 +970,43 @@
      "file": "tinicore/src/guardrails/pii/shared.rs:102",
      "lines": [
       {
-       "code": "let mut wanted = countries.to_vec();",
+       "code": "    let mut wanted = countries.to_vec();",
        "mark": "+"
       },
       {
-       "code": "wanted.sort_unstable();",
+       "code": "    wanted.sort_unstable();",
        "mark": "+"
       },
       {
-       "code": "wanted.dedup();",
+       "code": "    wanted.dedup();",
        "mark": "+"
       },
       {
-       "code": "let fixed = SELECTED_COUNTRIES.get_or_init(|| wanted.clone());",
-       "note": "처음이면 이 목록으로 고정",
-       "to": "SELECTED",
-       "edge": "use",
-       "mark": "+"
-      },
-      {
-       "code": "if *fixed == wanted {",
-       "mark": "+"
-      },
-      {
-       "code": "    Ok(())",
-       "mark": "+"
-      },
-      {
-       "code": "} else {",
-       "mark": "+"
-      },
-      {
-       "code": "    Err(fixed.clone())",
-       "note": "이미 다른 목록으로 고정됐으면 설치 실패",
-       "mark": "+"
-      },
-      {
-       "code": "}",
-       "mark": "+"
-      }
-     ]
-    },
-    {
-     "id": "engine_guard",
-     "kind": "fn",
-     "status": "same",
-     "name": "pii::shared::engine_guard()",
-     "file": "tinicore/src/guardrails/pii/shared.rs:176",
-     "lines": [
-      {
-       "code": "let _ = shared_slot();",
-       "note": "엔진 slot 을 먼저 등록",
-       "to": "shared_slot"
-      },
-      {
-       "code": "crate::sensitive::turn_scope::turn_guard()"
-      }
-     ]
-    },
-    {
-     "id": "shared_slot",
-     "kind": "fn",
-     "status": "changed",
-     "name": "shared_slot()",
-     "file": "tinicore/src/guardrails/pii/shared.rs:154",
-     "lines": [
-      {
-       "code": "static SHARED_SLOT: OnceLock<Arc<TurnSlot<PatternEngine, EngineError>>> = OnceLock::new();"
-      },
-      {
-       "code": "SHARED_SLOT.get_or_init(|| {"
-      },
-      {
-       "code": "    let countries = selected_countries();",
-       "note": "고정된 국가 목록 읽기",
-       "to": "selected",
-       "mark": "+"
-      },
-      {
-       "code": "    TurnSlot::new(\"guardrails:pii:embedded\", move || {",
-       "note": "엔진은 지금 만들지 않고 빌드 함수만 등록",
-       "mark": "+"
-      },
-      {
-       "code": "        compile_for_countries(countries, DEFAULT_CHUNK_SIZE, &super::extensions())",
-       "to": "compile",
-       "edge": "defer",
+       "code": "    let fixed = SELECTED_COUNTRIES.get_or_init(|| wanted.clone());",
        "mark": "+",
-       "label": "턴마다 필요할 때 실행"
-      },
-      {
-       "code": "    })"
-      },
-      {
-       "code": "})"
-      }
-     ]
-    },
-    {
-     "id": "selected",
-     "kind": "fn",
-     "status": "new",
-     "name": "pii::shared::selected_countries()",
-     "file": "tinicore/src/guardrails/pii/shared.rs:118",
-     "lines": [
-      {
-       "code": "SELECTED_COUNTRIES.get_or_init(|| DEFAULT_COUNTRIES.to_vec())",
-       "note": "설치 전에 읽히면 US 로 고정",
        "to": "SELECTED",
        "edge": "use",
+       "note": "처음이면 이 목록으로 고정"
+      },
+      {
+       "code": "    if *fixed == wanted {",
+       "mark": "+"
+      },
+      {
+       "code": "        Ok(())",
+       "mark": "+"
+      },
+      {
+       "code": "    } else {",
+       "mark": "+"
+      },
+      {
+       "code": "        Err(fixed.clone())",
+       "mark": "+",
+       "note": "이미 다른 목록으로 고정됐으면 Err"
+      },
+      {
+       "code": "    }",
        "mark": "+"
       }
      ]
@@ -1019,8 +1020,78 @@
      "lines": [
       {
        "code": "static SELECTED_COUNTRIES: OnceLock<Vec<PiiCountry>> = OnceLock::new();",
-       "note": "프로세스당 한 번만 정해짐",
-       "mark": "+"
+       "mark": "+",
+       "note": "프로세스당 한 번만 정해짐"
+      }
+     ]
+    },
+    {
+     "id": "engine_guard",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::engine_guard()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:176",
+     "lines": [
+      {
+       "code": "    let _ = shared_slot();",
+       "to": "shared_slot",
+       "note": "엔진 slot 을 먼저 등록"
+      },
+      {
+       "code": "    crate::sensitive::turn_scope::turn_guard()"
+      }
+     ]
+    },
+    {
+     "id": "shared_slot",
+     "kind": "fn",
+     "status": "changed",
+     "name": "shared_slot()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:154",
+     "lines": [
+      {
+       "code": "    static SHARED_SLOT: OnceLock<Arc<TurnSlot<PatternEngine, EngineError>>> = OnceLock::new();"
+      },
+      {
+       "code": "    SHARED_SLOT.get_or_init(|| {"
+      },
+      {
+       "code": "        let countries = selected_countries();",
+       "mark": "+",
+       "to": "selected",
+       "note": "고정된 국가 목록 읽기"
+      },
+      {
+       "code": "        TurnSlot::new(\"guardrails:pii:embedded\", move || {",
+       "mark": "+",
+       "note": "엔진은 지금 만들지 않고 빌드 함수만 등록"
+      },
+      {
+       "code": "            compile_for_countries(countries, DEFAULT_CHUNK_SIZE, &super::extensions())",
+       "mark": "+",
+       "to": "compile",
+       "edge": "defer",
+       "label": "턴마다 필요할 때 실행"
+      },
+      {
+       "code": "        })"
+      },
+      {
+       "code": "    })"
+      }
+     ]
+    },
+    {
+     "id": "selected",
+     "kind": "fn",
+     "status": "new",
+     "name": "pii::shared::selected_countries()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:118",
+     "lines": [
+      {
+       "code": "    SELECTED_COUNTRIES.get_or_init(|| DEFAULT_COUNTRIES.to_vec())",
+       "mark": "+",
+       "note": "설치 전에 읽히면 US 로 고정"
       }
      ]
     },
@@ -1032,25 +1103,25 @@
      "file": "tinicore/src/guardrails/pii/shared.rs:58",
      "lines": [
       {
-       "code": "let config = EngineConfig::from_yamls(&rule_documents(countries))?;",
-       "note": "common + 선택 국가 YAML 을 한 설정으로 병합",
+       "code": "    let config = EngineConfig::from_yamls(&rule_documents(countries))?;",
+       "mark": "+",
        "to": [
         "rule_docs",
         "from_yamls"
        ],
-       "mark": "+"
+       "note": "common + 선택 국가 YAML 을 한 설정으로 병합"
       },
       {
-       "code": "let engine = PatternEngine::from_config_with_chunk_size(&config, None, chunk_size, ext)?;",
-       "note": "DFA 엔진 빌드 (기존 함수)",
-       "mark": "+"
+       "code": "    let engine = PatternEngine::from_config_with_chunk_size(&config, None, chunk_size, ext)?;",
+       "mark": "+",
+       "note": "DFA 엔진 빌드, 실패면 Err"
       },
       {
        "elide": true,
-       "indent": 0
+       "indent": 4
       },
       {
-       "code": "Ok(engine)",
+       "code": "    Ok(engine)",
        "mark": "+"
       }
      ]
@@ -1063,20 +1134,20 @@
      "file": "tinicore/src/guardrails/pii/shared.rs:49",
      "lines": [
       {
-       "code": "std::iter::once(super::COMMON_CONFIG_YAML)",
-       "note": "국가 공통 파일은 항상 포함",
+       "code": "    std::iter::once(super::COMMON_CONFIG_YAML)",
+       "mark": "+",
        "to": "COMMON",
        "edge": "use",
-       "mark": "+"
+       "note": "국가 공통 파일은 항상 포함"
       },
       {
-       "code": "    .chain(countries.iter().map(|country| country.rule_yaml()))",
-       "note": "선택한 국가 파일만 추가",
+       "code": "        .chain(countries.iter().map(|country| country.rule_yaml()))",
+       "mark": "+",
        "to": "rule_yaml",
-       "mark": "+"
+       "note": "선택한 국가 파일만 추가"
       },
       {
-       "code": "    .collect()",
+       "code": "        .collect()",
        "mark": "+"
       }
      ]
@@ -1089,32 +1160,45 @@
      "file": "tinicore/src/guardrails/engine/config.rs:52",
      "lines": [
       {
-       "code": "let mut recognizers = std::collections::HashMap::new();",
+       "code": "        let mut recognizers = std::collections::HashMap::new();",
        "mark": "+"
       },
       {
-       "code": "for yaml in yamls {",
+       "code": "        for yaml in yamls {",
        "mark": "+"
       },
       {
-       "code": "    for (key, config) in parse_recognizers(yaml)? {",
+       "code": "            for (key, config) in parse_recognizers(yaml)? {",
+       "mark": "+",
+       "note": "파일 하나가 잘못되면 Err"
+      },
+      {
+       "code": "                if recognizers.contains_key(&key) {",
+       "mark": "+",
+       "note": "같은 recognizer 가 두 파일에 있으면 Err"
+      },
+      {
+       "code": "                    return Err(EngineError::Config(format!(",
        "mark": "+"
       },
       {
-       "code": "        if recognizers.contains_key(&key) {",
-       "note": "같은 recognizer 가 두 파일에 있으면 빌드 실패",
+       "code": "                        \"recognizer `{key}` is defined in more than one rule file\"",
        "mark": "+"
       },
       {
-       "code": "            return Err(EngineError::Config(format!(",
+       "code": "                    )));",
        "mark": "+"
       },
       {
-       "code": "                \"recognizer `{key}` is defined in more than one rule file\"",
+       "code": "                }",
        "mark": "+"
       },
       {
-       "code": "            )));",
+       "code": "                recognizers.insert(key, config);",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
        "mark": "+"
       },
       {
@@ -1122,19 +1206,7 @@
        "mark": "+"
       },
       {
-       "code": "        recognizers.insert(key, config);",
-       "mark": "+"
-      },
-      {
-       "code": "    }",
-       "mark": "+"
-      },
-      {
-       "code": "}",
-       "mark": "+"
-      },
-      {
-       "code": "Ok(Self { recognizers })",
+       "code": "        Ok(Self { recognizers })",
        "mark": "+"
       }
      ]
@@ -1148,8 +1220,8 @@
      "lines": [
       {
        "code": "pub(super) const COMMON_CONFIG_YAML: &str = include_str!(\"config/common.yaml\");",
-       "note": "카드 · 비밀번호 · API 키 등 40개",
-       "mark": "+"
+       "mark": "+",
+       "note": "카드 · 비밀번호 · API 키 등 40개"
       }
      ]
     },
@@ -1161,21 +1233,21 @@
      "file": "tinicore/src/guardrails/pii/country.rs:47",
      "lines": [
       {
-       "code": "match self {",
+       "code": "        match self {",
        "mark": "+"
       },
       {
-       "code": "    Self::Kr => include_str!(\"config/kr.yaml\"),",
-       "note": "한국 5개",
-       "mark": "+"
+       "code": "            Self::Kr => include_str!(\"config/kr.yaml\"),",
+       "mark": "+",
+       "note": "한국 5개"
       },
       {
-       "code": "    Self::Us => include_str!(\"config/us.yaml\"),",
-       "note": "미국 4개",
-       "mark": "+"
+       "code": "            Self::Us => include_str!(\"config/us.yaml\"),",
+       "mark": "+",
+       "note": "미국 4개"
       },
       {
-       "code": "}",
+       "code": "        }",
        "mark": "+"
       }
      ]
@@ -1201,8 +1273,8 @@
       },
       {
        "code": "        countries: _,",
-       "note": "국가 목록은 install 이 이미 고정함",
-       "mark": "+"
+       "mark": "+",
+       "note": "국가 목록은 install 이 이미 고정함"
       },
       {
        "code": "    } = config;"
@@ -1210,23 +1282,74 @@
       {
        "elide": true,
        "indent": 4
+      },
+      {
+       "code": "    check_filter_label_layers(filter_labels.as_ref())"
+      },
+      {
+       "code": "        .map_err(|e| layer_build_failure(\"pii_filter_labels\", &e))?;",
+       "note": "pii_filter_labels 레이어 이름이 틀리면 Err"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      },
+      {
+       "code": "    if mode == PiiMode::Off {"
+      },
+      {
+       "code": "        return Ok((None, None));",
+       "note": "off 면 아무것도 만들지 않음"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let input_detector = build_layer_detector(\"input\", labels, warnings)"
+      },
+      {
+       "code": "        .map_err(|e| layer_build_failure(\"input\", &e))?;"
+      },
+      {
+       "code": "    let output_detector = build_layer_detector(\"output\", labels, warnings)"
+      },
+      {
+       "code": "        .map_err(|e| layer_build_failure(\"output\", &e))?;"
+      },
+      {
+       "code": "    let default_detector = build_layer_detector(\"default\", labels, warnings)"
+      },
+      {
+       "code": "        .map_err(|e| layer_build_failure(\"default\", &e))?;",
+       "note": "레이어 필터 빌드 실패면 Err"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      },
+      {
+       "code": "    if mode == PiiMode::BlockOnly {"
+      },
+      {
+       "code": "        return Ok((Some(guardrail_set), None));",
+       "note": "block_only 면 입력 guardrail 만"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 0
       }
      ]
     }
    ]
   }
  ],
- "not_drawn": {
-  "GuardrailsInstallError": "PiiCountriesFixed 변형 추가. 흐름에서는 run() 의 Err(e) 로 부팅 중단",
-  "fmt": "PiiCountriesFixed 오류 문구 출력(Display)",
-  "join_countries": "위 오류 문구에 국가 목록을 넣는 도우미",
-  "ALL": "지원 국가 목록 상수. from_region() 이 읽음",
-  "code": "국가 코드 문자열. from_region() 이 비교에 사용",
-  "PiiCountryError": "국가 값 오류 타입. 그림에서는 Err 값으로만 나옴",
-  "supported_list": "오류 메시지에 지원 국가를 나열하는 도우미",
-  "layer_filter_for_countries": "테스트에서만 호출, main() 에서 닿지 않음",
-  "build_filters_with_params": "벤치·테스트에서만 호출, main() 에서 닿지 않음"
- },
  "commits": [
   [
    "ddc75c6e77",
