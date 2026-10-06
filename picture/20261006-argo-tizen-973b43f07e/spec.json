@@ -1,0 +1,1039 @@
+{
+ "title": "argo-tizen prompt guard: tinicore 내장 규칙으로 두 검사 실행",
+ "repo": "/Users/byungchulso/Works/argo-tizen",
+ "before": "99b883eb",
+ "after": "973b43f0",
+ "range": "argo-tizen · 99b883eb..973b43f0 · argot main()",
+ "not_drawn": {
+  "describe": "dashboard 설정 스키마 조회(gRPC)에서만 호출, 값 목록에 on 추가",
+  "make_runtime_context": "테스트 fixture",
+  "make_runtime_context_with_guard": "테스트 fixture",
+  "runner_fixture_with_sources": "테스트 fixture",
+  "bare_runner": "테스트 fixture",
+  "run_turn_prompt_guard_on_blocks_builtin_rule_before_persisting": "테스트",
+  "run_turn_prompt_guard_on_lets_a_warn_rule_through": "테스트"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅: mode 로 규칙 목록을 만들어 고정",
+   "caption": "config 의 mode 로 tinicore 내장 규칙 7개와 제품 규칙을 CoreConfig 에 넣고, 같은 mode 를 runner 에도 넘깁니다.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "crates/argot/src/main.rs:112",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            argot::daemon::boot::run(started_at, argot::product::argot_integration())",
+       "to": "run",
+       "note": "데몬 부팅 시작"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "boot::run()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:42",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match runtime.block_on(run_managed(",
+       "to": "run_managed",
+       "note": "tokio 런타임에서 데몬 본체 실행"
+      },
+      {
+       "code": "        started_at,"
+      },
+      {
+       "code": "        config,"
+      },
+      {
+       "code": "        storage,"
+      },
+      {
+       "code": "        definition,"
+      },
+      {
+       "code": "        product_endpoints,"
+      },
+      {
+       "code": "        background,"
+      },
+      {
+       "code": "        primitives,"
+      },
+      {
+       "code": "        &mut log_guard,"
+      },
+      {
+       "code": "    )) {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_managed",
+     "kind": "fn",
+     "status": "same",
+     "name": "run_managed()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:171",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match run_async(",
+       "to": "run_async",
+       "note": "서비스 조립과 서버 실행"
+      },
+      {
+       "code": "        started_at,"
+      },
+      {
+       "code": "        config,"
+      },
+      {
+       "code": "        storage,"
+      },
+      {
+       "code": "        definition,"
+      },
+      {
+       "code": "        product_endpoints,"
+      },
+      {
+       "code": "        background_resources,"
+      },
+      {
+       "code": "        primitives,"
+      },
+      {
+       "code": "        log_guard,"
+      },
+      {
+       "code": "    )"
+      },
+      {
+       "code": "    .await"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "run_async",
+     "kind": "fn",
+     "status": "same",
+     "name": "run_async()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:359",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let runtime = runtime::build_services(",
+       "to": "build_services",
+       "note": "RuntimeContext 등 서비스 조립"
+      },
+      {
+       "code": "        &config,"
+      },
+      {
+       "code": "        &storage,"
+      },
+      {
+       "code": "        &authoring,"
+      },
+      {
+       "code": "        &product_input,"
+      },
+      {
+       "code": "        Arc::clone(&interactions),"
+      },
+      {
+       "code": "        &primitives,"
+      },
+      {
+       "code": "    )"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let gateway = runtime::build_gateway(",
+       "to": "build_gateway",
+       "note": "턴을 실행할 runner 와 kernel 조립"
+      },
+      {
+       "code": "        &config,"
+      },
+      {
+       "code": "        &storage,"
+      },
+      {
+       "code": "        &runtime,"
+      },
+      {
+       "code": "        &tools,"
+      },
+      {
+       "code": "        &product_input,"
+      },
+      {
+       "code": "        Arc::clone(&agent_jobs),"
+      },
+      {
+       "code": "        Arc::clone(&interactions),"
+      },
+      {
+       "code": "    )?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "build_services",
+     "kind": "fn",
+     "status": "same",
+     "name": "build_services()",
+     "file": "crates/argot-daemon/src/boot/runtime.rs:133",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let (ctx, agent_registrar) ="
+      },
+      {
+       "code": "        crate::context_builder::build_runtime_context(crate::context_builder::ContextDeps {",
+       "to": "build_runtime_context",
+       "note": "CoreConfig 를 담은 ctx 생성"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "build_runtime_context",
+     "kind": "fn",
+     "status": "same",
+     "name": "build_runtime_context()",
+     "file": "crates/argot-daemon/src/context_builder.rs:106",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    crate::agent_config::apply_prompt_guard_mode(",
+       "to": "apply_prompt_guard_mode",
+       "note": "mode 로 규칙 목록을 CoreConfig 에 고정"
+      },
+      {
+       "code": "        &mut core,"
+      },
+      {
+       "code": "        argot_config.safety.prompt_guard.mode,"
+      },
+      {
+       "code": "        &guard_rules,"
+      },
+      {
+       "code": "    );"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "apply_prompt_guard_mode",
+     "kind": "fn",
+     "status": "same",
+     "name": "apply_prompt_guard_mode()",
+     "file": "crates/argot-daemon/src/agent_config.rs:371",
+     "lines": [
+      {
+       "code": "    core.prompt_guard = prompt_guard_config_for_mode(mode, additional);",
+       "to": "prompt_guard_config_for_mode",
+       "note": "loop·저장 전 검사가 같이 쓸 규칙 목록"
+      }
+     ]
+    },
+    {
+     "id": "prompt_guard_config_for_mode",
+     "kind": "fn",
+     "status": "changed",
+     "name": "prompt_guard_config_for_mode()",
+     "file": "crates/argot-daemon/src/agent_config.rs:324",
+     "lines": [
+      {
+       "code": "    let forced = match mode {",
+       "mark": "+",
+       "to": "mode",
+       "edge": "use"
+      },
+      {
+       "code": "        PromptGuardMode::Off => return PromptGuardConfig::default(),"
+      },
+      {
+       "code": "        PromptGuardMode::On => None,",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::Warn => Some(GuardAction::Warn),",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::Block => Some(GuardAction::Block),",
+       "mark": "+"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let product_action = forced.clone().unwrap_or(GuardAction::Block);",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut rules = builtin_prompt_guard_rules();",
+       "mark": "+",
+       "to": "builtin_prompt_guard_rules",
+       "note": "tinicore 내장 규칙 7개를 가져옴"
+      },
+      {
+       "code": "    if let Some(action) = &forced {",
+       "mark": "+"
+      },
+      {
+       "code": "        for rule in &mut rules {",
+       "mark": "+"
+      },
+      {
+       "code": "            rule.action = action.clone();",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    rules.extend(",
+       "mark": "+"
+      },
+      {
+       "code": "        prompt_guard_config("
+      },
+      {
+       "code": "            additional.iter().map(|r| (r.id.clone(), r.pattern.clone())),",
+       "mark": "+"
+      },
+      {
+       "code": "            product_action,",
+       "mark": "+"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .rules,",
+       "mark": "+"
+      },
+      {
+       "code": "    );"
+      },
+      {
+       "code": "    PromptGuardConfig { rules }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "builtin_prompt_guard_rules",
+     "kind": "fn",
+     "status": "new",
+     "name": "builtin_prompt_guard_rules()",
+     "file": "crates/argot-daemon/src/agent_config.rs:82",
+     "lines": [
+      {
+       "code": "    tinicore::guardrails::builtin_user_input_prompt_injection_rules()",
+       "mark": "+"
+      },
+      {
+       "code": "        .expect(\"tinicore's embedded prompt-injection rule file parses\")",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "mode",
+     "kind": "enum",
+     "status": "changed",
+     "name": "PromptGuardMode",
+     "file": "crates/argot-config/src/lib.rs:549",
+     "lines": [
+      {
+       "code": "pub enum PromptGuardMode {",
+       "note": "설정 값 네 가지 중 on 이 새로 생김"
+      },
+      {
+       "code": "    Off,"
+      },
+      {
+       "code": "    On,"
+      },
+      {
+       "code": "    Warn,"
+      },
+      {
+       "code": "    Block,"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "build_gateway",
+     "kind": "fn",
+     "status": "changed",
+     "name": "build_gateway()",
+     "file": "crates/argot-daemon/src/boot/runtime.rs:354",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let runner = crate::turn::ArgotRunner::new(",
+       "to": "new",
+       "note": "턴 runner 생성, 부팅 때 mode 전달"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        product_input.turn_guide.clone(),"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    )?;"
+      },
+      {
+       "code": "    let kernel = crate::transport::build_kernel(",
+       "note": "kernel 과 수신 채널 조립 → 그림 2"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "new",
+     "kind": "fn",
+     "status": "changed",
+     "name": "ArgotRunner::new()",
+     "file": "crates/argot-daemon/src/turn/mod.rs:312",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        // cached build then serves both passes.",
+       "mark": "+"
+      },
+      {
+       "code": "        if !ctx.config.prompt_guard.is_empty() {",
+       "mark": "+"
+      },
+      {
+       "code": "            prompt_guard::compile_cached(&ctx.config.prompt_guard)?;",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Ok(Arc::new(Self {",
+       "to": "ArgotRunner",
+       "edge": "use"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            prompt_guard_mode,",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "ArgotRunner",
+     "kind": "struct",
+     "status": "changed",
+     "name": "ArgotRunner",
+     "file": "crates/argot-daemon/src/turn/mod.rs:132",
+     "lines": [
+      {
+       "code": "pub struct ArgotRunner {"
+      },
+      {
+       "code": "    ctx: Arc<RuntimeContext>,"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    /// make the switch hot."
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · 턴: 저장 전 검사",
+   "caption": "저장 전 검사는 admit 으로 loop 와 같은 규칙을 검사하고, 위조 태그 2개만 RegexSet 으로 따로 검사합니다.",
+   "nodes": [
+    {
+     "id": "build_gateway",
+     "kind": "fn",
+     "status": "changed",
+     "name": "build_gateway()",
+     "file": "crates/argot-daemon/src/boot/runtime.rs:354",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let runner = crate::turn::ArgotRunner::new("
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    let kernel = crate::transport::build_kernel(",
+       "to": "build_kernel",
+       "note": "runner 를 kernel 에 연결하고 채널 시작"
+      },
+      {
+       "code": "        Arc::clone(&runner) as _,"
+      },
+      {
+       "code": "        Arc::clone(&runtime.http),"
+      },
+      {
+       "code": "        config.boot_config.channels.telegram.clone(),"
+      },
+      {
+       "code": "        Arc::clone(&runtime.watch),"
+      },
+      {
+       "code": "        terminal_metadata,"
+      },
+      {
+       "code": "        storage.scopes.bucket(),"
+      },
+      {
+       "code": "    )?;"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "build_kernel",
+     "kind": "fn",
+     "status": "same",
+     "name": "build_kernel()",
+     "file": "crates/argot-daemon/src/transport/mod.rs:65",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let telegram = channels"
+      },
+      {
+       "code": "        .telegram"
+      },
+      {
+       "code": "        .into_iter()"
+      },
+      {
+       "code": "        .map(|channel| channel.spawn_listener(Arc::clone(&kernel), bucket))",
+       "to": "tg_method",
+       "note": "Telegram 수신 리스너 시작"
+      },
+      {
+       "code": "        .collect();"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "tg_method",
+     "kind": "fn",
+     "status": "same",
+     "name": "TelegramGatewayChannel::spawn_listener()",
+     "file": "crates/argot-daemon/src/transport/telegram.rs:150",
+     "lines": [
+      {
+       "code": "        let listener = spawn_listener(self.id.clone(), Arc::clone(&self.inner), kernel, scope);",
+       "to": "tg_fn",
+       "note": "수신 루프 task 생성"
+      }
+     ]
+    },
+    {
+     "id": "tg_fn",
+     "kind": "fn",
+     "status": "same",
+     "name": "spawn_listener()",
+     "file": "crates/argot-daemon/src/transport/telegram.rs:394",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            match kernel.dispatch(env).await {",
+       "to": "dispatch",
+       "note": "수신 메시지마다 턴 실행 요청"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "dispatch",
+     "kind": "fn",
+     "status": "same",
+     "name": "GatewayKernel::dispatch()",
+     "file": "tini/tinicore/src/gateway/kernel/mod.rs:282",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            runner"
+      },
+      {
+       "code": "                .run_turn(",
+       "to": "run_turn",
+       "note": "SessionRunner trait 호출"
+      },
+      {
+       "code": "                    &runner_principal,"
+      },
+      {
+       "code": "                    &runner_session_key,"
+      },
+      {
+       "code": "                    runner_message,"
+      },
+      {
+       "code": "                    tx,"
+      },
+      {
+       "code": "                    runner_cancel,"
+      },
+      {
+       "code": "                )"
+      },
+      {
+       "code": "                .await"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "run_turn",
+     "kind": "fn",
+     "status": "same",
+     "name": "ArgotRunner::run_turn()",
+     "file": "crates/argot-daemon/src/turn/mod.rs:1158",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let Some(prepared) = self"
+      },
+      {
+       "code": "            .prepare(",
+       "to": "prepare",
+       "note": "저장 전 검사 후 사용자 메시지 저장"
+      },
+      {
+       "code": "                session_key,",
+       "mark": "+"
+      },
+      {
+       "code": "                turn_storage.as_ref(),"
+      },
+      {
+       "code": "                input,"
+      },
+      {
+       "code": "                &out,"
+      },
+      {
+       "code": "                &usage,"
+      },
+      {
+       "code": "                cancel.as_ref(),"
+      },
+      {
+       "code": "                &block_id,"
+      },
+      {
+       "code": "                &mut turn_trace,"
+      },
+      {
+       "code": "            )"
+      },
+      {
+       "code": "            .await?"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "prepare",
+     "kind": "fn",
+     "status": "changed",
+     "name": "ArgotRunner::prepare()",
+     "file": "crates/argot-daemon/src/turn/mod.rs:463",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        match prompt_guard::admit(self.ctx.as_ref(), &raw_user_msg.text()).await {",
+       "mark": "+"
+      },
+      {
+       "code": "            Ok(prompt_guard::Admission::Proceed(None)) => {}",
+       "mark": "+"
+      },
+      {
+       "code": "            Ok(prompt_guard::Admission::Proceed(Some(sanitized))) => {",
+       "mark": "+"
+      },
+      {
+       "code": "                raw_user_msg = ChatMessage::user(sanitized, now);"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            Ok(prompt_guard::Admission::Refuse { .. }) => {",
+       "mark": "+"
+      },
+      {
+       "code": "                send_guard_refusal(out, block_id).await;"
+      },
+      {
+       "code": "                return Ok(None);"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            Err(e) => {",
+       "mark": "+"
+      },
+      {
+       "code": "                send_terminal_error(",
+       "mark": "+"
+      },
+      {
+       "code": "                    &self.terminal_metadata,",
+       "mark": "+"
+      },
+      {
+       "code": "                    session_key,",
+       "mark": "+"
+      },
+      {
+       "code": "                    out,",
+       "mark": "+"
+      },
+      {
+       "code": "                    usage,",
+       "mark": "+"
+      },
+      {
+       "code": "                    TurnError::internal(e),",
+       "mark": "+"
+      },
+      {
+       "code": "                    turn_trace,",
+       "mark": "+"
+      },
+      {
+       "code": "                )"
+      },
+      {
+       "code": "                .await;",
+       "mark": "+"
+      },
+      {
+       "code": "                return Ok(None);"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "        if let Some((action, rule_ids)) =",
+       "mark": "+"
+      },
+      {
+       "code": "            agent_config::context_forgery_match(self.prompt_guard_mode, &raw_user_msg.text())",
+       "mark": "+",
+       "to": "cfm",
+       "note": "위조 태그 2개만 따로 검사"
+      },
+      {
+       "code": "        {"
+      },
+      {
+       "code": "            if matches!(action, tinicore_traits::prompt_guard::GuardAction::Block) {",
+       "mark": "+"
+      },
+      {
+       "code": "                fire_prompt_guard_event(self.ctx.as_ref(), \"block\", rule_ids[0]).await;",
+       "mark": "+"
+      },
+      {
+       "code": "                send_guard_refusal(out, block_id).await;"
+      },
+      {
+       "code": "                return Ok(None);"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            for rule_id in rule_ids {"
+      },
+      {
+       "code": "                fire_prompt_guard_event(self.ctx.as_ref(), \"warn\", rule_id).await;",
+       "mark": "+"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "cfm",
+     "kind": "fn",
+     "status": "new",
+     "name": "context_forgery_match()",
+     "file": "crates/argot-daemon/src/agent_config.rs:109",
+     "lines": [
+      {
+       "code": "    static RULES: LazyLock<regex::RegexSet> = LazyLock::new(|| {",
+       "mark": "+"
+      },
+      {
+       "code": "        regex::RegexSetBuilder::new(CONTEXT_FORGERY_RULES.iter().map(|(_, pattern)| pattern))",
+       "mark": "+",
+       "to": "CONTEXT_FORGERY_RULES",
+       "edge": "use"
+      },
+      {
+       "code": "            .unicode(false)",
+       "mark": "+"
+      },
+      {
+       "code": "            .build()",
+       "mark": "+"
+      },
+      {
+       "code": "            .expect(\"the forged-context-tag patterns compile\")",
+       "mark": "+"
+      },
+      {
+       "code": "    });"
+      },
+      {
+       "code": "    let action = match mode {",
+       "to": "mode",
+       "edge": "use"
+      },
+      {
+       "code": "        PromptGuardMode::Off => return None,",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::On | PromptGuardMode::Block => GuardAction::Block,",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::Warn => GuardAction::Warn,"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let ids: Vec<&'static str> = RULES",
+       "mark": "+"
+      },
+      {
+       "code": "        .matches(text)",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()"
+      },
+      {
+       "code": "        .map(|i| CONTEXT_FORGERY_RULES[i].0)",
+       "mark": "+"
+      },
+      {
+       "code": "        .collect();",
+       "mark": "+"
+      },
+      {
+       "code": "    (!ids.is_empty()).then_some((action, ids))",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "CONTEXT_FORGERY_RULES",
+     "kind": "static",
+     "status": "new",
+     "name": "CONTEXT_FORGERY_RULES",
+     "file": "crates/argot-daemon/src/agent_config.rs:90",
+     "lines": [
+      {
+       "code": "const CONTEXT_FORGERY_RULES: &[(&str, &str)] = &[",
+       "mark": "+"
+      },
+      {
+       "code": "    (\"argot_context_forgery\", r\"(?i)</?argot-context\\b\"),"
+      },
+      {
+       "code": "    (\"turn_context_forgery\", r\"(?i)</?turn-context\\b\"),"
+      },
+      {
+       "code": "];"
+      }
+     ]
+    },
+    {
+     "id": "mode",
+     "kind": "enum",
+     "status": "changed",
+     "name": "PromptGuardMode",
+     "file": "crates/argot-config/src/lib.rs:549",
+     "lines": [
+      {
+       "code": "pub enum PromptGuardMode {",
+       "note": "설정 값 네 가지 중 on 이 새로 생김"
+      },
+      {
+       "code": "    Off,"
+      },
+      {
+       "code": "    On,"
+      },
+      {
+       "code": "    Warn,"
+      },
+      {
+       "code": "    Block,"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "973b43f0",
+   "feat(safety): run tinicore's built-in prompt guard in both passes"
+  ]
+ ]
+}
