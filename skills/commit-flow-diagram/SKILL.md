@@ -1,6 +1,6 @@
 ---
 name: commit-flow-diagram
-description: Draw what a commit — or a commit range / PR-sized span — changed as a code-flow picture, starting at the program entry point (main) and following the calls down into the changed functions. Each function, struct, enum, static or trait is a box holding its REAL code (verbatim, syntax-highlighted, unrelated parts elided with `...`), with call arrows leaving from the exact call line. Output is always the same fixed format, whatever agent or LLM runs it: one directory per change holding one SVG (+PNG) per topic and one index.html. Use when the user asks to show, draw, diagram or visualize the code flow / call flow of a commit, a range, a branch or a PR ("코드 흐름 그림", "호출 흐름을 그려줘", "커밋 흐름도").
+description: "Draw what a commit — or a commit range / PR-sized span — changed as a code-flow picture, starting at the program entry point (main) and following the calls down into the changed functions. Each function, struct, enum, static or trait is a box holding its REAL code (verbatim, syntax-highlighted, unrelated parts elided with `...`), with call arrows leaving from the exact call line. Output is always the same fixed format, whatever agent or LLM runs it, as one directory per change holding one SVG (+PNG) per topic and one index.html. Use when the user asks to show, draw, diagram or visualize the code flow / call flow of a commit, a range, a branch or a PR ('코드 흐름 그림', '호출 흐름을 그려줘', '커밋 흐름도')."
 user-invocable: true
 allowed-tools: Bash, Read, Grep, Glob, Write, Edit
 ---
