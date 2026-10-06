@@ -4,6 +4,7 @@
 - 상태: 사용자 승인
 - 대상 저장소: `AGENTIC/argo-tizen` (`main` `99b883eb`, ARGO `8ead9197ca`까지 tinisync)
 - 서브에이전트 검토(코드 대조) 결과를 반영함
+
 ## Context
 
 - argo-tizen(`main` `99b883eb`)은 ARGO `8ead9197ca`(PR #3464)까지 tinisync되어, tinicore의 `builtin_user_input_prompt_injection_rules()`를 쓸 수 있다.
