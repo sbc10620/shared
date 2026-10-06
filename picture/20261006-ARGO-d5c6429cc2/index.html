@@ -1050,13 +1050,19 @@ document.querySelectorAll('.fig').forEach((fig) => {
     svg.setAttribute('height', Math.round(h * scale));
     out.textContent = Math.round(scale * 100) + '%';
   };
-  // Fit the width; in full screen fit the whole figure (width and height).
+  // Fit the whole figure, width and height, into the space it may take:
+  // the window in full screen, else the canvas's 82vh cap. The page opens
+  // fitted and stays fitted on resize until the reader zooms by hand.
+  let fitted = true;
   const fit = () => {
-    const byH = isFull() ? (canvas.clientHeight - 2) / h : Infinity;
-    scale = Math.min(1, (canvas.clientWidth - 2) / w, byH); apply();
+    const room = isFull() ? canvas.clientHeight : window.innerHeight * 0.82;
+    if (!canvas.clientWidth || !room) return;
+    scale = Math.min(1, (canvas.clientWidth - 2) / w, (room - 2) / h);
+    fitted = true; apply();
   };
   fig.querySelector('.tools').addEventListener('click', (e) => {
     const act = e.target.closest('button')?.dataset.act;
+    fitted = false;
     if (act === 'in') scale = Math.min(10, scale * 1.25);
     if (act === 'out') scale = Math.max(0.05, scale / 1.25);
     if (act === 'one') scale = 1;
@@ -1097,10 +1103,13 @@ document.querySelectorAll('.fig').forEach((fig) => {
   document.addEventListener('keydown', (e) => {
     if (!isFull()) return;
     if (e.key === 'Escape' && fig.classList.contains('is-max')) toggleFull();
-    else if (e.key === '+' || e.key === '=') { scale = Math.min(10, scale * 1.25); apply(); }
-    else if (e.key === '-') { scale = Math.max(0.05, scale / 1.25); apply(); }
+    else if (e.key === '+' || e.key === '=') { fitted = false; scale = Math.min(10, scale * 1.25); apply(); }
+    else if (e.key === '-') { fitted = false; scale = Math.max(0.05, scale / 1.25); apply(); }
     else if (e.key === '0') fit();
   });
   fit();
+  requestAnimationFrame(fit);            // after layout settles
+  window.addEventListener('load', fit);  // after web fonts
+  window.addEventListener('resize', () => { if (fitted) fit(); });
 });
 </script>
