@@ -1,0 +1,479 @@
+{
+ "title": "prompt_guard mode \"on\" 과 tinicore 내장 규칙 코드 흐름",
+ "repo": "/Users/byungchulso/Works/argo-tizen",
+ "before": "7b4b3fe0~1",
+ "after": "7b4b3fe0",
+ "range": "argo-tizen · 7b4b3fe0~1(99b883eb)..7b4b3fe0 · argot 바이너리 main() 부터",
+ "not_drawn": {
+  "describe": "설정 스키마의 mode 값 목록에 on 추가. gRPC get_schema 가 호출하며, 이 호출은 tonic 생성 코드가 해서 main 경로에 호출 줄이 없음",
+  "run_turn_prompt_guard_on_blocks_builtin_rule_before_persisting": "테스트 함수",
+  "run_turn_prompt_guard_on_lets_a_warn_rule_through": "테스트 함수"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 때 prompt guard 규칙 집합 조립",
+   "caption": "루프 안 검사(apply_prompt_guard_mode)와 DB 저장 전 검사(compile_pre_persist_prompt_guard)가 모두 prompt_guard_config_for_mode 에서 tinicore 내장 규칙을 받아 mode 에 맞게 action 을 정합니다.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "crates/argot/src/main.rs:112",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            argot::daemon::boot::run(started_at, argot::product::argot_integration())",
+       "note": "데몬 부팅 시작",
+       "to": "run"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "boot::run()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:42",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match runtime.block_on(run_managed(",
+       "note": "tokio 런타임에서 부팅 본체 실행",
+       "to": "run_managed"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_managed",
+     "kind": "fn",
+     "status": "same",
+     "name": "run_managed()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:171",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match run_async(",
+       "note": "서비스와 게이트웨이 조립",
+       "to": "run_async"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_async",
+     "kind": "fn",
+     "status": "same",
+     "name": "run_async()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:359",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let runtime = runtime::build_services(",
+       "note": "루프용 CoreConfig 만들기",
+       "to": "build_services"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    let gateway = runtime::build_gateway(",
+       "note": "턴 실행기(ArgotRunner) 만들기",
+       "to": "build_gateway"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "build_services",
+     "kind": "fn",
+     "status": "same",
+     "name": "runtime::build_services()",
+     "file": "crates/argot-daemon/src/boot/runtime.rs:133",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        crate::context_builder::build_runtime_context(crate::context_builder::ContextDeps {",
+       "note": "런타임 컨텍스트 조립",
+       "to": "build_runtime_context"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "build_runtime_context",
+     "kind": "fn",
+     "status": "same",
+     "name": "build_runtime_context()",
+     "file": "crates/argot-daemon/src/context_builder.rs:106",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    crate::agent_config::apply_prompt_guard_mode(",
+       "note": "설정 mode 를 루프 가드에 반영",
+       "to": "apply_prompt_guard_mode"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "apply_prompt_guard_mode",
+     "kind": "fn",
+     "status": "same",
+     "name": "apply_prompt_guard_mode()",
+     "file": "crates/argot-daemon/src/agent_config.rs:340",
+     "lines": [
+      {
+       "code": "    core.prompt_guard = prompt_guard_config_for_mode(mode, additional);",
+       "note": "루프 안에서 검사할 규칙 집합",
+       "to": "prompt_guard_config_for_mode"
+      }
+     ]
+    },
+    {
+     "id": "build_gateway",
+     "kind": "fn",
+     "status": "same",
+     "name": "runtime::build_gateway()",
+     "file": "crates/argot-daemon/src/boot/runtime.rs:354",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let runner = crate::turn::ArgotRunner::new(",
+       "note": "턴 실행기 생성",
+       "to": "new"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "new",
+     "kind": "fn",
+     "status": "same",
+     "name": "ArgotRunner::new()",
+     "file": "crates/argot-daemon/src/turn/mod.rs:313",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            agent_config::compile_pre_persist_prompt_guard(prompt_guard_mode, &guard_rules)?;",
+       "note": "DB 저장 전 가드를 부팅 때 컴파일",
+       "to": "compile_pre_persist_prompt_guard"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "compile_pre_persist_prompt_guard",
+     "kind": "fn",
+     "status": "same",
+     "name": "compile_pre_persist_prompt_guard()",
+     "file": "crates/argot-daemon/src/agent_config.rs:394",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let config = pre_persist_prompt_guard_config_for_mode(mode, additional);",
+       "note": "저장 전 검사 규칙 집합",
+       "to": "pre_persist_prompt_guard_config_for_mode"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "pre_persist_prompt_guard_config_for_mode",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pre_persist_prompt_guard_config_for_mode()",
+     "file": "crates/argot-daemon/src/agent_config.rs:359",
+     "lines": [
+      {
+       "code": "    let raw_rules = || {",
+       "note": "위조 태그 규칙 목록을 클로저로 공유",
+       "mark": "+"
+      },
+      {
+       "code": "        RAW_PROMPT_GUARD_RULES"
+      },
+      {
+       "code": "            .iter()"
+      },
+      {
+       "code": "            .map(|(id, pattern)| ((*id).to_string(), (*pattern).to_string()))"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    match mode {"
+      },
+      {
+       "code": "        PromptGuardMode::Off => PromptGuardConfig::default(),"
+      },
+      {
+       "code": "        PromptGuardMode::Warn => prompt_guard_config(raw_rules(), GuardAction::Warn),",
+       "note": "warn: 위조 태그 규칙만 저장 전 검사",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::On | PromptGuardMode::Block => {",
+       "note": "on 이 block 과 같은 경로로 합류",
+       "mark": "+"
+      },
+      {
+       "code": "            let mut config = prompt_guard_config_for_mode(mode, additional);",
+       "note": "루프와 같은 규칙 집합에서 출발",
+       "to": "prompt_guard_config_for_mode",
+       "mark": "+"
+      },
+      {
+       "code": "            config",
+       "mark": "+"
+      },
+      {
+       "code": "                .rules",
+       "mark": "+"
+      },
+      {
+       "code": "                .retain(|rule| matches!(rule.action, GuardAction::Block));",
+       "note": "Block 규칙만 남김, warn 중복 보고 방지",
+       "mark": "+"
+      },
+      {
+       "code": "            config",
+       "mark": "+"
+      },
+      {
+       "code": "                .rules",
+       "mark": "+"
+      },
+      {
+       "code": "                .extend(prompt_guard_config(raw_rules(), GuardAction::Block).rules);",
+       "note": "위조 태그 규칙을 Block 으로 추가",
+       "mark": "+"
+      },
+      {
+       "code": "            config",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "prompt_guard_config_for_mode",
+     "kind": "fn",
+     "status": "changed",
+     "name": "prompt_guard_config_for_mode()",
+     "file": "crates/argot-daemon/src/agent_config.rs:293",
+     "lines": [
+      {
+       "code": "    let forced = match mode {",
+       "note": "mode 가 모든 규칙의 action 을 강제하는지",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::Off => return PromptGuardConfig::default(),",
+       "note": "off: 빈 가드로 즉시 반환",
+       "to": "PromptGuardMode",
+       "edge": "use"
+      },
+      {
+       "code": "        PromptGuardMode::On => None,",
+       "note": "on: 규칙마다 자기 action 유지",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::Warn => Some(GuardAction::Warn),",
+       "mark": "+"
+      },
+      {
+       "code": "        PromptGuardMode::Block => Some(GuardAction::Block),",
+       "mark": "+"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let product_action = forced.clone().unwrap_or(GuardAction::Block);",
+       "note": "제품 규칙은 on 에서 Block",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut rules = builtin_prompt_guard_rules();",
+       "note": "tinicore 내장 규칙 7개 가져오기",
+       "to": "builtin_prompt_guard_rules",
+       "mark": "+"
+      },
+      {
+       "code": "    if let Some(action) = &forced {",
+       "mark": "+"
+      },
+      {
+       "code": "        for rule in &mut rules {",
+       "mark": "+"
+      },
+      {
+       "code": "            rule.action = action.clone();",
+       "note": "warn·block 이면 모든 action 덮어쓰기",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    rules.extend(",
+       "note": "내장 규칙 뒤에 제품 규칙 덧붙이기",
+       "mark": "+"
+      },
+      {
+       "code": "        prompt_guard_config("
+      },
+      {
+       "code": "            additional.iter().map(|r| (r.id.clone(), r.pattern.clone())),",
+       "mark": "+"
+      },
+      {
+       "code": "            product_action,",
+       "mark": "+"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .rules,",
+       "mark": "+"
+      },
+      {
+       "code": "    );"
+      },
+      {
+       "code": "    PromptGuardConfig { rules }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "builtin_prompt_guard_rules",
+     "kind": "fn",
+     "status": "new",
+     "name": "builtin_prompt_guard_rules()",
+     "file": "crates/argot-daemon/src/agent_config.rs:83",
+     "lines": [
+      {
+       "code": "    tinicore::guardrails::builtin_user_input_prompt_injection_rules()",
+       "note": "tinicore 내장 규칙 파일을 파싱",
+       "mark": "+"
+      },
+      {
+       "code": "        .expect(\"tinicore's embedded prompt-injection rule file parses\")",
+       "note": "파싱 실패는 빌드 결함이라 panic",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "PromptGuardMode",
+     "kind": "enum",
+     "status": "changed",
+     "name": "PromptGuardMode",
+     "file": "crates/argot-config/src/lib.rs:549",
+     "lines": [
+      {
+       "code": "pub enum PromptGuardMode {"
+      },
+      {
+       "code": "    Off,",
+       "note": "기본값: 가드 없음"
+      },
+      {
+       "code": "    On,",
+       "note": "새 모드: 규칙별 자기 action",
+       "mark": "+"
+      },
+      {
+       "code": "    Warn,",
+       "note": "모든 규칙 warn"
+      },
+      {
+       "code": "    Block,",
+       "note": "모든 규칙 block"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "slug": "20261006-argo-tizen-7b4b3fe03e",
+ "commits": [
+  [
+   "7b4b3fe0",
+   "feat(safety): add prompt_guard mode \"on\" over tinicore's built-in rules"
+  ]
+ ]
+}
