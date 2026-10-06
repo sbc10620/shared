@@ -2,7 +2,7 @@
 """Build one commit-flow GROUP: a directory holding every figure of one
 change, as SVG (+ PNG when a Chrome/Chromium is found) plus one index.html.
 
-usage: build_group.py <group.json> [<parent-dir>] [--skip-verify] [--no-png]
+usage: build_group.py <group.json> [<parent-dir>] [--no-png]
 
 <parent-dir> defaults to $COMMIT_FLOW_DIR, else ~/code-flow-diagrams. The
 group directory name is derived, never chosen: <YYYYMMDD of the `after`
@@ -12,8 +12,8 @@ lands in the same place.
 Output (the group directory name is derived, see above):
   <parent-dir>/<slug>/
     index.html             every figure inline, zoom/fit/drag, self-contained
-    fig1-<fig slug>.svg    one file per figure
-    fig1-<fig slug>.png    preview (optional)
+    fig1.svg, fig2.svg     one file per figure
+    fig1.png, fig2.png     previews (optional)
     spec.json              the group spec, to regenerate or extend later
 The layout and styling are fixed so every group looks the same.
 """
@@ -25,6 +25,7 @@ import subprocess
 import sys
 from xml.sax.saxutils import escape
 
+sys.dont_write_bytecode = True  # keep the skill directory free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render  # noqa: E402
 
@@ -51,15 +52,18 @@ def git(repo, *args):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    if flags - {"--no-png"}:
+        sys.exit(f"unknown option(s): {sorted(flags - {'--no-png'})} — the only option is --no-png")
     spec_path = args[0]
     parent = args[1] if len(args) > 1 else (
         os.environ.get("COMMIT_FLOW_DIR") or os.path.expanduser("~/code-flow-diagrams"))
     group = json.load(open(spec_path, encoding="utf-8"))
     here = os.path.dirname(os.path.abspath(__file__))
-    if "--skip-verify" not in flags:
-        r = subprocess.run([sys.executable, os.path.join(here, "verify_spec.py"), spec_path])
-        if r.returncode:
-            sys.exit("verify_spec failed; fix the spec (or pass --skip-verify knowingly)")
+    # Always verified; there is deliberately no way to skip it, because a
+    # group that skipped the checks is not the fixed format any more.
+    r = subprocess.run([sys.executable, os.path.join(here, "verify_spec.py"), spec_path])
+    if r.returncode:
+        sys.exit("verify_spec failed: fix the spec until it prints 0 problem(s); nothing was built")
     repo, after = group["repo"], group["after"]
     day = git(repo, "show", "-s", "--format=%cd", "--date=format:%Y%m%d", after).strip()
     sha = git(repo, "rev-parse", "--short=10", after).strip()
@@ -77,7 +81,7 @@ def main():
     chrome = None if "--no-png" in flags else find_chrome()
     figures = []
     for i, fig in enumerate(group["figures"]):
-        name = f'fig{i+1}-{fig["slug"]}'
+        name = f'fig{i+1}'  # never a chosen word: the same change gives the same files
         svg = render.render(group, json.loads(json.dumps(fig)))
         open(os.path.join(out_dir, name + ".svg"), "w", encoding="utf-8").write(svg)
         m = re.search(r'width="([\d.]+)" height="([\d.]+)"', svg)
@@ -105,6 +109,12 @@ def page(group, figures):
         f'<li><code>{escape(sha)}</code><span>{escape(subj)}</span></li>' for sha, subj in group["commits"]
     )
     toc = "".join(f'<a href="#fig{i+1}">{escape(f["title"])}</a>' for i, f, _ in figures)
+    nd = group.get("not_drawn") or {}
+    not_drawn = ("" if not nd else
+                 '<section class="not-drawn" id="not-drawn"><h2>그림에 없는 변경</h2>'
+                 '<p>이 범위에서 바뀌었지만 main() 에서 시작하는 흐름에 박스로 넣지 않은 정의입니다.</p><ul>'
+                 + "".join(f'<li><code>{escape(k)}</code><span>{escape(str(v))}</span></li>' for k, v in sorted(nd.items()))
+                 + '</ul></section>')
     figures_html = "".join(f'''
 <section class="fig" id="fig{i+1}">
   <header class="fig-head">
@@ -174,6 +184,13 @@ h1 {{ font-size: clamp(22px, 3vw, 30px); line-height: 1.3; margin: 0; text-wrap:
 }}
 .tools button:hover {{ border-color: var(--accent); color: var(--accent); }}
 .tools button:focus-visible, .canvas:focus-visible {{ outline: 2px solid var(--accent); outline-offset: 2px; }}
+.not-drawn {{ display: grid; gap: 8px; max-width: 100ch; }}
+.not-drawn h2 {{ margin: 0; font-size: 17px; }}
+.not-drawn p {{ margin: 0; color: var(--muted); font-size: 14px; }}
+.not-drawn ul {{ list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }}
+.not-drawn li {{ display: flex; gap: 12px; align-items: baseline; min-width: 0; }}
+.not-drawn code {{ font-family: var(--font-code); font-size: 13px; color: var(--accent); flex: none; }}
+.not-drawn span {{ min-width: 0; overflow-wrap: anywhere; }}
 .zoom-val {{ font-family: var(--font-code); font-size: 12px; min-width: 4.5ch; text-align: center; font-variant-numeric: tabular-nums; }}
 .canvas {{
   overflow: auto; background: var(--paper); max-height: 82vh; cursor: grab;
@@ -210,6 +227,7 @@ body.has-max {{ overflow: hidden; }}
     <nav class="toc">{toc}</nav>
   </div>
   {figures_html}
+  {not_drawn}
 </main>
 
 <script>
@@ -246,6 +264,9 @@ document.querySelectorAll('.fig').forEach((fig) => {{
   // page instead of the figure. Ctrl/Cmd + wheel is the browser's zoom.
   canvas.addEventListener('wheel', (e) => {{
     if (e.ctrlKey || e.metaKey || isFull() || document.activeElement === canvas) return;
+    // Sideways wheel (Shift + wheel, trackpad swipe): the page has no
+    // horizontal scroll, so the figure keeps it.
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
     e.preventDefault();
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
     window.scrollBy({{ top: e.deltaY * unit, left: 0 }});

@@ -195,11 +195,28 @@ def node_size(n):
     return max(w, 170), cy + PAD + 4
 
 
+def dedent(n):
+    """Drop the indentation every kept line of a box shares, so a call deep
+    inside closures or blocks starts at the box's left edge. The spec keeps
+    the file's own indentation; this makes the rendering independent of it."""
+    code = [ln["code"] for ln in n.get("lines", []) if not ln.get("elide") and ln.get("code", "").strip()]
+    if not code:
+        return
+    cut = min(len(c) - len(c.lstrip(" ")) for c in code)
+    for ln in n["lines"]:
+        if ln.get("elide"):
+            ln["indent"] = max(0, ln.get("indent", 0) - cut)
+        elif ln.get("code", "")[:cut].strip() == "":
+            ln["code"] = ln["code"][cut:]
+
+
 def layout(nodes):
     """Place every box. Nothing here depends on how the spec was written
     beyond its boxes and edges, so the same boxes always give the same
     picture. (`col` / `align_to` in a spec still override, for old specs.)"""
     by_id = {n["id"]: n for n in nodes}
+    for n in nodes:
+        dedent(n)
     order = visit_order(nodes, by_id)
     assign_columns(order)
     for n in order:
@@ -233,12 +250,12 @@ def layout(nodes):
 
 # --- drawing -------------------------------------------------------------
 
-def code_tspans(code, callees, dim, call_line):
+def code_tspans(code, callees, call_line):
     """Highlighted code. A line that calls another box is bold italic as a
     whole, and the called name inside it is also underlined."""
     parts = []
     for kind, text in tokens(code):
-        color = "#7d8590" if dim else HL[kind]
+        color = HL[kind]
         extra = ' text-decoration="underline"' if call_line and kind in ("fn", "plain") and text in callees else ""
         parts.append(f'<tspan fill="{color}"{extra}>{escape(text)}</tspan>')
     style = ' font-weight="700" font-style="italic"' if call_line else ""
@@ -286,14 +303,13 @@ def render_node(n, by_id, out):
         cy += LH
         elide = ln.get("elide")
         code = (" " * ln.get("indent", 0)) + "..." if elide else ln["code"]
-        dim = bool(ln.get("dim") or elide)
         if ln.get("mark"):
             out.append(f'<rect x="{x+2}" y="{cy-LH+1}" width="{w-4}" height="{LH}" fill="#4b4220"/>')
             out.append(f'<text x="{x+PAD}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}" font-weight="700" '
                        f'fill="#e3b341">+</text>')
         call_line = any(k in ("call", "defer") for _, _, k in edges_of({"lines": [ln]}))
         style, body = (("", f'<tspan fill="#7d8590">{escape(code)}</tspan>') if elide
-                       else code_tspans(code, callee_names(ln, by_id), dim, call_line))
+                       else code_tspans(code, callee_names(ln, by_id), call_line))
         out.append(f'<text x="{x+PAD+GUTTER}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}"{style} '
                    f'xml:space="preserve">{body}</text>')
         ln["_y"] = cy - LH / 2 - 1
@@ -376,6 +392,9 @@ def render_legend(x, y, out):
 def render(group, fig):
     nodes = fig["nodes"]
     total_w, total_h, by_id = layout(nodes)
+    # Write boxes in placement order, so the file itself (not only the
+    # picture) is the same however the spec listed them.
+    nodes = sorted(nodes, key=lambda n: (n["col"], n["y"], n["id"]))
     total_w = max(total_w, 1400)
     total_h += 20
     body, edges, head = [], [], []

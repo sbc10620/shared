@@ -6,7 +6,6 @@
  "range": "ARGO · origin/main(8ead9197ca)..d5c6429cc2 · argo 바이너리 main() 부터",
  "figures": [
   {
-   "slug": "country-resolve",
    "title": "그림 1 · 부팅할 때 PII 국가를 정하는 흐름",
    "caption": "config.toml 의 pii_locales → device locale → 기본값(US). 잘못 놓인 pii_locales 키 검사 포함",
    "nodes": [
@@ -287,7 +286,8 @@
       {
        "code": "    return parse_pii_countries(values)",
        "to": "parse_countries",
-       "mark": "+"
+       "mark": "+",
+       "callee": "parse_pii_countries"
       },
       {
        "code": "        .map(|countries| (countries, PiiCountrySource::Config))",
@@ -451,7 +451,7 @@
      "kind": "struct",
      "status": "changed",
      "name": "CliConfig",
-     "file": "tinicli/src/config.rs:165",
+     "file": "tinicli/src/config.rs:9",
      "lines": [
       {
        "elide": true,
@@ -723,7 +723,6 @@
    ]
   },
   {
-   "slug": "engine-build",
    "title": "그림 2 · 고른 국가를 고정하고 PII 엔진을 만드는 흐름",
    "caption": "install 에서 국가 목록을 프로세스 전역에 고정 → 턴마다 common + 선택 국가 YAML 로 엔진 빌드",
    "nodes": [
@@ -741,8 +740,7 @@
       {
        "code": "let pii_countries = match crate::guardrails::pii::resolve_pii_countries(",
        "note": "그림 1 에서 정한 국가 목록",
-       "mark": "+",
-       "dim": true
+       "mark": "+"
       },
       {
        "elide": true,
@@ -882,8 +880,8 @@
       },
       {
        "code": "let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;",
-       "note": "PII 레이어 구성 (기존, countries 는 읽지 않음)",
-       "dim": true
+       "note": "PII 레이어 구성 (countries 는 읽지 않음)",
+       "to": "build_pii"
       },
       {
        "elide": true,
@@ -953,8 +951,7 @@
        "to": "shared_slot"
       },
       {
-       "code": "crate::sensitive::turn_scope::turn_guard()",
-       "dim": true
+       "code": "crate::sensitive::turn_scope::turn_guard()"
       }
      ]
     },
@@ -1182,8 +1179,52 @@
        "mark": "+"
       }
      ]
+    },
+    {
+     "id": "build_pii",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pii::install::build_pii()",
+     "file": "tinicore/src/guardrails/pii/install.rs:295",
+     "lines": [
+      {
+       "code": "    let PiiConfig {"
+      },
+      {
+       "code": "        mode,"
+      },
+      {
+       "code": "        tool_args,"
+      },
+      {
+       "code": "        filter_labels,"
+      },
+      {
+       "code": "        countries: _,",
+       "note": "국가 목록은 install 이 이미 고정함",
+       "mark": "+"
+      },
+      {
+       "code": "    } = config;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
     }
    ]
   }
- ]
+ ],
+ "not_drawn": {
+  "GuardrailsInstallError": "PiiCountriesFixed 변형 추가. 흐름에서는 run() 의 Err(e) 로 부팅 중단",
+  "fmt": "PiiCountriesFixed 오류 문구 출력(Display)",
+  "join_countries": "위 오류 문구에 국가 목록을 넣는 도우미",
+  "ALL": "지원 국가 목록 상수. from_region() 이 읽음",
+  "code": "국가 코드 문자열. from_region() 이 비교에 사용",
+  "PiiCountryError": "국가 값 오류 타입. 그림에서는 Err 값으로만 나옴",
+  "supported_list": "오류 메시지에 지원 국가를 나열하는 도우미",
+  "layer_filter_for_countries": "테스트에서만 호출, main() 에서 닿지 않음",
+  "build_filters_with_params": "벤치·테스트에서만 호출, main() 에서 닿지 않음"
+ }
 }
