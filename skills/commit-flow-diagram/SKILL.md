@@ -17,7 +17,7 @@ Every group this skill produces must look the same, whoever runs it and on whate
 
 | Element | Fixed rendering |
 | --- | --- |
-| Function box | solid outline, rounded corners; header `fn name(params)` with the parameters read from the source (never written in the spec). A list over 48 characters keeps only the parameters the box's code uses (and `self`), with `…` for the rest |
+| Function box | solid outline, rounded corners; header `fn name(` / one parameter per line / `)` (stacked vertically, highlighted), with the parameters read from the source (never written in the spec); no parameters gives `fn name()`. A list over 48 characters keeps only the parameters the box's code uses (and `self`), with `…` for the rest |
 | Struct / enum box | long-dash outline, square corners |
 | Static / const box | dotted outline, square corners |
 | Trait box | double outline, rounded corners |

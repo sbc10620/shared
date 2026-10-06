@@ -138,13 +138,13 @@ DECL_NAME_RE = re.compile(r"\b(?:fn|def|func|fun|function)\s+(?:\([^)]*\)\s*)?(?
 
 
 def header_params(parts, used_code):
-    """Full list when short; otherwise only the parameters the box's code
-    uses (and `self`), with `…` for the rest."""
+    """The parameters to show, one per header line: all of them when the
+    list is short; otherwise only those the box's code uses (and `self`),
+    with `…` standing for each run of the rest."""
     if parts is None:
         return None
-    full = ", ".join(parts)
-    if len(full) <= PARAMS_MAX:
-        return full
+    if len(", ".join(parts)) <= PARAMS_MAX:
+        return parts
     keep, out = set(), []
     for p in parts:
         name = param_name(p)
@@ -158,7 +158,7 @@ def header_params(parts, used_code):
         elif not skipped:
             out.append("…")
             skipped = True
-    return ", ".join(out)
+    return out
 
 
 def text_width(s, size=FS):
@@ -256,10 +256,11 @@ def assign_columns(order):
 
 def node_size(n):
     """Box size, and each line's vertical offset (`_dy`) inside the box."""
-    widths = [text_width(n["kind"] + " " + display_name(n), 13) + 70, text_width(n.get("file", ""), 10) + 70]
+    widths = [text_width(n["kind"] + " " + head_lines(n)[0], 13) + 70] + \
+             [text_width(l, 12) + 2 * PAD for l in head_lines(n)[1:]] + [text_width(n.get("file", ""), 10) + 70]
     if n.get("desc"):
         widths.append(text_width(n["desc"], 11) + 2 * PAD)
-    cy = HEAD_H + (18 if n.get("desc") else 0) + 6
+    cy = head_h(n) + (18 if n.get("desc") else 0) + 6
     for ln in n.get("lines", []):
         if ln.get("note"):
             widths.append(text_width("// " + ln["note"]) + GUTTER + 14)
@@ -338,12 +339,21 @@ def code_tspans(code, callees, call_line):
     return style, "".join(parts)
 
 
-def display_name(n):
-    """Box header: the name, with the parameter list when one was read."""
-    if n["kind"] != "fn" or n.get("params") is None:
-        return n["name"]
+PARAM_LH = 15  # one header line per parameter
+
+
+def head_lines(n):
+    """Header text lines: `name(`, one indented line per parameter, `)`;
+    just `name()` when there are none (or none could be read)."""
+    params = n.get("params") if n["kind"] == "fn" else None
+    if not params:
+        return [n["name"]]
     base = re.sub(r"\(\)\s*$", "", n["name"])
-    return f"{base}({n['params']})"
+    return [base + "("] + [f"    {p}," if p != "…" else "    …" for p in params] + [")"]
+
+
+def head_h(n):
+    return HEAD_H + PARAM_LH * (len(head_lines(n)) - 1)
 
 
 def render_node(n, by_id, out):
@@ -360,20 +370,26 @@ def render_node(n, by_id, out):
     if kind == "trait":
         out.append(f'<rect x="{x+4}" y="{y+4}" width="{w-8}" height="{h-8}" rx="{rx-3}" fill="none" '
                    f'stroke="{st["stroke"]}" stroke-width="1.2"/>')
-    out.append(f'<rect x="{x+inset}" y="{y+inset}" width="{w-2*inset}" height="{HEAD_H-inset}" '
+    hh = head_h(n)
+    lines_h = head_lines(n)
+    out.append(f'<rect x="{x+inset}" y="{y+inset}" width="{w-2*inset}" height="{hh-inset}" '
                f'rx="{max(rx-2, 0)}" fill="{st["head"]}" />')
-    out.append(f'<path d="M{x+inset},{y+HEAD_H} H{x+w-inset}" stroke="{st["stroke"]}" stroke-opacity="0.35"/>')
+    out.append(f'<path d="M{x+inset},{y+hh} H{x+w-inset}" stroke="{st["stroke"]}" stroke-opacity="0.35"/>')
     out.append(f'<text x="{x+PAD}" y="{y+18}" font-family="{CODE_FONT}" font-size="13" font-weight="700" '
                f'fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">{kind} </tspan>'
-               f'{escape(display_name(n))}</text>')
+               f'{escape(lines_h[0])}</text>')
+    for k, pl in enumerate(lines_h[1:], start=1):
+        _, body = code_tspans(pl, set(), False)
+        out.append(f'<text x="{x+PAD}" y="{y+18+PARAM_LH*k}" font-family="{CODE_FONT}" font-size="12" '
+                   f'xml:space="preserve">{body}</text>')
     if n.get("file"):
-        out.append(f'<text x="{x+PAD}" y="{y+33}" font-family="{CODE_FONT}" font-size="10" fill="#9da7b3">'
+        out.append(f'<text x="{x+PAD}" y="{y+hh-7}" font-family="{CODE_FONT}" font-size="10" fill="#9da7b3">'
                    f'{escape(n["file"])}</text>')
     bw = 34
     out.append(f'<rect x="{x+w-bw-8}" y="{y+8}" width="{bw}" height="18" rx="9" fill="{st["stroke"]}"/>')
     out.append(f'<text x="{x+w-8-bw/2}" y="{y+21}" text-anchor="middle" font-family="{TEXT_FONT}" font-size="11" '
                f'font-weight="700" fill="#16181c">{st["badge"]}</text>')
-    cy = y + HEAD_H
+    cy = y + hh
     if n.get("desc"):
         out.append(f'<text x="{x+PAD}" y="{cy+15}" font-family="{TEXT_FONT}" font-size="11" fill="#c9d1d9">'
                    f'{escape(n["desc"])}</text>')
