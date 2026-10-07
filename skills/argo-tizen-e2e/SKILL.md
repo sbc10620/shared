@@ -40,15 +40,19 @@ Python 3.8+ scripts. Paths below are relative to this skill's directory
   - `tool-output-off|on` (+ with the prompt guard, + resume): a tool result
     carrying a forged tag or a built-in rule match reaches the model as
     `blocked: content withheld from the model; …` under
-    `[safety.tool_output_guard] mode = "on"`, raw under `off`. Commands use
+    `[safety.tool_output_guard] mode = "on"`, raw under `off`. `labels`
+    without `override` lets a forged tag through; `["override"]` still
+    withholds it. Commands use
     printf octal escapes (`\074` = `<`) so the tag exists only in the tool
     result, never in the user's prompt.
   - `pii-off|block-only|full`: card / RRN refused before storage, phone
     passed raw or masked (`[SENS:PII:PHONE:…]`) only on the way out.
   - `pii-full-with-prompt-guard`: guard refuses first; a PII refusal fires
     no guard event.
-  - `boot-*`: an unknown prompt-guard mode, an unknown tool-output-guard mode and a `credential` filter label
-    (even with PII off) stop the daemon.
+  - `boot-*`: an unknown prompt-guard mode, an unknown tool-output-guard
+    mode, an unknown tool-output label (even with the guard off) and a
+    `credential` filter label (even with PII off, written inline) stop the
+    daemon.
 
 ## Steps
 
