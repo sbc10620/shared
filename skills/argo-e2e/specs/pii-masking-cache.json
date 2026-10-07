@@ -1,0 +1,142 @@
+{
+ "files": {
+  "big1.txt": {
+   "head": "Customer record A: phone 010-1234-5678, card 4111-1111-1111-1111.\n",
+   "repeat": "Lorem ipsum dolor sit amet, consectetur adipiscing elit; quarterly ledger line.\n",
+   "times": 560,
+   "tail": "End of record A. Card on file 4111-1111-1111-1111, phone 010-1234-5678.\n"
+  },
+  "big2.txt": {
+   "head": "Customer record B: phone 010-1234-5678, card 4111-1111-1111-1111.\n",
+   "repeat": "Lorem ipsum dolor sit amet, consectetur adipiscing elit; quarterly ledger line.\n",
+   "times": 560,
+   "tail": "End of record B. Card on file 4111-1111-1111-1111, phone 010-1234-5678.\n"
+  }
+ },
+ "suites": [
+  {
+   "name": "daemon_masking_cache",
+   "bin": "guard",
+   "config": "provider = \"openai_compat\"\nmodel = \"mock-model\"\napi_key = \"sk-test-mock\"\nendpoint = \"{MOCK_URL}\"\n\n[pii]\nmode = \"full\"\ndemask_tool_args.file_read = [\"path\"]\n",
+   "env": {
+    "RUST_LOG": "debug"
+   },
+   "cases": [
+    {
+     "name": "turn1_fail_then_two_big_reads",
+     "mode": "daemon",
+     "session": "cache",
+     "message": "My phone is 010-1234-5678. READFILES {FILES}/no-such-file.txt {FILES}/big1.txt {FILES}/big2.txt ECHOFULL:2,3",
+     "require": {
+      "loop_calls": 4,
+      "requests_all": [
+       "<turn-context>"
+      ],
+      "request_at": {
+       "1": [
+        "One or more tool calls failed"
+       ]
+      }
+     },
+     "requests_none": [
+      "010-1234-5678",
+      "4111-1111-1111-1111"
+     ],
+     "requests_any": [
+      "\\[SENS:PII:"
+     ],
+     "call_log": [
+      {
+       "call": 0,
+       "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+       "count": 0
+      },
+      {
+       "call": 1,
+       "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+       "count": 0
+      },
+      {
+       "call": 2,
+       "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+       "count": 0
+      },
+      {
+       "call": 3,
+       "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+       "count": 0
+      }
+     ]
+    },
+    {
+     "name": "turn2_rescans_turn1_reply_once",
+     "mode": "daemon",
+     "session": "cache",
+     "message": "READFILES {FILES}/big1.txt",
+     "require": {
+      "loop_calls": 2,
+      "requests_all": [
+       "<turn-context>"
+      ],
+      "call_log": [
+       {
+        "call": 0,
+        "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+        "count": 1,
+        "range": [
+         65537,
+         140000
+        ]
+       }
+      ]
+     },
+     "requests_none": [
+      "010-1234-5678",
+      "4111-1111-1111-1111"
+     ],
+     "requests_any": [
+      "\\[SENS:PII:"
+     ],
+     "call_log": [
+      {
+       "call": 1,
+       "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+       "count": 0
+      }
+     ]
+    },
+    {
+     "name": "turn3_turn1_reply_covered",
+     "mode": "daemon",
+     "session": "cache",
+     "message": "thanks, that is all",
+     "require": {
+      "loop_calls": 1,
+      "requests_all": [
+       "<turn-context>"
+      ]
+     },
+     "requests_none": [
+      "010-1234-5678",
+      "4111-1111-1111-1111"
+     ],
+     "requests_any": [
+      "\\[SENS:PII:"
+     ],
+     "call_log": [
+      {
+       "call": 0,
+       "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+       "count": 0
+      },
+      {
+       "call": "turn",
+       "match": "\\[DEBUG\\] masking pass re-scanned.*?scanned_bytes=(\\d+)",
+       "count": 0
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
