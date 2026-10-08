@@ -88,17 +88,20 @@ def tokens(code):
 PARAMS_MAX = 48  # longer parameter lists keep only what the box's code uses
 
 
-def signature_params(lines, start):
-    """The parameter list of the declaration at lines[start], verbatim
-    pieces joined with ", " — read across lines up to the closing paren."""
+def signature(lines, start):
+    """(parameters, return type) of the declaration at lines[start], both
+    verbatim: the parameters as pieces joined with ", ", read across lines
+    up to the closing paren; the return type as the source writes it after
+    that paren (`-> R` in Rust/Swift/Python, `: R` in TS/Kotlin, `R` or
+    `(R, error)` in Go), or "" when the source states none."""
     text = "\n".join(lines[start:start + 40])
     m = DECL_NAME_RE.search(text)
     if not m:
-        return None
+        return None, ""
     i = text.find("(", m.end())
     if i < 0 or "{" in text[m.end():i] or ";" in text[m.end():i]:
-        return None
-    depth, buf, parts = 0, "", []
+        return None, ""
+    depth, buf, parts, close = 0, "", [], None
     for j in range(i + 1, len(text)):
         ch = text[j]
         prev = text[j - 1]
@@ -107,6 +110,7 @@ def signature_params(lines, start):
         elif ch in ")]}" or (ch == ">" and prev != "-"):
             if depth == 0 and ch == ")":
                 parts.append(buf)
+                close = j
                 break
             depth -= 1
         if ch == "," and depth == 0:
@@ -115,7 +119,44 @@ def signature_params(lines, start):
             continue
         buf += ch
     parts = [" ".join(p.split()) for p in parts if p.strip()]
-    return parts
+    python = m.group(0).startswith("def")
+    return parts, return_type(text[close + 1:], python) if close is not None else ""
+
+
+def return_type(tail, python=False):
+    """The return type written right after a parameter list's closing paren:
+    everything up to the body (`{`), a Rust `where`, a `;`, an expression
+    body (`= …`) or Python's closing `:` — brackets inside the type kept."""
+    depth, out = 0, ""
+    for j, ch in enumerate(tail):
+        prev = tail[j - 1] if j else ""
+        nxt = tail[j + 1] if j + 1 < len(tail) else ""
+        if depth == 0:
+            if ch in "{;" or re.match(r"\swhere\b", tail[j:]):
+                break
+            if ch == "=" and nxt != ">" and prev not in "=!<>":
+                break
+            if ch == ":" and (python or out.strip()) and nxt != ":" and prev != ":":
+                break  # Python's closing `:`; a leading `:` is the TS/Kotlin form
+        if ch in "([<":
+            depth += 1
+        elif ch in ")]" or (ch == ">" and prev not in "-="):
+            depth -= 1
+        out += ch
+    out = " ".join(out.split())
+    if len(out) > RET_MAX:
+        # Keep the outer type only: `-> Result<HashMap<…>>` -> `-> Result<…>`.
+        k = min((out.find(c) for c in "<([" if out.find(c) > 0), default=-1)
+        if k > 0:
+            out = out[:k + 1] + "…" + {"<": ">", "(": ")", "[": "]"}[out[k]]
+    return out
+
+
+def signature_params(lines, start):
+    return signature(lines, start)[0]
+
+
+RET_MAX = 64  # a longer return type keeps only its outer type
 
 
 def param_name(part):
@@ -368,13 +409,27 @@ PARAM_LH = 15  # one header line per parameter
 
 
 def head_lines(n):
-    """Header text lines: `name(`, one indented line per parameter, `)`;
-    just `name()` when there are none (or none could be read)."""
+    """Header text lines: `name(`, one indented line per parameter, then
+    `)` with the return type as the source writes it; just `name()` (plus
+    the return type) when there are no parameters (or none could be read)."""
     params = n.get("params") if n["kind"] == "fn" else None
-    if not params:
-        return [n["name"]]
+    ret = n.get("ret") if n["kind"] == "fn" else ""
+    close = ")" + ((ret if ret.startswith(":") else " " + ret) if ret else "")
     base = re.sub(r"\(\)\s*$", "", n["name"])
-    return [base + "("] + [f"    {p}," if p != "…" else "    …" for p in params] + [")"]
+    if not params:
+        return [base + "(" + close if re.search(r"\(\)\s*$", n["name"]) else n["name"]]
+    return [base + "("] + [f"    {p}," if p != "…" else "    …" for p in params] + [close]
+
+
+def first_line(n, line):
+    """The header's first line: the name in bold, and a return type that
+    shares the line (no parameters) highlighted like code."""
+    ret = n.get("ret") if n["kind"] == "fn" else ""
+    k = line.rfind(")" + ("" if ret.startswith(":") else " ") + ret) if ret else -1
+    if k <= 0:
+        return escape(line)
+    _, body = code_tspans(line[k + 1:], {}, False)
+    return escape(line[:k + 1]) + f'<tspan font-weight="400">{body}</tspan>'
 
 
 def head_h(n):
@@ -402,7 +457,7 @@ def render_node(n, by_id, out):
     out.append(f'<path d="M{x+inset},{y+hh} H{x+w-inset}" stroke="{st["stroke"]}" stroke-opacity="0.35"/>')
     out.append(f'<text x="{x+PAD}" y="{y+18}" font-family="{CODE_FONT}" font-size="13" font-weight="700" '
                f'fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">{kind} </tspan>'
-               f'{escape(lines_h[0])}</text>')
+               f'{first_line(n, lines_h[0])}</text>')
     for k, pl in enumerate(lines_h[1:], start=1):
         _, body = code_tspans(pl, {}, False)
         out.append(f'<text x="{x+PAD}" y="{y+18+PARAM_LH*k}" font-family="{CODE_FONT}" font-size="12" '

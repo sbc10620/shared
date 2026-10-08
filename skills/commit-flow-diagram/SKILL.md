@@ -17,7 +17,7 @@ Every group this skill produces must look the same, whoever runs it and on whate
 
 | Element | Fixed rendering |
 | --- | --- |
-| Function box | solid outline, rounded corners; header `fn name(` / one parameter per line / `)` (stacked vertically, highlighted), with the parameters read from the source (never written in the spec); no parameters gives `fn name()`. A list over 48 characters keeps only the parameters the box's code uses (and `self`), with `…` for the rest |
+| Function box | solid outline, rounded corners; header `fn name(` / one parameter per line / `)` (stacked vertically, highlighted), with the parameters read from the source (never written in the spec); no parameters gives `fn name()`. A list over 48 characters keeps only the parameters the box's code uses (and `self`), with `…` for the rest. The return type follows the closing paren exactly as the language writes it (`) -> R` Rust/Swift/Python, `): R` TS/Kotlin, `) R` / `) (R, error)` Go; `name() -> R` with no parameters); none is shown when the source states none, and one over 64 characters keeps its outer type (`-> Result<…>`). Parameters and return type are never converted to another language's notation, and local variables never get an inferred type: the header shows the declaration, the box shows the source |
 | Struct / enum box | long-dash outline, square corners |
 | Static / const box | dotted outline, square corners |
 | Trait box | double outline, rounded corners |
