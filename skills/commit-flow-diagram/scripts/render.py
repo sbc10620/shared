@@ -12,6 +12,8 @@ import re
 import sys
 from xml.sax.saxutils import escape
 
+import decl
+
 CODE_FONT = "'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace"
 TEXT_FONT = "'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif"
 FS = 12          # code font size
@@ -88,19 +90,26 @@ def tokens(code):
 PARAMS_MAX = 48  # longer parameter lists keep only what the box's code uses
 
 
-def signature(lines, start):
-    """(parameters, return type) of the declaration at lines[start], both
-    verbatim: the parameters as pieces joined with ", ", read across lines
-    up to the closing paren; the return type as the source writes it after
-    that paren (`-> R` in Rust/Swift/Python, `: R` in TS/Kotlin, `R` or
-    `(R, error)` in Go), or "" when the source states none."""
+def signature(lines, start, path=""):
+    """(parameters, return type after, return type before) of the
+    declaration at lines[start], all verbatim. Parameters: the pieces of
+    the list joined with ", ", read across lines up to the closing paren.
+    Return type after: as the source writes it after that paren (`-> R` in
+    Rust/Swift/Python/C++ trailing, `: R` in TS/Kotlin, `R` or `(R, error)`
+    in Go). Return type before: what C, C++ and Java write before the name
+    (`const char *`, `List<T>`; "" for a constructor). "" when none."""
     text = "\n".join(lines[start:start + 40])
+    pre, python = "", False
     m = DECL_NAME_RE.search(text)
-    if not m:
-        return None, ""
-    i = text.find("(", m.end())
-    if i < 0 or "{" in text[m.end():i] or ";" in text[m.end():i]:
-        return None, ""
+    if m:
+        i = text.find("(", m.end())
+        if i < 0 or "{" in text[m.end():i] or ";" in text[m.end():i]:
+            return None, "", ""
+        python = m.group(0).startswith("def")
+    elif decl.is_clike(path) and decl.function(lines, start):
+        _, pre, i = decl.function(lines, start)
+    else:
+        return None, "", ""
     depth, buf, parts, close = 0, "", [], None
     for j in range(i + 1, len(text)):
         ch = text[j]
@@ -119,8 +128,10 @@ def signature(lines, start):
             continue
         buf += ch
     parts = [" ".join(p.split()) for p in parts if p.strip()]
-    python = m.group(0).startswith("def")
-    return parts, return_type(text[close + 1:], python) if close is not None else ""
+    after = return_type(text[close + 1:], python) if close is not None else ""
+    if decl.is_clike(path) and not after.startswith("->"):
+        after = ""  # `) const`, `) throws E`, `) noexcept` are not a return type
+    return parts, after, pre
 
 
 def return_type(tail, python=False):
@@ -152,8 +163,8 @@ def return_type(tail, python=False):
     return out
 
 
-def signature_params(lines, start):
-    return signature(lines, start)[0]
+def signature_params(lines, start, path=""):
+    return signature(lines, start, path)[0]
 
 
 RET_MAX = 64  # a longer return type keeps only its outer type
@@ -207,8 +218,9 @@ def text_width(s, size=FS):
 
 
 def short_name(node):
-    """The name a call site uses for a box: `a::b::run()` -> `run`."""
-    return re.sub(r"\(.*$", "", node["name"]).split("::")[-1]
+    """The name a call site uses for a box: `a::b::run()` -> `run`,
+    `Engine.describe()` -> `describe`."""
+    return re.split(r"::|\.", re.sub(r"\(.*$", "", node["name"]))[-1]
 
 
 def callee_names(line, by_id):
@@ -411,25 +423,43 @@ PARAM_LH = 15  # one header line per parameter
 def head_lines(n):
     """Header text lines: `name(`, one indented line per parameter, then
     `)` with the return type as the source writes it; just `name()` (plus
-    the return type) when there are no parameters (or none could be read)."""
+    the return type) when there are no parameters (or none could be read).
+    A C/C++/Java return type stands before the name, as in the source."""
     params = n.get("params") if n["kind"] == "fn" else None
     ret = n.get("ret") if n["kind"] == "fn" else ""
     close = ")" + ((ret if ret.startswith(":") else " " + ret) if ret else "")
-    base = re.sub(r"\(\)\s*$", "", n["name"])
+    base = ret_prefix(n) + re.sub(r"\(\)\s*$", "", n["name"])
+    if params == ["void"]:  # C's `(void)`: no parameters
+        return [base + "(void" + close]
     if not params:
-        return [base + "(" + close if re.search(r"\(\)\s*$", n["name"]) else n["name"]]
+        return [base + "(" + close if re.search(r"\(\)\s*$", n["name"]) else ret_prefix(n) + n["name"]]
     return [base + "("] + [f"    {p}," if p != "…" else "    …" for p in params] + [close]
+
+
+def ret_prefix(n):
+    """`const char *` -> `const char *`, `int` -> `int ` : the text put in
+    front of the name for a return type written before it."""
+    pre = n.get("ret_pre") if n["kind"] == "fn" else ""
+    if not pre:
+        return ""
+    return pre if pre.endswith(("*", "&")) else pre + " "
 
 
 def first_line(n, line):
     """The header's first line: the name in bold, and a return type that
-    shares the line (no parameters) highlighted like code."""
+    shares the line (before the name, or after it when there are no
+    parameters) highlighted like code."""
+    pre = ret_prefix(n)
+    out = ""
+    if pre and line.startswith(pre):
+        _, body = code_tspans(pre, {}, False)
+        out, line = f'<tspan font-weight="400">{body}</tspan>', line[len(pre):]
     ret = n.get("ret") if n["kind"] == "fn" else ""
     k = line.rfind(")" + ("" if ret.startswith(":") else " ") + ret) if ret else -1
     if k <= 0:
-        return escape(line)
+        return out + escape(line)
     _, body = code_tspans(line[k + 1:], {}, False)
-    return escape(line[:k + 1]) + f'<tspan font-weight="400">{body}</tspan>'
+    return out + escape(line[:k + 1]) + f'<tspan font-weight="400">{body}</tspan>'
 
 
 def head_h(n):

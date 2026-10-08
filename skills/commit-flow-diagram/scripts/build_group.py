@@ -90,7 +90,7 @@ def main():
             if path not in files:
                 files[path] = git(repo, "show", f"{after}:{path}").splitlines()
             used = "\n".join(ln.get("code", "") for ln in n.get("lines", []) if not ln.get("elide"))
-            params, n["ret"] = render.signature(files[path], int(line) - 1)
+            params, n["ret"], n["ret_pre"] = render.signature(files[path], int(line) - 1, path)
             n["params"] = render.header_params(params, used)
     # A line whose note points at another figure ("→ 그림 N", "그림 N 에서")
     # links to the box of that figure whose name the line calls, so a click
@@ -133,6 +133,7 @@ def main():
         for n in fig["nodes"]:
             n.pop("params", None)  # derived at build time, not part of the spec
             n.pop("ret", None)
+            n.pop("ret_pre", None)
             for ln in n.get("lines", []):
                 ln.pop("_link", None)
     json.dump(clean, open(os.path.join(out_dir, "spec.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)

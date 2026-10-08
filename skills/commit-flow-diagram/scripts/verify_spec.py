@@ -25,6 +25,8 @@ import re
 import subprocess
 import sys
 
+import decl
+
 
 SOURCE_EXT = (".rs", ".c", ".h", ".cc", ".cpp", ".hpp", ".java", ".kt", ".kts", ".swift",
               ".go", ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cs", ".m", ".mm")
@@ -39,6 +41,19 @@ DEF_RE = re.compile(
     r"|\b(?:const|static)\s+(?:mut\s+)?([A-Z_][A-Z0-9_]*)\s*:")
 MAIN_RE = re.compile(r"^\s*(pub\s+)?(async\s+)?fn\s+main\s*\(|\bint\s+main\s*\(|^def\s+main\s*\(|"
                      r"static\s+void\s+main\s*\(|^func\s+main\s*\(|^fun\s+main\s*\(")
+
+
+def definition(lines, i, path):
+    """(name, is_const_or_static) of what lines[i] declares, or None. C, C++
+    and Java functions have no keyword, so they are read by decl.function."""
+    if decl.is_clike(path):
+        f = decl.function(lines, i)
+        if f:
+            return f[0], False
+    m = DEF_RE.search(lines[i])
+    if not m:
+        return None
+    return next(g for g in m.groups() if g), bool(m.group(7))
 
 
 EXIT_RE = re.compile(r"\breturn\b|\bErr\(|\?;?\s*$|\bexit\(|\bpanic!|\bthrow\b|\braise\b|refuse_to_start|"
@@ -82,12 +97,11 @@ def changed_definitions(repo, before, after):
                 if not l.strip() or l.lstrip().startswith(("//", "#", "*", "/*")):
                     continue
                 lj = len(l) - len(l.lstrip())
-                m = DEF_RE.search(l)
-                if m and m.group(7) and lj > 0 and j != i:
-                    m = None  # a const/static inside a body is not a definition of its own
-                if m and (j == i or lj <= ind):
-                    name = next(g for g in m.groups() if g)
-                    out.setdefault(name, f"{path}:{j+1}")
+                d = definition(lines, j, path)
+                if d and d[1] and lj > 0 and j != i:
+                    d = None  # a const/static inside a body is not a definition of its own
+                if d and (j == i or lj <= ind):
+                    out.setdefault(d[0], f"{path}:{j+1}")
                     break
                 if lj < ind:
                     ind = lj
@@ -130,7 +144,7 @@ def main():
         root = next((n for n in fig["nodes"] if roots and n["id"] == roots[0]), None)
         if root is None:
             problems.append(f"fig{fi+1}: no entry box (every box is called by another)")
-        elif fi == 0 and not re.search(r"(^|::)main\(\)$", root["name"]) and not group.get("entry_exception"):
+        elif fi == 0 and not re.search(r"(^|::|\.)main\(\)$", root["name"]) and not group.get("entry_exception"):
             problems.append(f"fig1: starts at {root['name']!r} — start at the program's `main()` "
                             "(Step 1), or set group `entry_exception` to why there is none")
         elif fi > 0 and (root["name"], root["file"]) not in drawn:
@@ -208,20 +222,20 @@ def main():
             unique.add((n["name"], n["file"]))
             try:
                 after_lines = git(repo, "show", f"{after}:{path}").splitlines()
-                decl = after_lines[int(line) - 1]
+                decl_line = after_lines[int(line) - 1]
             except (subprocess.CalledProcessError, ValueError, IndexError):
                 problems.append(f"fig{fi+1} {n['id']}: `file` must be path:line of the declaration at {after}")
                 continue
-            m = DEF_RE.search(decl)
-            dname = next((g for g in m.groups() if g), None) if m else None
+            d = definition(after_lines, int(line) - 1, path)
+            dname = d[0] if d else None
             if not dname:
-                problems.append(f"fig{fi+1} {n['id']}: {n['file']} is not a declaration line: {decl.strip()!r}")
+                problems.append(f"fig{fi+1} {n['id']}: {n['file']} is not a declaration line: {decl_line.strip()!r}")
                 continue
             if not re.search(rf"\b{re.escape(dname)}\b", n["name"]):
                 problems.append(f"fig{fi+1} {n['id']}: name {n['name']!r} does not match the declaration `{dname}`")
             if dname in changed:
                 try:
-                    existed = decl.strip() in {l.strip() for l in git(repo, "show", f"{before}:{path}").splitlines()}
+                    existed = decl_line.strip() in {l.strip() for l in git(repo, "show", f"{before}:{path}").splitlines()}
                 except subprocess.CalledProcessError:
                     existed = False
                 want = "changed" if existed else "new"
@@ -231,6 +245,11 @@ def main():
                         old = git(repo, "show", f"{before}:{path}")
                         if re.search(rf"\b(fn|def|func|fun|function|struct|enum|trait|class|interface|const|static)\s+(mut\s+)?{re.escape(dname)}\b", old):
                             want = "changed"
+                        elif decl.is_clike(path):
+                            old_lines = old.splitlines()
+                            if any(f and f[0] == dname for f in (decl.function(old_lines, k) for k in
+                                   range(len(old_lines)) if dname in old_lines[k])):
+                                want = "changed"
                     except subprocess.CalledProcessError:
                         pass
             else:
@@ -242,7 +261,7 @@ def main():
                 for t, kind in zip(*_targets(ln)):
                     if kind == "use" or t not in by_id:
                         continue
-                    callee = re.sub(r"\(.*$", "", by_id[t]["name"]).split("::")[-1].split()[-1]
+                    callee = re.split(r"::|\.", re.sub(r"\(.*$", "", by_id[t]["name"]))[-1].split()[-1]
                     alias = ln.get("callee")
                     names = [callee] + ([alias] if isinstance(alias, str) else list(alias or []))
                     here = ln.get("code", "") + " " + (lines[k - 1].get("code", "") if k else "")
@@ -259,10 +278,10 @@ def main():
     # Drawn = a box's name, or a declaration shown as a line inside a box
     # (e.g. a const listed in its enum's box).
     boxed = " ".join(n["name"] for fig in group["figures"] for n in fig["nodes"])
-    boxed += " " + " ".join(next(g for g in m.groups() if g)
+    boxed += " " + " ".join(d[0]
                             for fig in group["figures"] for n in fig["nodes"]
                             for ln in n.get("lines", []) if not ln.get("elide")
-                            for m in [DEF_RE.search(ln.get("code", ""))] if m)
+                            for d in [definition([ln.get("code", "")], 0, n["file"].partition(":")[0])] if d)
     not_drawn = group.get("not_drawn", {})
     for name, where in changed.items():
         if not re.search(rf"\b{re.escape(name)}\b", boxed) and name not in not_drawn:
