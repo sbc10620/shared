@@ -91,6 +91,21 @@ def main():
                 files[path] = git(repo, "show", f"{after}:{path}").splitlines()
             used = "\n".join(ln.get("code", "") for ln in n.get("lines", []) if not ln.get("elide"))
             n["params"] = render.header_params(render.signature_params(files[path], int(line) - 1), used)
+    # A line whose note points at another figure ("→ 그림 N", "그림 N 에서")
+    # links to the box of that figure whose name the line calls, so a click
+    # on the name jumps there.
+    for fig in group["figures"]:
+        for n in fig["nodes"]:
+            for ln in n.get("lines", []):
+                m = re.search(r"그림 (\d+)", ln.get("note") or "")
+                if not m or ln.get("elide") or not 1 <= int(m.group(1)) <= len(group["figures"]):
+                    continue
+                k = int(m.group(1))
+                for other in group["figures"][k - 1]["nodes"]:
+                    name = render.short_name(other)
+                    if re.search(rf"\b{re.escape(name)}\s*\(", ln["code"]):
+                        ln["_link"] = (name, k, other["id"])
+                        break
     chrome = None if "--no-png" in flags else find_chrome()
     figures = []
     for i, fig in enumerate(group["figures"]):
@@ -107,12 +122,17 @@ def main():
                            capture_output=True)
         inline = svg.replace(m.group(0), f'data-w="{w:.0f}" data-h="{h:.0f}"', 1)
         inline = inline.replace("<svg ", f'<svg role="img" aria-label="{escape(fig["title"])}" ', 1)
+        # Box ids repeat across figures (the same function starts figure 1
+        # and 2), so the page prefixes them with the figure number.
+        inline = inline.replace('<g class="node" id="n-', f'<g class="node" id="f{i+1}-n-')
         figures.append((i, fig, inline))
     clean = json.loads(json.dumps(group))
     clean.pop("slug", None)  # derived at build time, refused in a spec
     for fig in clean["figures"]:
         for n in fig["nodes"]:
             n.pop("params", None)  # derived at build time, not part of the spec
+            for ln in n.get("lines", []):
+                ln.pop("_link", None)
     json.dump(clean, open(os.path.join(out_dir, "spec.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8").write(page(group, figures))
     print(out_dir)
@@ -219,6 +239,10 @@ h1 {{ font-size: clamp(22px, 3vw, 30px); line-height: 1.3; margin: 0; text-wrap:
 .canvas:focus {{ outline: 2px solid var(--accent); outline-offset: -2px; }}
 .canvas svg {{ display: block; }}
 .canvas svg text {{ cursor: text; user-select: text; -webkit-user-select: text; }}
+/* An underlined name jumps to its box; the box flashes when reached. */
+.canvas svg tspan[data-go] {{ cursor: pointer; }}
+.canvas svg tspan[data-go]:hover {{ fill: #ffffff; }}
+.canvas svg .node.go-hit > rect:first-child {{ stroke: #ffffff; stroke-width: 4; }}
 /* Full screen: the browser's own when the frame allows it, else the figure
    fills the window (the same look either way). */
 .fig:fullscreen, .fig.is-max {{
@@ -242,6 +266,7 @@ body.has-max {{ overflow: hidden; }}
       <li>박스 안의 코드는 실제 소스를 그대로 옮겼습니다. <code>...</code> 은 생략한 구간이고, 원래 있던 영어 주석은 빼고 한글 설명(초록 <code>//</code>)으로 바꿨습니다.</li>
       <li>황토색 줄과 <code>+</code> 는 이 커밋 범위에서 추가·수정된 줄입니다. 박스 오른쪽 위 배지는 함수 단위의 신규·변경·기존을 뜻합니다.</li>
       <li>호출하는 줄의 오른쪽 점에서 화살표가 나갑니다. 그림을 클릭하면 테두리가 생기고, 그때부터 휠이 그림 안을 스크롤합니다(그림 밖 클릭이나 Esc로 해제). 빈 곳을 끌면 그림이 움직이고, 글자 위를 끌면 코드를 선택해 복사할 수 있습니다.</li>
+      <li>밑줄 친 함수 이름을 클릭하면 그 함수의 박스로 이동합니다. <code>→ 그림 N</code> 처럼 다른 그림으로 이어지는 줄은 그 그림의 박스로 이동합니다.</li>
     </ol>
     <nav class="toc">{toc}</nav>
   </div>
@@ -333,6 +358,39 @@ document.querySelectorAll('.fig').forEach((fig) => {{
     else if (e.key === '0') fit();
   }});
   apply();
+  fig.goTo = (node) => {{
+    // Center the box in this figure's canvas at the current scale.
+    const b = node.getBBox();
+    canvas.scrollTo({{
+      left: (b.x + b.width / 2) * scale - canvas.clientWidth / 2,
+      top: (b.y + Math.min(b.height, 160) / 2) * scale - canvas.clientHeight / 3,
+      behavior: 'smooth',
+    }});
+    node.classList.remove('go-hit');
+    void node.getBBox();
+    node.classList.add('go-hit');
+    setTimeout(() => node.classList.remove('go-hit'), 1400);
+  }};
+  fig.leaveFull = () => {{ if (isFull()) toggleFull(); }};
+}});
+// Click an underlined name: jump to its box (in this figure, or in the
+// figure a "→ 그림 N" line continues in). A drag or a text selection made
+// over the name is not a click.
+let down = null;
+document.addEventListener('pointerdown', (e) => {{ down = {{ x: e.clientX, y: e.clientY }}; }}, true);
+document.addEventListener('click', (e) => {{
+  const t = e.target.closest && e.target.closest('tspan[data-go]');
+  if (!t || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+  if (String(window.getSelection() || '').length) return;
+  const from = t.closest('.fig');
+  const fig = t.dataset.goFig ? document.getElementById('fig' + t.dataset.goFig) : from;
+  const node = fig && fig.querySelector('#' + CSS.escape(fig.id.replace('fig', 'f') + '-n-' + t.dataset.go));
+  if (!node) return;
+  if (fig !== from) {{
+    from.leaveFull();
+    fig.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+  }}
+  fig.goTo(node);
 }});
 </script>
 '''

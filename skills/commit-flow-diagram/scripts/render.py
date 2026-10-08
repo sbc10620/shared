@@ -165,17 +165,33 @@ def text_width(s, size=FS):
     return sum(size * (1.02 if ord(ch) > 0x1100 else 0.61) for ch in s)
 
 
+def short_name(node):
+    """The name a call site uses for a box: `a::b::run()` -> `run`."""
+    return re.sub(r"\(.*$", "", node["name"]).split("::")[-1]
+
+
 def callee_names(line, by_id):
-    """Identifiers to bold: the called function's own name for each call edge."""
-    names = set(line.get("callee", []) if isinstance(line.get("callee"), list) else
-                [line["callee"]] if line.get("callee") else [])
+    """Identifiers to underline, each mapped to the box id it jumps to: the
+    called function's own name for each call edge, or the `callee` name the
+    line uses instead (an `as` import, a re-export)."""
     targets = line.get("to") or []
     targets = [targets] if isinstance(targets, str) else targets
     kinds = line.get("edge", "call")
+    code = line.get("code", "")
+    names, unmatched = {}, []
     for i, t in enumerate(targets):
         kind = kinds[i] if isinstance(kinds, list) else kinds
         if kind in ("call", "defer") and t in by_id:
-            names.add(re.sub(r"\(.*$", "", by_id[t]["name"]).split("::")[-1])
+            name = short_name(by_id[t])
+            if re.search(rf"\b{re.escape(name)}\b", code):
+                names[name] = t
+            else:
+                unmatched.append(t)
+    callee = line.get("callee")
+    callee = callee if isinstance(callee, list) else [callee] if callee else []
+    for i, name in enumerate(callee):
+        if name not in names:
+            names[name] = unmatched[i] if i < len(unmatched) else (unmatched or [None])[-1]
     return names
 
 
@@ -327,13 +343,22 @@ def layout(nodes):
 
 # --- drawing -------------------------------------------------------------
 
-def code_tspans(code, callees, call_line):
+def code_tspans(code, callees, call_line, link=None):
     """Highlighted code. A line that calls another box is bold italic as a
-    whole, and the called name inside it is also underlined."""
+    whole, and the called name inside it is also underlined. Each underlined
+    name carries `data-go` (the box it jumps to on the page). `link` is
+    (name, figure, box id) for a line that continues in another figure: that
+    name is underlined and jumps to the box in that figure."""
     parts = []
     for kind, text in tokens(code):
         color = HL[kind]
-        extra = ' text-decoration="underline"' if call_line and kind in ("fn", "plain") and text in callees else ""
+        extra = ""
+        if call_line and kind in ("fn", "plain") and text in callees:
+            extra = ' text-decoration="underline"'
+            if callees[text]:
+                extra += f' data-go="{escape(callees[text])}"'
+        elif link and kind in ("fn", "plain") and text == link[0]:
+            extra = f' text-decoration="underline" data-go="{escape(link[2])}" data-go-fig="{link[1]}"'
         parts.append(f'<tspan fill="{color}"{extra}>{escape(text)}</tspan>')
     style = ' font-weight="700" font-style="italic"' if call_line else ""
     return style, "".join(parts)
@@ -379,7 +404,7 @@ def render_node(n, by_id, out):
                f'fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">{kind} </tspan>'
                f'{escape(lines_h[0])}</text>')
     for k, pl in enumerate(lines_h[1:], start=1):
-        _, body = code_tspans(pl, set(), False)
+        _, body = code_tspans(pl, {}, False)
         out.append(f'<text x="{x+PAD}" y="{y+18+PARAM_LH*k}" font-family="{CODE_FONT}" font-size="12" '
                    f'xml:space="preserve">{body}</text>')
     if n.get("file"):
@@ -409,7 +434,7 @@ def render_node(n, by_id, out):
                        f'fill="#e3b341">+</text>')
         call_line = any(k in ("call", "defer") for _, _, k in edges_of({"lines": [ln]}))
         style, body = (("", f'<tspan fill="#7d8590">{escape(code)}</tspan>') if elide
-                       else code_tspans(code, callee_names(ln, by_id), call_line))
+                       else code_tspans(code, callee_names(ln, by_id), call_line, ln.get("_link")))
         out.append(f'<text x="{x+PAD+GUTTER}" y="{cy-4}" font-family="{CODE_FONT}" font-size="{FS}"{style} '
                    f'xml:space="preserve">{body}</text>')
         ln["_y"] = cy - LH / 2 - 1
