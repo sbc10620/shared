@@ -85,6 +85,32 @@ Rank what to walk through in full, in this order:
 
 State this priority explicitly to the user when the diff is large, so they know why some files got full before/after and others got a one-line mention.
 
+## Step 3a — Opening overview (top of the answer, required)
+
+The answer always opens with an overview, before any per-item section, so the reader knows what the commits are for before reading code. Order at the top of the answer:
+
+1. The one-line resolved `before_ref`/`after_ref` from Step 0.
+2. A `## 개요` section with two parts, in this order:
+
+**커밋 메시지 요약** — what the author said, condensed. Read the full messages (subject *and* body), oldest first:
+
+```bash
+git log --reverse --format='%h %s%n%b%n---' <before_ref>..<after_ref>
+```
+
+- Single commit: the short sha and the subject, then 1–3 bullets condensing the body (the motivation, the issue/PR it references, any stated caveat). If the body is empty, say "본문 없음" instead of inventing one.
+- Range: a table, one row per commit, oldest → newest — `| 커밋 | 메시지 요약 |` with the short sha and a one-line Korean summary. Mark commits that cancel each other out or fix an earlier commit in the same range (Step 1) in their row. If the range has more than ~15 commits, group rows by theme (e.g. "리뷰 대응 4건") instead of listing each one.
+- Summarize in Korean; don't paste the message verbatim (quote only a short phrase when the exact wording matters, e.g. an issue number or a config key).
+
+**무엇을 하는 커밋인가** — what the change as a whole does, in 2–4 bullets:
+
+- the problem or goal it addresses;
+- the main approach (the one or two mechanisms the per-item sections will show);
+- scope: which modules/areas it touches and roughly how big (`git diff --stat` totals);
+- any behavior change a user or caller will notice (new default, renamed key, removed path) — or "외부 동작 변화 없음" when it is a pure refactor.
+
+Ground these bullets in both the messages and the diff. If the two disagree — the message claims something the diff doesn't do, or the diff does something the message never mentions — say so here explicitly; that mismatch is often the most useful fact in the whole answer. Keep this section descriptive: engineering opinions belong in each item's **변경관련 의견** and in 종합 의견, not in the overview.
+
 ## Step 4 — Per-item output shape
 
 For every item worth walking through, in this exact shape:
@@ -202,6 +228,7 @@ End with a short "종합 의견" (a few bullets, not a new essay) only if there'
 Before sending the final answer, verify it against each of these (they point back to the rule that spells out the detail — this list is a scan, not a restatement):
 
 - [ ] Step 0: resolved `before_ref`/`after_ref` stated to the user up front.
+- [ ] Step 3a: the answer opens with `## 개요` — 커밋 메시지 요약 (single commit: subject + body bullets; range: oldest-first table) and 무엇을 하는 커밋인가 (goal, approach, scope, user-visible behavior change) — written in Korean, descriptive only, with any message/diff mismatch called out.
 - [ ] Step 2: every item's header carries `[확인됨]` or `[추정]`, and every `[추정]` block's reconstruction is labeled as such, not presented as `git show` output.
 - [ ] Step 4 code highlighting: every fence has a language tag from the table (`text` for the call-flow diagram) — no bare ``` fence anywhere in the answer.
 - [ ] Step 4 verbatim rule: every line inside a Before/After fence is real — none swapped for a prose summary.
@@ -213,6 +240,8 @@ Before sending the final answer, verify it against each of these (they point bac
 - [ ] Step 4 호출 흐름: present only where a function has multiple real (grep-confirmed) callers or a multi-hop chain, absent where the sole caller is already shown in Before/After; every call site listed actually exists; rendered as a box/arrow (or Mermaid) diagram, not a bullet list or table, unless the relationship genuinely resisted drawing.
 
 ## What NOT to do
+
+- Don't jump straight into per-item Before/After — the `## 개요` overview (Step 3a) always comes first, and it summarizes the messages rather than pasting them.
 
 - Don't show only the changed lines without surrounding context — the user explicitly wants to recognize *where* in the file the change sits.
 - Don't write annotation comments in English (or mirror the repo's comment language) — annotations are always Korean; only the source's own existing comments stay as they are.
