@@ -142,12 +142,36 @@ For every item worth walking through, in this exact shape:
 
 **Line annotations (required in every Before/After block):**
 
+Annotations are explanatory comments you add on top of the verbatim code so a reader can follow the change without opening the repo. They are the part of the answer that does the explaining *inside* the code, so put them wherever a reader would otherwise stop and ask "why is this here?" — not only on the lines listed below.
+
+0. **Language and form — always Korean.** Every annotation comment is written in **Korean**, regardless of the repo's own comment language or the language the user wrote in. Keep code identifiers (`build_request()`, `MaskMode::Strict`, config keys) in their original form inside the Korean sentence. Use the comment syntax of the block's language (`//` for Rust/C/Java/TS/Go, `#` for Python/bash/YAML/TOML, `--` for SQL, `<!-- -->` for Markdown/HTML), placed either at the end of the line or on its own line directly above it when the explanation is longer than a short phrase. Existing comments that are part of the real source stay verbatim in their original language — never translate or reword them; the Korean annotation is added next to them, which also lets the reader tell the source's comments apart from yours.
 1. **Added-line marker.** Every line in an `After` block that does not exist in the corresponding `Before` block gets a leading `+` (before the line's own indentation) — mirrors `git diff` output. Lines unchanged from `Before` (context) get no `+`. `Before` blocks never get a `+` — nothing in a `Before` block is "added" relative to itself.
 2. **Function-call purpose comment.** On a line that calls another function/method, append a trailing comment naming the call and stating *why it is called at this specific site* — not a restatement of what the function generically does. ("`build_request()` 재호출 목적: 마스킹된 요청으로 HTTP 요청을 다시 만듦" beats "build_request는 요청을 만드는 함수".)
 3. **Function-declaration summary comment.** Immediately above any function/method declaration (`fn ...`) shown in the block, add one line stating what that function does overall, from the reader's point of view (not implementation detail).
-4. **Don't annotate everything.** Comments 2 and 3 go only on function calls and function declarations; trivial lines (field-copy assignments, braces, blank lines, simple literals) get no comment. A line is also worth annotating when it's the exact line a **변경된 내용** bullet is pointing at and the connection isn't obvious from the surrounding code alone — use judgment, don't caption every line mechanically.
+4. **Explain wherever explanation is needed.** Beyond calls and declarations, annotate a line when its meaning or reason is not obvious from the code alone. Typical cases:
+   - a changed or new **condition / branch** (`if`, `match` arm, early `return`, `?` propagation): say what case it catches and what happens in that case (`// 마스킹이 꺼져 있으면 원문 그대로 반환 — 기존 동작 유지`);
+   - a **magic value or constant** (a size limit, timeout, regex, default): say what it means and, if the diff or commit message shows it, why that value;
+   - a line in a `Before` block that **disappears or changes** in `After`: say so and what replaced it (`// After 에서 삭제: 검사를 install 단계로 옮김`), so the reader can match Before to After line by line;
+   - **error handling / fallback** paths: say what failure is handled and what the caller sees;
+   - **type, signature or ownership changes** (a parameter becoming `Option`, `&str` → `String`, a new generic bound): say what the change enables or forbids for callers;
+   - the exact line a **변경된 내용** bullet points at, when the connection isn't obvious from the surrounding code.
+5. **Don't annotate everything.** Trivial lines (field-copy assignments, braces, blank lines, imports, simple literals whose meaning is plain) get no comment. One short comment per idea; if a block would need a comment on nearly every line, the explanation belongs in **변경된 내용**, not in the fence. Annotations explain *what this line does in this change and why*; they never repeat the identifier name as the explanation (`// handle_error 호출` is not an explanation).
 
-**Self-check before sending:** for every bullet in **변경된 내용**, confirm it points at a line actually visible in that item's Before/After blocks. If a bullet describes something the shown code doesn't contain (e.g. "installs X" but the fence never shows the call that installs X), the fence was truncated or paraphrased — fix the fence, don't adjust the bullet to match a shortcut. Also confirm every `+` marker is correct (present exactly on lines absent from `Before`) and that call/declaration comments describe purpose, not just restate the name.
+Example (Rust, `After` block — note the Korean annotations next to the verbatim English source comment):
+
+```rust
+// 요청 본문을 마스킹한 뒤 LLM 으로 보낼 최종 요청을 만듦
+fn prepare_request(cfg: &Config, body: &str) -> Result<Request> {
+    // Fast path.
++   if cfg.pii.mode == PiiMode::Off {          // 마스킹이 꺼진 설정이면 원문 그대로 보냄 — 새로 추가된 우회 경로
++       return build_request(body);            // build_request() 호출 목적: 원문 본문으로 바로 요청 생성
++   }
+    let masked = mask_pii(body, &cfg.pii)?;    // mask_pii() 호출 목적: 본문 속 PII 를 치환, 실패 시 요청 자체를 중단
+    build_request(&masked)                     // build_request() 호출 목적: 마스킹된 본문으로 요청 생성
+}
+```
+
+**Self-check before sending:** for every bullet in **변경된 내용**, confirm it points at a line actually visible in that item's Before/After blocks. If a bullet describes something the shown code doesn't contain (e.g. "installs X" but the fence never shows the call that installs X), the fence was truncated or paraphrased — fix the fence, don't adjust the bullet to match a shortcut. Also confirm every `+` marker is correct (present exactly on lines absent from `Before`), that call/declaration comments describe purpose, not just restate the name, and that every annotation you added is in Korean while the source's own comments are left untouched.
 
 Rules for the two bullet sections:
 
@@ -181,7 +205,8 @@ Before sending the final answer, verify it against each of these (they point bac
 - [ ] Step 2: every item's header carries `[확인됨]` or `[추정]`, and every `[추정]` block's reconstruction is labeled as such, not presented as `git show` output.
 - [ ] Step 4 code highlighting: every fence has a language tag from the table (`text` for the call-flow diagram) — no bare ``` fence anywhere in the answer.
 - [ ] Step 4 verbatim rule: every line inside a Before/After fence is real — none swapped for a prose summary.
-- [ ] Step 4 line annotations: `+` markers correct on every added line (and absent from `Before`), function calls carry a purpose comment, function declarations carry a one-line summary above them, and trivial lines are left uncommented.
+- [ ] Step 4 line annotations: `+` markers correct on every added line (and absent from `Before`), function calls carry a purpose comment, function declarations carry a one-line summary above them, non-obvious lines (changed conditions, constants, removed Before lines, error paths, signature changes) carry an explanation, and trivial lines are left uncommented.
+- [ ] Step 4 annotation language: every added annotation comment is in Korean, uses the block language's comment syntax, keeps identifiers in their original form, and no original source comment was translated or reworded.
 - [ ] Step 4 self-check: every **변경된 내용** bullet is backed by a line actually visible in that item's Before/After.
 - [ ] Step 4 opinion rules: every **변경관련 의견** bullet is either grounded in checkable evidence (a grep result, a convention found elsewhere, a concrete blast-radius path) or explicitly "없음 — <reason>" — none are generic best-practice filler.
 - [ ] Step 3/5: large-diff prioritization was stated when applicable, and 종합 의견 only appears if it covers a cross-cutting concern not already in a per-item opinion.
@@ -190,6 +215,7 @@ Before sending the final answer, verify it against each of these (they point bac
 ## What NOT to do
 
 - Don't show only the changed lines without surrounding context — the user explicitly wants to recognize *where* in the file the change sits.
+- Don't write annotation comments in English (or mirror the repo's comment language) — annotations are always Korean; only the source's own existing comments stay as they are.
 - Don't paraphrase real code into a descriptive comment inside a Before/After fence (e.g. turning a multi-line match arm into `/* installs X */`) — this silently drops the exact call the reader came to verify, and produces a "변경된 내용" bullet that claims more than the fence shows. Elide explicitly or show it in full.
 - Don't present an inferred "before" as if it came from `git show` — always carry the `[추정]` label through to the section header.
 - Don't write opinions that are true of almost any diff ("could use more tests", "consider documentation") — every opinion must be specific to what this diff actually did.
