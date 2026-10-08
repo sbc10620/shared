@@ -30,7 +30,9 @@ The spec (JSON) holds:
       "cases":  [ {
           "name":     str,
           "mode":     "single" | "daemon" | "boot",
-          "message":  str              {FILES} substituted; "boot" may omit it
+          "message":  str              {FILES} substituted, {FILE:<name>} replaced
+                                       by that fixture's content (a big user
+                                       message); "boot" may omit it
           "session":  str              daemon only: sent as session_id, so
                                        cases with the same session are turns
                                        of ONE conversation (without it every
@@ -263,7 +265,7 @@ def run_suite(suite, bins, work, files_dir):
                 results.append((case["name"], [f"not run: precondition failed in {blocked_by}"], ""))
                 continue
             open(mock_log, "w").close()
-            msg = case.get("message", "hi").replace("{FILES}", files_dir)
+            msg = expand_message(case.get("message", "hi"), files_dir)
             segs = None
             if case["mode"] in ("single", "boot"):
                 try:
@@ -356,6 +358,13 @@ def post_chat(port, msg, dlog, session_id=None):
     return "unauthorised"
 
 
+def expand_message(msg, files_dir):
+    def inline(m):
+        with open(os.path.join(files_dir, m.group(1)), encoding="utf-8") as f:
+            return f.read()
+    return re.sub(r"\{FILE:([^}]+)\}", inline, msg).replace("{FILES}", files_dir)
+
+
 def file_content(spec):
     if isinstance(spec, str):
         return spec
@@ -427,6 +436,9 @@ def check_spec(spec):
                 errs.append(f"{cw}: unknown keys {sorted(extra)}")
             if "session" in c and mode != "daemon":
                 errs.append(f"{cw}: session needs mode daemon")
+            for ref in re.findall(r"\{FILE:([^}]+)\}", c.get("message", "")):
+                if ref not in spec.get("files", {}):
+                    errs.append(f"{cw}: message names unknown fixture {ref!r}")
             check_judge(cw, c, mode)
             req = c.get("require", {})
             extra = set(req) - set(JUDGE_KEYS)

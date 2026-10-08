@@ -41,11 +41,13 @@ skill's directory (`SKILL_DIR`, the directory holding this file).
   silently, every boot refusal (unknown key in each section, misspelled
   mode, unknown label, unknown filter-labels layer — whatever the mode), and
   the `noguard` build reporting the sections as ignored.
-- `specs/pii-masking-cache.json` — the outbound masking scan cache on the
-  daemon path: one conversation, three turns, PII mode `full`, a failed tool
-  call, two ~45 KB files with PII; asserts no raw PII ever reaches the model
-  and counts the large-scan debug lines per LLM call (see Masking-cache
-  check).
+- `specs/scan-caches.json` — every sha-keyed scan cache on the daemon path
+  (PII mode `full`, one conversation per suite, three turns each): the
+  outbound masking cache (finished-turns record X + previous-batch record
+  W), the LLM-output buffer-pass cache (X only) and the input-guardrail
+  prefix checkpoint. Each has a positive control that must log, cross-turn
+  "no line" checks, and (outbound) a within-turn check; no raw PII ever
+  reaches the model (see Scan-cache checks).
 
 ## Requirements
 
@@ -144,55 +146,86 @@ skill's directory (`SKILL_DIR`, the directory holding this file).
   (`tinicore/src/tools/content_budget.rs`, `[output truncated: N bytes
   total, showing first 50000]`); a ~88 KB file reaches the model as 50 KB.
 
-## Masking-cache check (`pii-masking-cache.json`)
+## Scan-cache checks (`scan-caches.json`)
 
-What is measured: tinicore logs one debug line per outbound masking pass
-whose cache MISSES total more than 64 KiB (`LARGE_SCAN_WARN_BYTES`,
-`tinicore/src/agent/pii_masking.rs`, `mask_messages_for_cloud_in_session`).
-With `RUST_LOG=debug` the daemon's stderr logger prints it through the
-`tracing`→`log` bridge as `[DEBUG] masking pass re-scanned … scanned_bytes=N
-threshold=65536 scanned_messages=M detectors=K`. Only that message is
-counted; the `llm-output masking pass`, `background egress masking pass` and
-`input-guardrail pass` lines are other walks.
+What is measured: each cached pass logs ONE debug line when its cache
+misses in that pass total more than 64 KiB (`LARGE_SCAN_WARN_BYTES`). With
+`RUST_LOG=debug` the daemon's stderr logger prints tinicore's
+`tracing::debug!` through the `log` bridge as `[DEBUG] <message>
+scanned_bytes=N threshold=65536 …`. Three messages, three regexes:
 
-Why the scenario has this shape — a "no line" only means something when
-the same pass WITHOUT the cache would have crossed 64 KiB, and no single
-new text may cross it on its own:
+| Cache | Code | Line starts with |
+|---|---|---|
+| outbound masking (X + W) | `pii_masking.rs` `mask_messages_for_cloud_in_session`, before every LLM request | `masking pass re-scanned` |
+| LLM-output masking (X only) | `pii_masking.rs` `mask_llm_output_in_session`, twice at the end of every turn (`loop_.rs`: once on this turn's `state.produced`, no session; once on the whole buffer, cached) | `llm-output masking pass scanned` |
+| input-guardrail prefix checkpoint | `loop_.rs` + `guardrail_scan_cache.rs`, once at turn start over every non-internal user message | `input-guardrail pass re-scanned` |
 
-- Each file is ~45 KB: below the 50,000-char tool-output cap (so it reaches
-  the model whole), below 64 KiB alone, above it together with the other.
-- Turn 1: `READFILES <missing> big1 big2 ECHOFULL:2,3` — requests 0–3. The
-  failed read makes tinicore add the nudge to request 1. Request 3 carries
-  big1 and big2; with the within-turn record (previous call's batch) it
-  scans only big2 (~45 KB, no line); without it, both (~90 KB, a line).
-  Expected: 0 lines on every request. The final answer echoes both files,
-  so the STORED reply is ~90 KB (tool results are never stored).
-- Turn 2: `READFILES big1`. Request 0 must re-scan turn 1's stored reply
-  once (it is history for the first time) — exactly one line, 65537–140000
-  bytes. This is the positive control (in `require`): without it every
-  "no line" would pass vacuously (a debug line that never prints). Request
-  1 (big1 again, ~45 KB new) must not log: the reply was just scanned.
-- Turn 3: plain message. Request 0 must not log: turn 1's ~90 KB reply is
-  covered by the finished-turns record.
-- Preconditions (`require`; a failure fails the suite and skips later
-  turns): the tool sequence ran (`loop_calls`), every agent-loop request
-  (one that offered tools; background calls offer none) carries the
-  `<turn-context>` carrier, and turn 1 request 1 carries the nudge "One or
-  more tool calls failed" — the internal messages the cache must skip.
-- Correctness: no request the mock received (background calls included)
-  contains `010-1234-5678` or `4111-1111-1111-1111`; requests carry
-  `[SENS:PII:` placeholders.
-- Attribution: the mock records daemon.log's byte size when each request
-  arrives; the masking pass for request i runs before request i is sent, so
-  its line lies between request i-1's offset and request i's. Concurrent
-  work (a detached post-turn task) lands in whatever segment it was written
-  in, which is why only the outbound pass's message is counted.
-  `scanned_bytes` / `scanned_messages` in a FAIL's output say what was
-  re-scanned.
-- Known result at ARGO `aa6d5cdc4b` (2026-10-07): carrier, nudge, positive
-  control and every correctness check pass; the three "no line" checks FAIL
-  (turn 1 req 3: 91479 bytes / 6 msgs; turn 2 req 1: 136044 / 5; turn 3 req
-  0: 91276 / 6) — the cache never engages on `/api/v1/chat`, because the
-  gateway's `AgentLoopConfig` (`tinicore/src/gateway/handler.rs`) sets no
-  `conversation_id`/`harness_session_id`, so `session_key()` is `None` and
-  the masking pass neither reads nor records a checkpoint.
+A "no line" only proves something when the same pass WITHOUT its cache
+would have crossed 64 KiB, so every no-line check is paired with that
+counterfactual, and every suite has a positive control (in `require`) that
+must log — otherwise a debug line that never prints would pass every check.
+
+Sizes the scenario is built around:
+- A tool result is cut to 50,000 chars before the model sees it
+  (`tools/content_budget.rs`). Each `bigN.txt` is ~45 KB: whole, under
+  64 KiB alone, over it with the other one.
+- The gateway stores only user and assistant messages, so a tool result
+  never comes back as history; `ECHOFULL:2,3` makes turn 1's stored reply
+  ~90 KB (both files) so later turns have something big to (not) re-scan.
+- `long.txt` is ~70 KB, sent as the user message itself (`{FILE:long.txt}`),
+  with no blocked PII (a phone is masked, not refused).
+
+Suite `daemon_masking_caches` (outbound + LLM-output):
+- Turn 1 `READFILES <missing> big1 big2 ECHOFULL:2,3`, requests 0–3. The
+  failed read makes tinicore add the nudge to request 1. Outbound: 0 lines
+  on every request — request 3 holds big1+big2, and without W it would
+  scan both (~90 KB). LLM-output: 2 lines after the last request (each
+  end-of-turn pass scans this turn's ~90 KB reply) — positive control.
+- Turn 2 `READFILES big1`. Outbound: request 0 exactly 1 line in
+  65537–140000 (turn 1's reply is re-scanned once as the previous turn —
+  positive control); request 1 none (W). LLM-output: 1 line after the last
+  request (the buffer pass re-scans turn 1's reply once; this turn's reply
+  is small).
+- Turn 3 plain. Outbound, LLM-output, input: no line — turn 1's reply is in
+  X for both caches.
+- Preconditions: tool sequence ran (`loop_calls`), `<turn-context>` in every
+  agent-loop request (one that offered tools), nudge "One or more tool
+  calls failed" in turn 1 request 1.
+
+Suite `daemon_input_guardrail_cache`:
+- Turn 1 = the ~70 KB message: input-guardrail 1 line and outbound 1 line
+  before request 0 (both 65537–90000) — positive controls.
+- Turn 2 short: input none (the checkpoint covers turn 1's message; without
+  it, ~70 KB again); outbound none either — turn 1 made one call, so its
+  W (the whole stable batch, the long message included) is still a valid
+  prefix of turn 2's batch and is reused. Compare the first suite, where
+  turn 1's W holds assistant tool calls with pre-demask placeholders that
+  come back demasked, so W misses, X (messages before turn 1's user
+  message) is used and turn 1 is re-scanned once.
+- Turn 3 short: no line of any kind (X covers turn 1 for the outbound pass,
+  the checkpoint for the input pass).
+
+Every turn of both suites: no request the mock received (background calls
+included) contains `010-1234-5678` or `4111-1111-1111-1111`, and requests
+carry `[SENS:PII:` placeholders.
+
+Attribution and limits:
+- The mock records daemon.log's byte size when each request arrives. A
+  pass that runs before request i is sent (outbound, input) lies between
+  request i-1's offset (or the turn start) and request i's; the
+  end-of-turn LLM-output passes land in "after" (after the last request,
+  until the response plus one second).
+- The two end-of-turn LLM-output passes print the same message; they are
+  told apart only by count per turn, not individually.
+- Work running concurrently (a detached post-turn task, another
+  `agent_loop`) lands in whatever segment it is written in. Only the three
+  messages above are counted; `background egress masking pass` is not.
+- Context compaction would rebuild the batch and show up as extra lines.
+
+Observed at ARGO `a80c70d758` (2026-10-08), both suites ALL PASS:
+`daemon_masking_caches` — turn 1: two LLM-output lines after the last
+request (90013 bytes each), nothing else; turn 2: outbound request 0
+(91107 bytes, 4 messages) and one LLM-output line after (90077, 2
+messages); turn 3: nothing. `daemon_input_guardrail_cache` — turn 1: input
+(70074, 1 message) and outbound (78348, 2 messages: the long message and
+the carrier) before request 0; turns 2 and 3: nothing.
