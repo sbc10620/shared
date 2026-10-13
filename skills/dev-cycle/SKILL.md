@@ -125,8 +125,16 @@ before that.
 
 ## 5. Fix, re-verify, re-review
 
-- Fix the chosen findings. Fold each fix into the commit it belongs to
-  (`git commit --fixup` + autosquash), unless the user wants a separate commit.
+- Fix the chosen findings and amend each fix into the commit it belongs to
+  right away (`git commit --amend` when it is HEAD, otherwise
+  `git commit --fixup=<commit>` immediately followed by
+  `git rebase -i --autosquash`). Do not leave `fixup!` commits standing
+  between rounds. A new commit only when no existing commit is the fix's
+  home (e.g. a change to a file the series never touched for that purpose).
+- Rewriting history while a background check has the tree checked out (a
+  regression dump at a base revision) breaks that check: wait for it first.
+- Keep the pre-amend SHA for the next verification: it is the base of the
+  regression comparison for the fix (`match_regress.sh compare <old-sha>`).
 - Back to step 2 with the affected set of the FIX, not of the whole change.
 - Back to step 3. A round whose fixes touched code is always followed by
   another review round, even if every finding was minor: a fix can bring its
