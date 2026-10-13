@@ -29,6 +29,24 @@ reviewed.
 This document is Claude-facing and stays in English. Reports to the user are in
 the user's language.
 
+## Roles and prompts
+
+The one running this skill is the **orchestrator**: it implements, and it
+writes the prompt for every helper agent from the plan. There are no fixed
+agent definitions; each prompt has two parts.
+
+| Role | Always in the prompt | Chosen from the plan for this round |
+| --- | --- | --- |
+| Test agent (step 1a) | Spec only, never the implementation; edit test files only, or return values as a list when tests live inside implementation files; a spec that contradicts itself, or an example that fails its own rule, is reported, not fixed | The spec for this commit's scope (the design doc's sections, shapes, rules, labels, layers), the user's decisions that override the doc, where the tests go |
+| Reviewer (step 3) | Read-only; the required method (step 3) and the method on the first line; earlier rounds' decisions are not re-argued | The range, what changed this round, earlier findings and their decisions, the user's decisions, what was already verified |
+
+- Never pass the test agent the implementation, nor test cases the
+  orchestrator picked itself: both bring the implementer's view back in.
+- Never write a "do it yourself if the skill is missing" fallback into a
+  reviewer prompt (step 3).
+- When reporting a helper's result, say in a line or two what it was given.
+  Show the full prompt only when the user asks.
+
 ## 0. Find the project profile
 
 ```bash
