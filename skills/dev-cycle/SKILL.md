@@ -71,10 +71,25 @@ each one.
 
 ## 3. Review
 
-Run `/code-review` (high effort) in a subagent, read-only, over the change
-(`<base>..HEAD`). From the second round on, the prompt carries the earlier
-rounds' findings with their decisions, and the decisions already made, marked
-"do not re-argue".
+Run the review in a subagent, read-only, over the change (`<base>..HEAD`):
+
+- **Claude (Claude Code):** the subagent MUST run the `code-review` skill at
+  high effort. No substitute review: if the skill cannot be run, the subagent
+  stops and reports that, and the round is repeated once it can. A fixup that
+  looks small is not a reason to skip the skill. Do not write an "if the skill
+  is unavailable, review it yourself" fallback into the prompt; a subagent
+  reads it as permission.
+- **Other agents** (no `code-review` skill): review the range by hand for
+  correctness, edge cases, regressions, consistency between code, config,
+  tests and docs, and the repository's own rules.
+
+Either way, the report's first line states the method actually used
+("code-review skill, high" / "manual review"). A report without that line,
+or with a different method than required, is rerun, not used.
+
+From the second round on, the prompt carries the earlier rounds' findings
+with their decisions, and the decisions already made, marked "do not
+re-argue".
 
 Then check every finding against the code before reporting it:
 
