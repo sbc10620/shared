@@ -50,6 +50,28 @@ lists in `bash -c '...'`.
 Lib tests run in debug: some release builds fail `debug_assert`-dependent
 tests by design.
 
+## Tests: where they live, who writes them
+
+- Unit tests sit inside implementation files (`#[cfg(test)] mod tests`).
+  For spec-derived expectations there (e.g. the validator table
+  `validate_dispatches_by_method_name` in `engine/validator.rs`: which values
+  pass or fail a checksum), the test agent returns a list (validator, input,
+  expected result, spec text) and the implementer inserts it unchanged.
+- PII detection behaviour is an integration test the test agent writes
+  directly: one table per recognizer in
+  `tinicore/tests/guardrails/filter_test/{common,kr,us}_rules.rs`
+  (`<pii_type>_cases()` of `case(label, text, &[Has|NoType|Span])` rows),
+  plus `tables()` registration. Every recognizer needs a row that must
+  detect it and one that must not (`layers.rs` guard).
+- A recognizer with a lowered `score:` follows the AGENTS.md "Test
+  conventions for scored recognizers": a bare value not reported, the value
+  beside a context word reported at 0.8 (a separate `#[test]`), and
+  `analyze()` reporting nothing for the false positive that motivated the
+  score.
+- Implementer-owned: counts (`layers.rs`, the 49/52-style type lists),
+  `sub_samples()`, `examples/guardrails/common.rs` `diverse_pii_samples()`,
+  `detector.rs` mapping lists, and detector-internal unit tests.
+
 ## Baselines to take before editing
 
 - Matching regression (any change to PII rules, detectors or the engine):

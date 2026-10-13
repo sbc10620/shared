@@ -1,6 +1,6 @@
 ---
 name: dev-cycle
-description: "Run a code change through the development cycle that ends in a PR: implement, verify only what the change affects, review with /code-review, fix, and repeat until the review asks for no change or only doc changes; then run the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
+description: "Run a code change through the development cycle that ends in a PR: tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects, review with /code-review, fix, and repeat until the review asks for no change or only doc changes; then run the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
 user-invocable: true
 ---
 
@@ -9,10 +9,15 @@ user-invocable: true
 One loop for every code change that will become a PR:
 
 ```
-implement ─► verify what it affects ─► /code-review ─► report, wait for decisions
-    ▲                                                        │
-    └──────────── fix the chosen findings ◄──────────────────┘
-ends when a review round asks for no change, or only doc changes
+spec ─► tests from the spec (separate agent) ─► implement
+                                                   │
+        ┌──────────────────────────────────────────┘
+        ▼
+verify what it affects ─► /code-review ─► report, wait for decisions
+        ▲                                         │
+        └────────── fix the chosen findings ◄─────┘
+ends when a review round asks for no change, only doc changes, or only
+spec-derived test rows that pass
 then, once, before the PR: full suites + full e2e on the final HEAD
 ```
 
@@ -37,7 +42,7 @@ paths call for which tests, extra regression checks and e2e suites.
 
 No profile → discover from the repository: its `AGENTS.md` / `CLAUDE.md`, CI
 workflow files, `Cargo.toml` / `package.json` / `Makefile` test targets, and
-any e2e skill named for the project. Note what you used; step 6 turns it into a
+any e2e skill named for the project. Note what you used; step 7 turns it into a
 profile.
 
 ## 1. Before the first edit
@@ -48,6 +53,45 @@ profile.
   taken after editing compares the change with itself.
 - Never use a bare `git stash` (the stash is shared across worktrees). Set
   work aside with a temporary commit.
+
+## 1a. Tests first, from the spec, by a separate agent
+
+A test written by whoever writes the code tends to follow the code rather
+than the intent. So the expected values of NEW behaviour are fixed first,
+by another agent that sees only the spec.
+
+- **Spec** means what the change is meant to do, written down: the plan, a
+  design document, an issue, or for a bug fix the reproducing input and the
+  correct result.
+- Give the test agent the spec and the project's test conventions (the
+  profile says where tests live). Never the implementation, nor a draft of
+  it.
+- What it writes, by where the tests live (the profile says which applies):
+  - tests in their own files (integration tests; unit tests in languages
+    that keep them apart, e.g. `*.test.ts`, `test_*.py`, `*_test.go`): it
+    writes them directly, touching test files only;
+  - tests inside implementation files (e.g. Rust `#[cfg(test)]` modules):
+    it does not open the file; it returns the expected values as a list
+    (input, expected result, the spec text it comes from), and the
+    implementer inserts them unchanged.
+- New tests failing at this point is expected.
+- Who runs it: Claude runs it as a subagent; other agents use a separate
+  session; or the user writes the tests.
+- Not this agent's job: tests that check the implementation's own design
+  (helpers, offsets, internal structure) and structural edits that follow
+  the code (counts, sample lists, keeping existing rows). The implementer
+  writes those.
+- Do not run the test agent and the implementation at the same time in one
+  worktree.
+- Skip this step, and say so in the report, when there is no spec to derive
+  expectations from (a refactor or a performance change: there "behaviour
+  unchanged" is shown by the existing tests and the regression checks) or
+  the change is trivial (a typo, one config value).
+
+Then implement until those tests pass. When a test and the implementation
+disagree, change neither on your own: report the test, the spec text it came
+from, and what the code does, and let the user decide. Bending a test to the
+code is the bias this step exists to remove.
 
 ## 2. Verify what the change affects
 
@@ -90,6 +134,9 @@ or with a different method than required, is rerun, not used.
 From the second round on, the prompt carries the earlier rounds' findings
 with their decisions, and the decisions already made, marked "do not
 re-argue".
+
+A fix that changes behaviour gets its expected values the step-1a way when
+the spec covers the case: from the test agent, not from the implementer.
 
 Then check every finding against the code before reporting it:
 
@@ -134,13 +181,25 @@ before that.
 - Rewriting history while a background check has the tree checked out (a
   regression dump at a base revision) breaks that check: wait for it first.
 - Keep the pre-amend SHA for the next verification: it is the base of the
-  regression comparison for the fix (`match_regress.sh compare <old-sha>`).
+  fix's regression comparison, when the profile has one.
+- When a finding is about a test:
+  - a spec-derived expectation is wrong, or a case the spec covers has no
+    test → the test agent fixes it (step 1a), given the finding and the
+    spec text; if the spec itself is unclear or wrong, the user decides
+    the spec first;
+  - a test of the implementation's own design, or a structural problem
+    (naming, duplication, comments, counts) → the implementer fixes it;
+  - a corrected or added test that now fails means the implementation is
+    wrong: fix the code, then verify and review as for any code fix.
 - Back to step 2 with the affected set of the FIX, not of the whole change.
 - Back to step 3. A round whose fixes touched code is always followed by
   another review round, even if every finding was minor: a fix can bring its
   own defect.
-- The cycle ends after a round whose fixes were doc-only, or that had nothing
-  to fix.
+- The cycle ends after a round whose fixes were doc-only, had nothing to
+  fix, or only changed spec-derived test rows or expected values written by
+  the test agent, all passing. A round that changed test logic (helpers,
+  how results are compared, test structure) or the implementation is
+  followed by another review round.
 
 ## 6. Before the PR (once)
 
@@ -177,6 +236,10 @@ A profile holds:
 
 ## Path → affected checks
 | changed path | tests | extra checks | e2e suite |
+
+## Tests: where they live, who writes them
+- where new behaviour's tests go (files, tables), and whether unit tests sit
+  inside implementation files (then the test agent returns values only)
 
 ## Baselines to take before editing
 ## Pre-PR checklist
