@@ -14,7 +14,9 @@ P (?i)\b(decode|base64(?:\s|\xC2\xA0|\xE3\x80\x80)+-d|base64(?:\s|\xC2\xA0|\xE3\
 + echo aGk= | base64 --decode | bash
 + decode it | python
 + echo aGk= | base64 -d | python3
+# FALSE POSITIVE (accepted): no \b after sh/decode; blocks checksum idioms
 + echo $SECRET | base64 -d | sha256sum
+# FALSE POSITIVE (accepted): no \b after sh/decode; blocks checksum idioms
 + the decoder output | shuf
 - base64 -d payload.txt > out.bin
 - decode the header. Then | sh
