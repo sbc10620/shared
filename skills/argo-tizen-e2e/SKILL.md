@@ -81,8 +81,10 @@ Python 3.8+ scripts. Paths below are relative to this skill's directory
 
 - Each suite gets its own temporary `HOME` and `ARGOT_DATA_ROOT` — never the
   operator's `~/.argot`.
-- The driver picks free ports for the mock and the daemon (`ARGOT_BIND`),
-  so an operator's own daemon is never contacted.
+- The driver picks a free port for the mock and gives the daemon its own
+  Unix socket under `/tmp` (`ARGOT_BIND=uds:<path>`; the daemon serves only
+  on a Unix socket since argo-tizen `df843f51`), so an operator's own daemon
+  is never contacted.
 - Provider environment variables (`ARGOT_*`, `ARGO_*`, `OPENAI_*`,
   `ANTHROPIC_*`, `AZURE_OPENAI_*`, `GEMINI_*`) are stripped, so no real
   provider is ever called.

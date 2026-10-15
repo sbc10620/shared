@@ -29,7 +29,7 @@ Spec schema:
   }]
 }
 
-Each suite gets its own HOME, ARGOT_DATA_ROOT, free mock and daemon ports,
+Each suite gets its own HOME, ARGOT_DATA_ROOT, a free mock port, its own daemon Unix socket,
 and a fresh daemon; provider environment variables are stripped. Processes
 are stopped by PID only. Exit 1 when any check fails.
 """
@@ -80,10 +80,15 @@ class Suite:
         os.makedirs(self.root)
         os.makedirs(os.path.join(self.work, "home"))
         self.llm_log = os.path.join(self.work, "llm.jsonl")
-        self.mock_port, self.daemon_port = free_port(), free_port()
+        self.mock_port = free_port()
+        # The daemon serves only on a Unix socket (argo-tizen df843f51). Keep
+        # the socket path short: macOS caps sun_path at 104 bytes and the
+        # per-suite temp dir under /var/folders is already long.
+        self.sock_dir = tempfile.mkdtemp(prefix="ae2e-", dir="/tmp")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(STRIP)}
         self.env.update(HOME=os.path.join(self.work, "home"), ARGOT_DATA_ROOT=self.root,
-                        ARGOT_BIND=f"127.0.0.1:{self.daemon_port}", TZ="UTC", RUST_LOG="info")
+                        ARGOT_BIND=f"uds:{os.path.join(self.sock_dir, 'argot.sock')}",
+                        TZ="UTC", RUST_LOG="info")
         self.mock = self.daemon = None
         self.results = []
 
@@ -134,6 +139,7 @@ class Suite:
         if self.mock and self.mock.poll() is None:
             self.mock.terminate()
             self.mock.wait()
+        shutil.rmtree(self.sock_dir, ignore_errors=True)
         if not self.keep:
             shutil.rmtree(self.work, ignore_errors=True)
 
