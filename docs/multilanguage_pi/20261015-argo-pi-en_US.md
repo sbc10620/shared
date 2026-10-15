@@ -9,7 +9,7 @@
   - 손으로 작성한 검출기: `tinicore/src/guardrails/prompt_injection/handwritten/base64_shell_detector.rs`
   - 사용자 입력 검사 엔진: `tinicore/src/agent/prompt_guard.rs`
   - ARGO 배선: `tinicli/src/guardrails/prompt_guard.rs`, `tinicli/src/guardrails/prompt_injection.rs`
-- **관련 문서**: PII 쪽 대응 문서는 `docs/multilanguage/20260914-argo-pii-en_US.md` 이다. prompt injection 으로 유출되는 대상(계정 정보, 개인정보)에 적용되는 법령은 그 문서의 1절에 정리되어 있다.
+- **관련 문서**: PII 쪽 대응 문서는 `docs/multilanguage/20260914-argo-pii-en_US.md` 이다.
 
 ## 0. 문서 작성 기준
 
@@ -17,12 +17,12 @@
 
 각 규칙은 다음 네 가지 기준으로 평가한다.
 
-1. 공개된 위협 분류(OWASP, MITRE ATLAS, NIST 등)에서 prompt injection 또는 그와 직접 연결된 공격으로 다루는 형태인가?
+1. 출처가 있는 규칙인가? 현재 내장 규칙은 모두 ClawKeeper 또는 argo-tizen baseline 에서 옮긴 것이다(1절). locale 문서에서는 그 언어의 패턴이 출처에 있는지, 없어서 새로 제안하는 규칙인지를 밝힌다.
 2. 그 문장이 무엇을 시도하며, 모델이 그대로 따르면 어떤 피해가 생기는가?
 3. 결정론적 방법(regex 또는 손으로 작성한 검출기)으로 검출할 수 있는가?
 4. 일상 문장에서 측정한 오탐 결과가 있는가? 그 결과에 따라 어느 검사 지점(layer)에 두고, 어떤 동작(action)을 줄 것인가?
 
-PII 문서와 달리 이 문서 시리즈는 법령을 기준 1로 쓰지 않는다. prompt injection 의 근거는 locale 과 무관한 공개 위협 분류에서 찾고, 그 나라에 관련 법령이나 정부 지침이 있는지는 각 locale 문서의 1절에서 따로 확인해 기록한다(예: EU 회원국은 EU AI Act 의 견고성·사이버보안 조항, 검토 필요). prompt injection 이 성공했을 때 유출되는 정보(자격 증명, 개인정보)는 해당 locale PII 문서가 정리한 법령의 보호 대상이 된다. PII 문서의 점수 체계(score), context_words, 체크섬 검증기도 이 규칙 집합에서는 쓰지 않는다. 대신 4번 기준(오탐 측정과 layer·action 선택)이 그 역할을 맡는다.
+PII 문서와 달리 이 문서 시리즈는 법령을 기준으로 쓰지 않는다. prompt injection 을 직접 다루는 법령이 없기 때문이다. PII 문서의 점수 체계(score), context_words, 체크섬 검증기도 이 규칙 집합에서는 쓰지 않는다. 대신 4번 기준(오탐 측정과 layer·action 선택)이 그 역할을 맡는다.
 
 ### 검사 지점 두 개 (layers)
 
@@ -88,7 +88,7 @@ PII 쪽의 Aho-Corasick 검출기는 이 규칙 집합에서 쓰지 않는다.
 
 ### 언어 종속성 분류
 
-이 문서 시리즈에서 locale 마다 달라지는 것은 법령이 아니라 **공격 문장의 언어**이다. 그래서 규칙마다 다음 세 가지 중 하나로 분류한다.
+이 문서 시리즈에서 locale 마다 달라지는 것은 **공격 문장의 언어**이다. 그래서 규칙마다 다음 세 가지 중 하나로 분류한다.
 
 | 분류 | 뜻 | 다른 locale 문서에서 할 일 |
 |---|---|---|
@@ -125,24 +125,9 @@ en_GB, en_IN 은 영어권이므로 en_US 의 규칙을 대부분 그대로 공�
 - `rules.yaml` 과 `parse_rules` 가 요구하는 키를 모두 채운다. 모든 규칙에 `action` 이 필요하고, `tool_output` 에서 동작하는 규칙에는 `label` 도 필요하며, 매핑 키와 `entity_type` 은 같아야 한다. `prompt_guard` 규칙은 패턴이 정확히 1개여야 한다.
 - layer·action 은 영어 대응 규칙을 따른다. 그 언어의 일상 문장에서 오탐이 측정되면 영어 규칙과 같은 방식으로 layer 를 `tool_output` 으로 좁히거나 action 을 `warn` 으로 낮춘다.
 
-## 1. 위협 근거 및 참고 기준
+## 1. 규칙의 출처
 
-미국에서 prompt injection 을 직접 규정한 연방법이나 주법은 확인되지 않는다. 그래서 이 문서는 공개된 위협 분류와 보안 지침을 근거로 삼는다. prompt injection 이 성공해서 자격 증명이나 개인정보가 유출되면, 그 결과는 `docs/multilanguage/20260914-argo-pii-en_US.md` 1절의 법령(GLBA, HIPAA, 주 데이터 유출 통지법 등)이 다루는 사고가 된다.
-
-| 참고 기준 | 발행 주체 | 이 문서와의 관계 |
-|---|---|---|
-| OWASP Top 10 for LLM Applications 2025, **LLM01:2025 Prompt Injection** | OWASP Foundation | 직접 injection(사용자 입력)과 간접 injection(외부 콘텐츠)을 구분한다. 이 구분이 `prompt_guard` / `tool_output` layer 분리와 대응한다 |
-| OWASP Top 10 for LLM Applications 2025, **LLM07:2025 System Prompt Leakage** | OWASP Foundation | `reveal_secrets`, `reveal_system_prompt` 가 막는 공격 |
-| MITRE ATLAS **AML.T0051 LLM Prompt Injection** (하위 기법 `.000` Direct, `.001` Indirect) | MITRE | 직접·간접 injection 의 기법 분류 |
-| MITRE ATLAS **AML.T0054 LLM Jailbreak** | MITRE | `role_override`, `act_as_override` 가 막는 공격 |
-| MITRE ATLAS **AML.T0056** (LLM Meta Prompt Extraction. 현재 명칭이 바뀌었을 수 있음, 확인 필요) | MITRE | `reveal_*` 규칙 |
-| NIST AI 100-2 E2025, *Adversarial Machine Learning: A Taxonomy and Terminology of Attacks and Mitigations* | NIST | 생성형 AI 공격 분류에서 직접·간접 prompt injection 을 정의한다 |
-| NIST AI 600-1 (2024), *AI RMF Generative AI Profile* | NIST | 정보 보안 위험 항목에서 prompt injection 을 생성형 AI 고유 위험으로 다룬다 |
-| CVE-2021-42574 "Trojan Source" | MITRE CVE (공개: Boucher·Anderson, 2021) | bidi override 문자로 사람이 보는 텍스트와 기계가 읽는 텍스트를 다르게 만드는 공격. `invisible_payload` 의 근거 |
-| Unicode Technical Report #36 (Unicode Security Considerations), UTS #55 (Unicode Source Code Handling) | Unicode Consortium | 보이지 않는 문자와 bidi 제어 문자의 보안 위험. `invisible_payload` 의 근거 |
-| Unicode Technical Standard #39 (Unicode Security Mechanisms), CVE-2021-42694 (Trojan Source 의 homoglyph 공격) | Unicode Consortium, MITRE CVE | 혼동 문자(confusables). 4절 미채택 항목의 근거 |
-
-### 규칙의 출처
+내장 규칙 13개는 모두 아래 두 출처에서 옮긴 것이다. 출처와 옮긴 방식은 `mod.rs` 모듈 문서의 "Provenance" 절에 기록되어 있다.
 
 | 출처 | 규칙 수 | 내용 |
 |---|---|---|
@@ -176,7 +161,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### ignore_prior
 
 - **설명**: 모델에게 앞선 지시(system prompt, 개발자 지시)를 무시하라고 요구하는 가장 전형적인 injection 문장이다. 동사 4종(`ignore`, `disregard`, `forget`, `override`), 선택적 `all`, 시점어 5종(`prior`, `previous`, `above`, `earlier`, `preceding`), 대상어(`instruction(s)`, `prompt(s)`, `directive(s)`, `rule(s)`, `system prompt(s)`)의 순서로 이루어진다.
-- **위협 근거**: OWASP LLM01:2025 의 직접 injection 대표 예시이다. MITRE ATLAS AML.T0051 에 해당한다. 모델이 따르면 운영자가 정한 안전 지시와 도구 사용 제한이 무력화된다.
+- **노리는 동작**: 사용자 입력(직접 injection)이나 도구 결과(간접 injection)에서 모델의 기존 지시를 무효화한다. 모델이 따르면 운영자가 정한 안전 지시와 도구 사용 제한이 무력화된다.
 - **결정론적 검출**: 가능. 고정된 영어 어순이라 regex 로 정확하게 잡힌다.
 
   ```yaml
@@ -199,7 +184,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### ignore_previous_instructions
 
 - **설명**: `ignore_prior` 와 같은 공격을 argo-tizen 이 따로 작성한 형태이다. 동사 3종(`ignore`, `forget`, `disregard`), 선택적 `all`/`any`, 선택적 한정사 `the`/`your`, 시점어 4종, 대상어 3종(`instructions`, `directions`, `rules`)으로 이루어진다.
-- **위협 근거**: `ignore_prior` 와 같다 (OWASP LLM01:2025, MITRE ATLAS AML.T0051).
+- **노리는 동작**: `ignore_prior` 와 같다.
 - **결정론적 검출**: 가능.
 
   ```yaml
@@ -221,7 +206,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### act_as_override
 
 - **설명**: "from now on, you are / act as / will be …" 로 모델의 역할을 대화 중간에 바꾸려는 문장이다. 주어는 `you` 또는 `the assistant` 이다.
-- **위협 근거**: MITRE ATLAS AML.T0054 (LLM Jailbreak), OWASP LLM01:2025. 역할을 바꿔서 운영자 지시의 제약을 우회한다.
+- **노리는 동작**: 역할을 바꿔서 운영자 지시의 제약을 우회한다(jailbreak).
 - **결정론적 검출**: 가능.
 
   ```yaml
@@ -242,7 +227,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### reveal_secrets
 
 - **설명**: system prompt, 숨은 지시, 비밀, API 키를 공개하라는 요구이다. 동사는 `reveal`, `disclose`, `show me` 3종이고, 대상은 `system prompt`, `hidden instruction(s)`, `the secret`, `the api key` 이다.
-- **위협 근거**: OWASP LLM07:2025 System Prompt Leakage. system prompt 에 들어 있는 운영 규칙이나 자격 증명이 노출된다.
+- **노리는 동작**: system prompt 에 들어 있는 운영 규칙이나 자격 증명을 노출시킨다.
 - **결정론적 검출**: 가능.
 
   ```yaml
@@ -263,7 +248,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### reveal_system_prompt
 
 - **설명**: system 또는 developer 의 prompt/instructions/message 를 출력하라는 요구이다. 동사 6종(`reveal`, `print`, `show`, `display`, `dump`, `repeat`)과 선택적 `me`/`us`, 선택적 `your`/`the` 를 받는다.
-- **위협 근거**: OWASP LLM07:2025 System Prompt Leakage.
+- **노리는 동작**: `reveal_secrets` 와 같이 system prompt 를 노출시킨다.
 - **결정론적 검출**: 가능.
 
   ```yaml
@@ -285,7 +270,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### role_override
 
 - **설명**: 알려진 jailbreak 역할 문장이다. `DAN mode`, `you are (now) in developer/DAN/god mode`, `you are now / act as` + `unrestricted`/`unfiltered`/`uncensored`/`jailbroken` 을 받는다.
-- **위협 근거**: MITRE ATLAS AML.T0054 (LLM Jailbreak), OWASP LLM01:2025.
+- **노리는 동작**: 알려진 jailbreak 역할을 씌워서 운영자 지시의 제약을 우회한다.
 - **결정론적 검출**: 가능. 의도적으로 좁게 작성했다. `developer mode` 단독은 실제 TV 설정 이름이고, `you are now …` 는 수많은 일상 문장의 시작이기 때문이다.
 
   ```yaml
@@ -306,7 +291,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### invisible_payload
 
 - **설명**: 사람 눈에 보이지 않는 코드 포인트 15종이다. zero-width 문자(U+200B, U+200C, U+200D, U+2060, U+FEFF), bidi 제어 문자(U+202A–U+202E, U+2066–U+2069), soft hyphen(U+00AD)이 여기에 속한다.
-- **위협 근거**: CVE-2021-42574 (Trojan Source)는 bidi 제어 문자로 사람이 보는 순서와 기계가 읽는 순서를 다르게 만든다. zero-width 문자는 사람이 검토하는 텍스트 안에 모델만 읽는 지시를 숨기는 데 쓰인다. Unicode UTR #36 과 UTS #55 가 이런 문자의 보안 위험을 다룬다.
+- **노리는 동작**: bidi 제어 문자는 사람이 보는 순서와 기계가 읽는 순서를 다르게 만든다. zero-width 문자는 사람이 검토하는 텍스트 안에 모델만 읽는 지시를 숨긴다.
 - **결정론적 검출**: 가능. 코드 포인트 집합이므로 정확하다. 다만 엔진이 ASCII 모드라서 패턴 앞에 `(?u)` 가 필요하다.
 
   ```yaml
@@ -327,7 +312,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### trust_this_source
 
 - **설명**: 도구 결과 안에서 자신을 신뢰할 출처라고 주장하는 문장이다. 단어 `trust`, `treat as authoritative`, `this is sanctioned`, `sanctioned by`/`sanctioned operation`, `maintainer note`/`maintainer-note` 를 받는다.
-- **위협 근거**: OWASP LLM01:2025 의 간접 injection. 외부 콘텐츠가 권위를 주장해서 모델이 자기 지시처럼 따르게 만든다.
+- **노리는 동작**: 외부 콘텐츠가 권위를 주장해서, 모델이 그 내용을 자기 지시처럼 따르게 만든다(간접 injection).
 - **결정론적 검출**: 가능하지만 정밀도가 낮다.
 
   ```yaml
@@ -349,7 +334,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### imperative_credential_read
 
 - **설명**: 명령 동사(`run`, `execute`, `please run/execute`, `also run/cat/read/dump`) 뒤 같은 문장 안에 자격 증명 경로가 나오는 문장이다. 경로는 `~/.ssh/`, `~/.aws/`, `~/.gnupg/`, `/etc/passwd`, `/etc/shadow`, `/etc/sudoers`, `.aws/credentials`, `.ssh/id_`, `authorized_keys`, `.env` 이다.
-- **위협 근거**: OWASP LLM01:2025 의 간접 injection 대표 시나리오이다. 웹 페이지나 README 에 숨긴 지시가 에이전트에게 자격 증명 파일을 읽게 한다. MITRE ATLAS AML.T0051.001 (Indirect).
+- **노리는 동작**: 웹 페이지나 README 에 숨긴 지시가 에이전트에게 자격 증명 파일을 읽게 한다(간접 injection).
 - **결정론적 검출**: 가능. 다만 오탐 요인 두 가지가 알려져 있다.
 
   ```yaml
@@ -371,7 +356,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### imperative_pipe_to_shell
 
 - **설명**: `curl`/`wget`/`fetch` 로 받은 내용을 파이프로 셸이나 인터프리터(`bash`, `sh`, `zsh`, `ksh`, `python`, `perl`, `ruby`, `node`)에 바로 넘기는 문장이다.
-- **위협 근거**: 간접 injection 으로 원격 코드를 실행시키는 전형적인 형태이다. MITRE ATLAS AML.T0051.001.
+- **노리는 동작**: 외부 콘텐츠가 에이전트에게 원격 코드를 내려받아 실행하게 한다(간접 injection).
 - **결정론적 검출**: 가능.
 
   ```yaml
@@ -393,7 +378,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### imperative_base64_run
 
 - **설명**: `decode` 또는 `base64 -d`/`base64 --decode` 뒤 같은 문장 안에서 파이프로 셸·`python` 에 넘기는 문장이다.
-- **위협 근거**: 실행할 명령을 base64 로 감춰서 사람의 검토와 단순 문자열 검사를 피한다. MITRE ATLAS AML.T0051.001.
+- **노리는 동작**: 실행할 명령을 base64 로 감춰서 사람의 검토와 단순 문자열 검사를 피한다.
 - **결정론적 검출**: 가능.
 
   ```yaml
@@ -417,7 +402,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### comment_directive
 
 - **설명**: HTML 주석(`<!--`), C 계열 주석(`/*`), `# maintainer-note` 로 시작해서 800바이트 안에 지시 구문(`also run/dump/cat/read/show/exfil`, `please include`, `please always`, `please verify`)이나 `~/.ssh/`·`~/.aws/` 경로가 나오는 텍스트이다.
-- **위협 근거**: 렌더링된 화면에는 보이지 않는 주석에 모델만 읽는 지시를 숨긴다. OWASP LLM01:2025 의 간접 injection, MITRE ATLAS AML.T0051.001.
+- **노리는 동작**: 렌더링된 화면에는 보이지 않는 주석에 모델만 읽는 지시를 숨긴다(간접 injection).
 - **결정론적 검출**: 가능. 알려진 빈틈이 하나 있다.
 
   ```yaml
@@ -439,7 +424,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 ### base64_decoded_to_shell
 
 - **설명**: 단어 경계에서 시작하는 24자 이상의 base64 문자열(끝에 `=` 최대 2개)을 엄격하게 해독하고, 해독 결과를 소문자로 바꾼 뒤 셸 토큰 15종 중 하나가 들어 있으면 매칭한다. 토큰은 `cat `, `rm `, `curl `, `wget `, `ssh `, `scp `, `/etc/`, `/.ssh/`, `/.aws/`, `id_ed25519`, `id_rsa`, `AKIA`, `/credentials`, `passwd`, `shadow` 이다. 64 KiB 보다 긴 문자열은 앞 64 KiB 만 해독한다. 이것이 원본과의 유일한 의도적 변경이다. 이 밖에 단어 경계가 ASCII 기준이라서, 비 ASCII 글자에 붙은 base64 문자열을 원본(Python Unicode `\b`)은 거부하고 이 검출기는 받는 방언 차이가 있다.
-- **위협 근거**: `imperative_base64_run` 과 같이 명령을 base64 로 감추는 공격이다. 이 규칙은 파이프 문법이 없어도 해독 결과만 보고 판단한다.
+- **노리는 동작**: `imperative_base64_run` 과 같이 명령을 base64 로 감춘다. 이 규칙은 파이프 문법이 없어도 해독 결과만 보고 판단한다.
 - **결정론적 검출**: 가능. regex 로 표현할 수 없으므로(해독 필요) handwritten 검출기(`handwritten/base64_shell_detector.rs`)로 구현했다.
 
   | 매칭 예시 | 거부 반례 | 비고 |
@@ -455,16 +440,16 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 
 ## 4. 검토 후 미채택한 항목
 
-| 항목 | 근거 | 미채택 이유 |
-|---|---|---|
-| ClawKeeper `security_rules.py` 의 `PROMPT_INJECTION_PATTERNS` (60개) | OWASP LLM01:2025 | 통째로 거부했다. 105행의 대안 우선순위 버그(`bypass.*?安全\|safety.*?绕过\|防护\|security`)가 단어 `security` 만으로 발동하고, 62행은 그룹 안의 `\|` 리터럴 때문에 절대 매칭되지 않는다. 라이선스 출처도 제3자(MIT, Peter Steinberger)이다. ClawKeeper 에서도 오프라인 로그 검사에만 쓰였다 |
-| ClawKeeper `dispatchable_policy::audit` 의 prompt injection 규칙 4개 | OWASP LLM01:2025 | skill·도구 manifest 텍스트용으로 설계되었다. 일상 대화에서 오탐을 측정했다(`SYSTEM:` 으로 시작하는 로그 줄, `<system>` 이 든 XML, "You are now looking at the wrong file", "DEVELOPER MODE is a Chrome setting") |
-| 단독 `developer mode`, 단독 `you are now …` | MITRE ATLAS AML.T0054 | `role_override` 를 의도적으로 좁힌 이유이다. 실제 TV 설정 이름이고, 일상 문장의 시작이다 |
-| "ignore **my** previous instructions" | OWASP LLM01:2025 | 사용자가 자기 요청을 취소하는 정상 대화이다 |
-| 모든 Unicode 공백 (`(?u:\s)`) | 엔진 제약 | 사용자 입력 엔진이 약 47 KB 커진다(두 문자만 더하면 약 22 KB). U+2000–U+200A, U+202F 는 여전히 문장을 끊는다 |
-| 혼동 문자(homoglyph, 예: 키릴 `о` 로 쓴 `ignоre`), leetspeak(`1gn0re`), ROT13 등 난독화 | Unicode UTS #39, CVE-2021-42694, OWASP LLM01:2025 | 결정론적으로 정규화하려면 confusables 표를 쓰는 전처리 단계가 필요하다. 규칙 하나로 표현할 수 없다. 향후 전처리 도입 시 재검토한다 |
-| 다른 언어로 번역한 injection 문장 | OWASP LLM01:2025 | en_US 범위 밖이다. 각 locale 문서에서 다룬다 |
-| ML 분류기 기반 검출 (prompt injection 전용 분류 모델) | NIST AI 100-2 E2025 | 결정론적 방법이 아니므로 이 문서 범위 밖이다 |
+| 항목 | 미채택 이유 |
+|---|---|
+| ClawKeeper `security_rules.py` 의 `PROMPT_INJECTION_PATTERNS` (60개) | 통째로 거부했다. 105행의 대안 우선순위 버그(`bypass.*?安全\|safety.*?绕过\|防护\|security`)가 단어 `security` 만으로 발동하고, 62행은 그룹 안의 `\|` 리터럴 때문에 절대 매칭되지 않는다. 라이선스 출처도 제3자(MIT, Peter Steinberger)이다. ClawKeeper 에서도 오프라인 로그 검사에만 쓰였다 |
+| ClawKeeper `dispatchable_policy::audit` 의 prompt injection 규칙 4개 | skill·도구 manifest 텍스트용으로 설계되었다. 일상 대화에서 오탐을 측정했다(`SYSTEM:` 으로 시작하는 로그 줄, `<system>` 이 든 XML, "You are now looking at the wrong file", "DEVELOPER MODE is a Chrome setting") |
+| 단독 `developer mode`, 단독 `you are now …` | `role_override` 를 의도적으로 좁힌 이유이다. 실제 TV 설정 이름이고, 일상 문장의 시작이다 |
+| "ignore **my** previous instructions" | 사용자가 자기 요청을 취소하는 정상 대화이다 |
+| 모든 Unicode 공백 (`(?u:\s)`) | 사용자 입력 엔진이 약 47 KB 커진다(두 문자만 더하면 약 22 KB). U+2000–U+200A, U+202F 는 여전히 문장을 끊는다 |
+| 혼동 문자(homoglyph, 예: 키릴 `о` 로 쓴 `ignоre`), leetspeak(`1gn0re`), ROT13 등 난독화 | 결정론적으로 정규화하려면 confusables 표를 쓰는 전처리 단계가 필요하다. 규칙 하나로 표현할 수 없다. 향후 전처리 도입 시 재검토한다 |
+| 다른 언어로 번역한 injection 문장 | en_US 범위 밖이다. 각 locale 문서에서 다룬다 |
+| ML 분류기 기반 검출 (prompt injection 전용 분류 모델) | 결정론적 방법이 아니므로 이 문서 범위 밖이다 |
 
 ## 5. 후속 작업과 13개국 확장 시 제약
 
