@@ -51,7 +51,7 @@
 | `imperative_credential_read` | 혼합 | {동사 부분만 번역} | | tool_output · block · embedded_directive | |
 | `imperative_pipe_to_shell` | 언어 무관 | 같음 | — | — | 기존 · 유지 |
 | `imperative_base64_run` | 혼합 | {같음 / 번역 제안, 이유} | | | |
-| `comment_directive` | 혼합 | {지시 구문만 번역. 별도 규칙, 창 `[^>*]{0,800}` (ko_KR 5절 결정)} | | tool_output · block · comment_directive | |
+| `comment_directive` | 혼합 | {지시 구문만 번역. 별도 규칙, 창 `.{0,800}` 은 영어 규칙과 같음} | | tool_output · block · comment_directive | |
 | `base64_decoded_to_shell` | 언어 무관 | 같음 | — | — | 기존 · 유지 |
 
 ## 3. 제안 규칙
@@ -87,7 +87,7 @@
 ko_KR 5절의 결정(2026-10-15)을 따른다. 이 locale 에서 새로 생긴 결정만 아래 표에 적는다. 없으면 "ko_KR 5절과 같음"이라고 쓴다.
 
 - 모든 번역 규칙의 layer 와 action 은 대응하는 en_US 규칙과 똑같이 둔다. 오탐이 확인되어도 지금은 감수하고 기록만 하며, 조정은 운영 데이터를 본 뒤에 한다.
-- `comment_directive` 의 번역 구문은 별도 규칙으로 두고, 창은 `[^>*]{0,800}` 이다(주석 끝에서 멈춤).
+- `comment_directive` 의 번역 구문은 별도 규칙으로 두고, 주석 시작 기호와 창(`.{0,800}`)은 영어 규칙과 같게 둔다.
 - lookbehind 가 있어야 거를 수 있는 오탐(소유격이 앞에 오는 자기 요청 취소 등)은 감수하고, 케이스 파일과 문서에 오탐으로 기록한다.
 
 | 항목 | 결정 | 이유 |
