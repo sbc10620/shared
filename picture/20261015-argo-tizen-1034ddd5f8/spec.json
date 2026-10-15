@@ -1,0 +1,397 @@
+{
+ "title": "argot tool output guard labels 와 PII 예시 정리",
+ "repo": "/Users/byungchulso/Works/argo-tizen-PromptGuard",
+ "before": "9c30a143",
+ "after": "1034ddd5",
+ "range": "argo-tizen · 9c30a143..1034ddd5 · argot main()",
+ "not_drawn": {
+  "is_empty": "serde 직렬화 생략 판정에만 쓰임, 직접 호출 없음",
+  "describe": "gRPC GetSchema 핸들러에서만 호출, 설명 문자열만 변경"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 시 tool output labels 해석",
+   "caption": "argot daemon 부팅에서 [safety.tool_output_guard] labels 를 읽어 tinicore 설정으로 넘기고, 모르는 label 이면 부팅을 거부한다.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "crates/argot/src/main.rs:84",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            argot::product::run(started_at)",
+       "note": "daemon 서브커맨드 실행",
+       "to": "product_run"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "product_run",
+     "kind": "fn",
+     "status": "same",
+     "name": "product::run()",
+     "file": "crates/argot/src/product.rs:171",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    argot_daemon::boot::run_configured(started_at, install_integration(flavour)?, configure)",
+       "note": "제품 설정으로 daemon 부팅",
+       "to": "run_configured"
+      }
+     ]
+    },
+    {
+     "id": "run_configured",
+     "kind": "fn",
+     "status": "same",
+     "name": "boot::run_configured()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:46",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match runtime.block_on(run_managed(",
+       "note": "tokio 런타임에서 daemon 실행",
+       "to": "run_managed"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "run_managed",
+     "kind": "fn",
+     "status": "same",
+     "name": "boot::run_managed()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:184",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match run_async(",
+       "note": "부팅 본체 실행",
+       "to": "run_async"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_async",
+     "kind": "fn",
+     "status": "changed",
+     "name": "boot::run_async()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:372",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let pii = &config.boot_config.safety.pii;"
+      },
+      {
+       "code": "    let tool_output = &config.boot_config.safety.tool_output_guard;",
+       "mark": "+",
+       "note": "mode 뿐 아니라 섹션 전체를 넘김",
+       "to": "ToolOutputGuardSettings",
+       "edge": "use"
+      },
+      {
+       "code": "    let guardrails = crate::guardrails::guardrails_config(pii, tool_output).map_err(|e| {",
+       "mark": "+",
+       "note": "tinicore 설정으로 변환, 실패 가능",
+       "to": "guardrails_config"
+      },
+      {
+       "code": "        anyhow::anyhow!(",
+       "mark": "+"
+      },
+      {
+       "code": "            \"[tool_output_guard] refusing to start: {e} (config.toml: \\",
+       "mark": "+"
+      },
+      {
+       "code": "             [safety.tool_output_guard] labels)\"",
+       "mark": "+"
+      },
+      {
+       "code": "        )",
+       "mark": "+"
+      },
+      {
+       "code": "    })?;",
+       "mark": "+",
+       "note": "모르는 label 이면 부팅 거부"
+      },
+      {
+       "code": "    match tinicore::guardrails::install_guardrails_from_config(guardrails) {",
+       "mark": "+",
+       "note": "변환된 설정으로 가드레일 설치"
+      },
+      {
+       "code": "        Ok(report) => {",
+       "mark": "+"
+      },
+      {
+       "code": "            for warning in &report.warnings {",
+       "mark": "+",
+       "note": "설치 보고서의 경고를 모두 로그"
+      },
+      {
+       "code": "                tracing::warn!(\"[guardrails] {warning}\");",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            tracing::info!(",
+       "mark": "+"
+      },
+      {
+       "code": "                configured = ?pii.mode,"
+      },
+      {
+       "code": "                tool_output_guard = ?tool_output.mode,",
+       "mark": "+"
+      },
+      {
+       "code": "                tool_output_labels = ?tool_output.labels,",
+       "mark": "+"
+      },
+      {
+       "code": "                warnings = report.warnings.len(),"
+      },
+      {
+       "code": "                \"guardrails: install complete\""
+      },
+      {
+       "code": "            );",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        Err(e @ tinicore::guardrails::GuardrailsInstallError::LayerBuild { .. }) => {"
+      },
+      {
+       "code": "            anyhow::bail!(\"[pii] refusing to start: {e} (config.toml)\");"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        Err(e @ tinicore::guardrails::GuardrailsInstallError::PromptInjection { .. }) => {"
+      },
+      {
+       "code": "            anyhow::bail!("
+      },
+      {
+       "code": "                \"[tool_output_guard] refusing to start: {e} (config.toml: set \\"
+      },
+      {
+       "code": "                 [safety.tool_output_guard] mode = \\\"off\\\" to run without it)\""
+      },
+      {
+       "code": "            );"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        Err(e) => {"
+      },
+      {
+       "code": "            anyhow::bail!(\"[pii] refusing to start: {e}\");"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "guardrails_config",
+     "kind": "fn",
+     "status": "changed",
+     "name": "guardrails::guardrails_config()",
+     "file": "crates/argot-daemon/src/guardrails/mod.rs:58",
+     "lines": [
+      {
+       "code": "    Ok(GuardrailsConfig {",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        prompt_injection: PromptInjectionConfig {"
+      },
+      {
+       "code": "            tool_output: tool_output_config(tool_output)?,",
+       "mark": "+",
+       "note": "labels 해석 실패를 그대로 전달",
+       "to": "tool_output_config"
+      },
+      {
+       "code": "        },"
+      },
+      {
+       "code": "    })",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "tool_output_config",
+     "kind": "fn",
+     "status": "changed",
+     "name": "guardrails::tool_output_config()",
+     "file": "crates/argot-daemon/src/guardrails/mod.rs:81",
+     "lines": [
+      {
+       "code": "    let labels = settings",
+       "mark": "+",
+       "note": "문자열 label 을 tinicore 타입으로 파싱",
+       "to": "ToolOutputGuardSettings",
+       "edge": "use"
+      },
+      {
+       "code": "        .labels",
+       "mark": "+"
+      },
+      {
+       "code": "        .as_ref()",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|labels| labels.iter().map(|l| l.parse()).collect())",
+       "mark": "+"
+      },
+      {
+       "code": "        .transpose()?;",
+       "mark": "+",
+       "note": "모르는 label 이면 mode 와 무관하게 실패"
+      },
+      {
+       "code": "    Ok(match settings.mode {",
+       "mark": "+"
+      },
+      {
+       "code": "        ToolOutputGuardMode::Off => PromptInjectionToolOutputConfig {",
+       "mark": "+"
+      },
+      {
+       "code": "            labels,",
+       "mark": "+",
+       "note": "off 에서도 labels 전달, tinicore 가 경고"
+      },
+      {
+       "code": "            ..PromptInjectionToolOutputConfig::default()",
+       "mark": "+"
+      },
+      {
+       "code": "        },",
+       "mark": "+"
+      },
+      {
+       "code": "        ToolOutputGuardMode::On => PromptInjectionToolOutputConfig {"
+      },
+      {
+       "code": "            enabled: true,"
+      },
+      {
+       "code": "            labels,",
+       "mark": "+",
+       "note": "None 대신 설정된 labels 사용"
+      },
+      {
+       "code": "            rules: crate::agent_config::CONTEXT_FORGERY_RULES"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "        },"
+      },
+      {
+       "code": "    })",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "ToolOutputGuardSettings",
+     "kind": "struct",
+     "status": "changed",
+     "name": "ToolOutputGuardSettings",
+     "file": "crates/argot-config/src/lib.rs:465",
+     "lines": [
+      {
+       "code": "pub struct ToolOutputGuardSettings {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub mode: ToolOutputGuardMode,",
+       "note": "off | on"
+      },
+      {
+       "code": "    #[serde(default, skip_serializing_if = \"Option::is_none\")]",
+       "mark": "+"
+      },
+      {
+       "code": "    pub labels: Option<Vec<String>>,",
+       "mark": "+",
+       "note": "생략=전체, []=차단 없음"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "1034ddd5",
+   "feat(safety): tool-output guard labels, inline PII examples"
+  ]
+ ]
+}

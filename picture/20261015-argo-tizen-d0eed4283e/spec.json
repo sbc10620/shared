@@ -1,0 +1,467 @@
+{
+ "title": "위조 문맥 태그 규칙을 공용 prompt guard 로 이동",
+ "repo": "/Users/byungchulso/Works/argo-tizen-PromptGuard",
+ "before": "1034ddd5",
+ "after": "d0eed428",
+ "range": "argo-tizen · 1034ddd5..d0eed428 · argot main()",
+ "not_drawn": {
+  "runner_fixture_with_sources": "테스트 모듈의 러너 생성 도우미",
+  "bare_runner": "테스트 모듈의 러너 생성 도우미"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 때 위조 태그 규칙이 공용 규칙 집합에 들어가는 흐름",
+   "caption": "main() 에서 prompt_guard_config_for_mode() 까지, 그리고 mode 인자가 빠진 ArgotRunner 생성. 턴마다 prompt_guard::admit 과 agent_loop 가 이 하나의 규칙 집합을 읽는다.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "crates/argot/src/main.rs:84",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            argot::product::run(started_at)",
+       "note": "daemon 하위 명령 실행",
+       "to": "product_run"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "product_run",
+     "kind": "fn",
+     "status": "same",
+     "name": "product::run()",
+     "file": "crates/argot/src/product.rs:171",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    argot_daemon::boot::run_configured(started_at, install_integration(flavour)?, configure)",
+       "note": "daemon 부팅 시작",
+       "to": "run_configured"
+      }
+     ]
+    },
+    {
+     "id": "run_configured",
+     "kind": "fn",
+     "status": "same",
+     "name": "boot::run_configured()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:46",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match runtime.block_on(run_managed(",
+       "note": "tokio 런타임 위에서 실행",
+       "to": "run_managed"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    )) {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_managed",
+     "kind": "fn",
+     "status": "same",
+     "name": "boot::run_managed()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:184",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let outcome = match run_async(",
+       "note": "비동기 부팅 본체",
+       "to": "run_async"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    .await"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "run_async",
+     "kind": "fn",
+     "status": "same",
+     "name": "boot::run_async()",
+     "file": "crates/argot-daemon/src/boot/mod.rs:372",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let runtime = runtime::build_services(",
+       "note": "런타임 문맥(규칙 집합 포함) 생성",
+       "to": "build_services"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    .await?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let gateway = runtime::build_gateway(",
+       "note": "턴 러너와 게이트웨이 생성",
+       "to": "build_gateway"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    )?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "build_services",
+     "kind": "fn",
+     "status": "same",
+     "name": "runtime::build_services()",
+     "file": "crates/argot-daemon/src/boot/runtime.rs:228",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let (ctx, agent_registrar) ="
+      },
+      {
+       "code": "        crate::context_builder::build_runtime_context(crate::context_builder::ContextDeps {",
+       "note": "제품 규칙·설정으로 ctx 생성",
+       "to": "build_runtime_context"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            guard_rules: product_input.guard_rules.clone(),"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            argot_config: Arc::clone(&config.boot_config),"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "        });"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "build_runtime_context",
+     "kind": "fn",
+     "status": "same",
+     "name": "context_builder::build_runtime_context()",
+     "file": "crates/argot-daemon/src/context_builder.rs:101",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    crate::agent_config::apply_prompt_guard_mode(",
+       "note": "mode 로 CoreConfig 규칙 설정",
+       "to": "apply_prompt_guard_mode"
+      },
+      {
+       "code": "        &mut core,"
+      },
+      {
+       "code": "        argot_config.safety.prompt_guard.mode,"
+      },
+      {
+       "code": "        &guard_rules,"
+      },
+      {
+       "code": "    );"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "apply_prompt_guard_mode",
+     "kind": "fn",
+     "status": "same",
+     "name": "agent_config::apply_prompt_guard_mode()",
+     "file": "crates/argot-daemon/src/agent_config.rs:338",
+     "lines": [
+      {
+       "code": "    core.prompt_guard = prompt_guard_config_for_mode(mode, additional);",
+       "note": "규칙 집합을 만들어 고정",
+       "to": "prompt_guard_config_for_mode"
+      }
+     ]
+    },
+    {
+     "id": "prompt_guard_config_for_mode",
+     "kind": "fn",
+     "status": "changed",
+     "name": "agent_config::prompt_guard_config_for_mode()",
+     "file": "crates/argot-daemon/src/agent_config.rs:284",
+     "lines": [
+      {
+       "code": "    let forced = match mode {"
+      },
+      {
+       "code": "        PromptGuardMode::Off => return PromptGuardConfig::default(),",
+       "note": "off 면 위조 태그 규칙도 설치 안 함"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let product_action = forced.clone().unwrap_or(GuardAction::Block);"
+      },
+      {
+       "code": "    let mut rules = builtin_prompt_guard_rules();"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    rules.extend("
+      },
+      {
+       "code": "        prompt_guard_config("
+      },
+      {
+       "code": "            additional",
+       "mark": "+",
+       "note": "제품 규칙 뒤에 위조 태그 규칙을 이어 붙임"
+      },
+      {
+       "code": "                .iter()"
+      },
+      {
+       "code": "                .map(|r| (r.id.clone(), r.pattern.clone()))",
+       "mark": "+"
+      },
+      {
+       "code": "                .chain(",
+       "mark": "+"
+      },
+      {
+       "code": "                    CONTEXT_FORGERY_RULES",
+       "mark": "+"
+      },
+      {
+       "code": "                        .iter()"
+      },
+      {
+       "code": "                        .map(|(id, pattern)| ((*id).to_string(), (*pattern).to_string())),",
+       "mark": "+"
+      },
+      {
+       "code": "                ),",
+       "mark": "+"
+      },
+      {
+       "code": "            product_action,"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .rules,"
+      },
+      {
+       "code": "    );"
+      },
+      {
+       "code": "    PromptGuardConfig { rules }"
+      }
+     ]
+    },
+    {
+     "id": "build_gateway",
+     "kind": "fn",
+     "status": "changed",
+     "name": "runtime::build_gateway()",
+     "file": "crates/argot-daemon/src/boot/runtime.rs:457",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let runner = crate::turn::ArgotRunner::new(",
+       "note": "mode 인자 없이 러너 생성",
+       "to": "runner_new"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        product_input.turn_guide.clone(),"
+      },
+      {
+       "code": "        crate::adapters::events::agent::AgentEvents::from_config(&config.boot_config.log),"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    )?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "runner_new",
+     "kind": "fn",
+     "status": "changed",
+     "name": "ArgotRunner::new()",
+     "file": "crates/argot-daemon/src/turn/mod.rs:336",
+     "lines": [
+      {
+       "code": "        if !ctx.config.prompt_guard.is_empty() {"
+      },
+      {
+       "code": "            prompt_guard::compile_cached(&ctx.config.prompt_guard)?;",
+       "note": "패턴 오류면 부팅 실패"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Ok(Arc::new(Self {",
+       "to": "ArgotRunner",
+       "edge": "use"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            turn_context,"
+      },
+      {
+       "code": "            tool_selection,"
+      },
+      {
+       "code": "            agent_events,"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "        }))"
+      }
+     ]
+    },
+    {
+     "id": "ArgotRunner",
+     "kind": "struct",
+     "status": "changed",
+     "name": "ArgotRunner",
+     "file": "crates/argot-daemon/src/turn/mod.rs:123",
+     "lines": [
+      {
+       "code": "pub struct ArgotRunner {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    turn_context: Arc<[Arc<dyn crate::product::TurnContextProvider>]>,"
+      },
+      {
+       "code": "    tool_selection: guide::ToolSelection,",
+       "note": "이 아래 prompt_guard_mode 필드 삭제"
+      },
+      {
+       "code": "    agent_events: crate::adapters::events::agent::AgentEvents,"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "d0eed428",
+   "refactor(safety): run the forged-context-tag rules in the shared prompt guard"
+  ]
+ ]
+}
