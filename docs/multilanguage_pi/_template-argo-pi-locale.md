@@ -4,10 +4,11 @@
   이 파일은 locale 별 prompt injection 문서의 템플릿이다. 새 locale 문서를 만들 때 이 파일을 복사해
   docs/multilanguage_pi/YYYYMMDD-argo-pi-{LOCALE}.md 로 저장하고, {…} 자리를 채운 뒤 이 주석 블록과
   "작성 체크리스트" 절은 삭제한다. 완성된 예시는 docs/multilanguage_pi/20261015-argo-pi-ko_KR.md 이다.
+  언어와 무관한 common 규칙 4개는 docs/multilanguage_pi/20261015-argo-pi-common.md 가 다룬다.
 
   이미 정해진 원칙 (바꾸지 않는다):
   - 법령과 외부 위협 분류(OWASP, MITRE, NIST, CVE 등)는 쓰지 않는다. 근거는 규칙의 출처뿐이다.
-  - 다루는 범위는 현재 내장 규칙 13개뿐이다. 2절 표는 정확히 13행이다.
+  - 다루는 범위는 현재 내장 규칙 13개뿐이다. 그중 common 규칙 4개는 common 문서가 다루므로, 2절 표는 나머지 9개로 정확히 9행이다.
   - 비영어 규칙은 출처가 없다 (ClawKeeper return_content_scan.py 는 영어 패턴만 가진다). 따라서 번역 규칙은
     모두 "출처 없음 → 신규 제안"이고, locale 선택 장치가 없으므로 상태는 "조건부"이다.
   - 영어 내장 규칙은 이 locale 에서도 그대로 동작한다. 번역 규칙은 영어 규칙을 대체하지 않고 추가된다.
@@ -46,13 +47,11 @@
 | `reveal_secrets` | 영어 구문 | | | prompt_guard, tool_output · block · override | |
 | `reveal_system_prompt` | 영어 구문 | | | prompt_guard, tool_output · block · override | |
 | `role_override` | 영어 구문 | | | prompt_guard, tool_output · block · override | |
-| `invisible_payload` | 언어 무관 | 같음 {th_TH·en_IN 은 정상 텍스트의 ZWSP·ZWJ·ZWNJ 사용을 확인} | — | — | 기존 · 유지 |
 | `trust_this_source` | 영어 구문 | | | tool_output · warn · override | |
 | `imperative_credential_read` | 혼합 | {동사 부분만 번역} | | tool_output · block · embedded_directive | |
-| `imperative_pipe_to_shell` | 언어 무관 | 같음 | — | — | 기존 · 유지 |
-| `imperative_base64_run` | 혼합 | {같음 / 번역 제안, 이유} | | | |
 | `comment_directive` | 혼합 | {지시 구문만 번역. 별도 규칙, 창 `.{0,800}` 은 영어 규칙과 같음} | | tool_output · block · comment_directive | |
-| `base64_decoded_to_shell` | 언어 무관 | 같음 | — | — | 기존 · 유지 |
+
+common 규칙 4개(`invisible_payload`, `imperative_pipe_to_shell`, `imperative_base64_run`, `base64_decoded_to_shell`)는 이 표에 넣지 않는다. 언어와 무관하거나 번역할 필요가 없어서 `docs/multilanguage_pi/20261015-argo-pi-common.md` 가 다루고, 이 locale 에서도 그대로 동작한다. {th_TH·en_IN 은 common 문서 2절의 확인 항목을 이 문서 1절에 기록한다.}
 
 ## 3. 제안 규칙
 
@@ -73,14 +72,14 @@
 
 ## 4. 메모리
 
-`rxprobe mem` 으로 잰 값이다. `total` 은 정방향·역방향 NFA 와 lazy DFA 최소 캐시의 합이며, 패턴 전체를 청크 하나로 컴파일한 값이다. 엔진은 실제로 최소 캐시의 3배(`CACHE_MARGIN_RATIO = 3.0`)를 할당하므로, 실행 중 메모리는 이 표보다 크다. 엔진은 턴마다 만들고 턴이 끝나면 버리므로, 이 값은 상주 메모리가 아니라 턴 동안의 사용량이다. en_US 문서의 `bench_prompt_guard_memory` 수치(약 22/47 KB)와는 측정 방법이 달라서 직접 비교할 수 없다. 규칙을 locale 값에 따라 싣는다는 전제이므로, 아래 값은 이 locale 사용자 한 명이 받는 규칙 기준이다. 기준 행 외의 값은 이 locale 의 패턴으로 다시 잰다.
+`rxprobe mem` 으로 잰 값이다. `total` 은 정방향·역방향 NFA 와 lazy DFA 최소 캐시의 합이며, 패턴 전체를 청크 하나로 컴파일한 값이다. 엔진은 실제로 최소 캐시의 3배(`CACHE_MARGIN_RATIO = 3.0`)를 할당하므로, 실행 중 메모리는 이 표보다 크다. 엔진은 턴마다 만들고 턴이 끝나면 버리므로, 이 값은 상주 메모리가 아니라 턴 동안의 사용량이다. 기준 행은 `rxprobe/cases/common.*.txt` 와 `en_US.*.txt` 를 함께 잰 값이다. en_US 문서의 `bench_prompt_guard_memory` 수치(약 22/47 KB)와는 측정 방법이 달라서 직접 비교할 수 없다. 규칙을 locale 값에 따라 싣는다는 전제이므로, 아래 값은 이 locale 사용자 한 명이 받는 규칙 기준이다. 기준 행 외의 값은 이 locale 의 패턴으로 다시 잰다.
 
 | 집합 | 패턴 수 | total |
 |---|---|---|
-| en 사용자 입력 규칙 (기준) | 7 | 114 KB |
-| en + {lang} 사용자 입력 규칙 | | |
-| en 전체 regex 규칙 (기준) | 12 | 343 KB |
-| en + {lang} 전체 regex 규칙 | | |
+| common + en 사용자 입력 규칙 (기준) | 7 | 114 KB |
+| common + en + {lang} 사용자 입력 규칙 | | |
+| common + en 전체 regex 규칙 (기준) | 12 | 343 KB |
+| common + en + {lang} 전체 regex 규칙 | | |
 
 ## 5. 결정 사항
 
@@ -96,7 +95,7 @@ ko_KR 5절의 결정(2026-10-15)을 따른다. 이 locale 에서 새로 생긴 �
 
 ## 작성 체크리스트 (완성 후 이 절은 삭제)
 
-- [ ] 2절 표가 정확히 13행이고, 모든 행에 처리가 적혀 있다
+- [ ] 2절 표가 common 규칙 4개를 뺀 정확히 9행이고, 모든 행에 처리가 적혀 있다
 - [ ] 법령·외부 위협 분류를 쓰지 않았다
 - [ ] 제안 규칙의 패턴을 rxprobe 케이스 파일에 넣고 검사를 통과했다 (`cd rxprobe && cargo build --offline --release && ./target/release/rxprobe check cases/{LOCALE}.txt`)
 - [ ] 문서 표의 예시·반례가 모두 케이스 파일에 같은 부호(`+`/`-`)로 들어 있다

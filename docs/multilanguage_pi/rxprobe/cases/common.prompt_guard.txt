@@ -1,0 +1,8 @@
+# invisible_payload
+P (?u)[\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}\u{202A}-\u{202E}\u{2066}-\u{2069}\u{00AD}]
++ click here\u{200B}\u{202E}
++ family \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}
++ \u{1F3F3}\u{FE0F}\u{200D}\u{1F308}
++ soft\u{AD}hyphen
+- plain text
+- no-break\u{A0}space
