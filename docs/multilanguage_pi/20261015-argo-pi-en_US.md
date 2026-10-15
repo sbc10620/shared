@@ -123,7 +123,7 @@ en_GB, en_IN 은 영어권이므로 en_US 의 규칙을 대부분 그대로 공�
 
 - id 는 `{언어}_{대응하는 영어 규칙 id}` 로 짓는다(예: `ko_ignore_prior`). 대응하는 영어 규칙이 없으면 공격 형태를 영어 snake_case 로 쓴다.
 - `rules.yaml` 과 `parse_rules` 가 요구하는 키를 모두 채운다. 모든 규칙에 `action` 이 필요하고, `tool_output` 에서 동작하는 규칙에는 `label` 도 필요하며, 매핑 키와 `entity_type` 은 같아야 한다. `prompt_guard` 규칙은 패턴이 정확히 1개여야 한다.
-- layer·action 은 영어 대응 규칙을 따른다. 그 언어의 일상 문장에서 오탐이 측정되면 영어 규칙과 같은 방식으로 layer 를 `tool_output` 으로 좁히거나 action 을 `warn` 으로 낮춘다.
+- layer·action 은 영어 대응 규칙과 똑같이 둔다. 그 언어의 일상 문장에서 오탐이 측정되어도 우선 기록만 하고, layer 를 `tool_output` 으로 좁히거나 action 을 `warn` 으로 낮추는 조정은 운영 데이터를 본 뒤에 한다(2026-10-15 결정, ko_KR 5절).
 
 ## 1. 규칙의 출처
 

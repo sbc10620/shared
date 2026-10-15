@@ -42,7 +42,7 @@
 |---|---|---|---|---|---|
 | `ignore_prior` | 영어 구문 | {번역 제안 / 같음} | `{lang}_ignore_prior` | prompt_guard, tool_output · block · override | 조건부 |
 | `ignore_previous_instructions` | 영어 구문 | {`{lang}_ignore_prior` 에 통합 등} | — | — | 기존 · 유지 |
-| `act_as_override` | 영어 구문 | | | tool_output · block · override (ko_KR 5절 결정) | |
+| `act_as_override` | 영어 구문 | | | prompt_guard, tool_output · block · override | |
 | `reveal_secrets` | 영어 구문 | | | prompt_guard, tool_output · block · override | |
 | `reveal_system_prompt` | 영어 구문 | | | prompt_guard, tool_output · block · override | |
 | `role_override` | 영어 구문 | | | prompt_guard, tool_output · block · override | |
@@ -78,7 +78,7 @@
 | 집합 | 패턴 수 | total |
 |---|---|---|
 | en 사용자 입력 규칙 (기준) | 7 | 114 KB |
-| en + {lang} 사용자 입력 규칙 (`{lang}_act_as_override` 는 tool_output 전용이라 제외) | | |
+| en + {lang} 사용자 입력 규칙 | | |
 | en 전체 regex 규칙 (기준) | 12 | 343 KB |
 | en + {lang} 전체 regex 규칙 | | |
 
@@ -86,7 +86,7 @@
 
 ko_KR 5절의 결정(2026-10-15)을 따른다. 이 locale 에서 새로 생긴 결정만 아래 표에 적는다. 없으면 "ko_KR 5절과 같음"이라고 쓴다.
 
-- `act_as_override` 의 번역 규칙은 tool_output 전용 block 이다.
+- 모든 번역 규칙의 layer 와 action 은 대응하는 en_US 규칙과 똑같이 둔다. 오탐이 확인되어도 지금은 감수하고 기록만 하며, 조정은 운영 데이터를 본 뒤에 한다.
 - `comment_directive` 의 번역 구문은 별도 규칙으로 두고, 창은 `[^>*]{0,800}` 이다(주석 끝에서 멈춤).
 - lookbehind 가 있어야 거를 수 있는 오탐(소유격이 앞에 오는 자기 요청 취소 등)은 감수하고, 케이스 파일과 문서에 오탐으로 기록한다.
 
@@ -107,6 +107,6 @@ ko_KR 5절의 결정(2026-10-15)을 따른다. 이 locale 에서 새로 생긴 �
 - [ ] 악센트·성조 문자가 있는 언어는 NFC/NFD 두 형태의 차이를 1절에 적었다 (엔진은 정규화하지 않는다)
 - [ ] 공백을 `\s` 대신 `␣` 형태로 썼다. 띄어쓰기가 일정하지 않은 언어는 `␣*` 를 썼다
 - [ ] `prompt_guard` 에 둘 규칙은 패턴이 정확히 1개이다. `tool_output` 에서 동작하는 규칙에는 label 을 적었다
-- [ ] 일상 문장에서 오탐이 나온 규칙은 layer 를 좁히거나 action 을 낮출지 5절에 결정 항목으로 올렸다
+- [ ] 모든 번역 규칙의 layer·action 을 대응하는 en_US 규칙과 같게 두었다. 일상 문장에서 나온 오탐은 조정하지 않고 기록만 했다
 - [ ] `rxprobe mem` 으로 4절 표를 채웠다
 - [ ] 서브에이전트 리뷰를 받고 반영했다
