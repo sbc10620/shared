@@ -13,7 +13,7 @@
 
 ## 0. 문서 작성 기준
 
-이 절은 locale 과 무관한 공통 내용이다. 다른 locale 문서에도 그대로 복사해서 쓴다.
+이 절은 locale 과 무관한 공통 내용이다. 다른 locale 문서는 이 절을 복사하지 않고 참조한다.
 
 각 규칙은 다음 네 가지 기준으로 평가한다.
 
@@ -490,7 +490,7 @@ regex 패턴에서 원본과 다른 것은 엔진 방언에 맞춘 두 가지뿐
 
 | 순서 | 작업 | 산출물 |
 |---|---|---|
-| 1 | 이 문서를 바탕으로 locale 문서 템플릿을 만든다. 0절은 이 문서의 0절을 그대로 쓴다 | `docs/multilanguage_pi/_template-argo-pi-locale.md` |
+| 1 | 이 문서를 바탕으로 locale 문서 템플릿을 만든다. 템플릿은 이 문서의 0절을 참조하고, 13개 규칙만 표로 다룬다 | `docs/multilanguage_pi/_template-argo-pi-locale.md` |
 | 2 | 언어 무관 규칙 3개(`invisible_payload`, `imperative_pipe_to_shell`, `base64_decoded_to_shell`)와 혼합 규칙의 언어 무관 부분(경로 목록, 주석 시작 기호)을 공통 문서로 옮길지 결정한다 | `docs/multilanguage_pi/YYYYMMDD-argo-pi-common.md` (결정 시) |
 | 3 | 나머지 12개 locale 문서를 작성한다. 각 문서는 "영어 구문"과 "혼합" 규칙을 그 언어로 옮긴 공격 문장, 일상 문장 반례, 5.1절 제약의 적용 결과를 기록한다 | `docs/multilanguage_pi/YYYYMMDD-argo-pi-{LOCALE}.md` |
 | 4 | 5.1절의 규칙 수 경계와 locale 선택 장치를 결정한다. locale 규칙을 core 에 둘지, Product layer(ARGO `config.toml` 의 호스트 규칙 키 등)로 옮길지 정한다 | 설계 결정 |
