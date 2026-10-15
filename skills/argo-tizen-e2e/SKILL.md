@@ -22,6 +22,9 @@ Python 3.8+ scripts. Paths below are relative to this skill's directory
 
 - `scripts/build_argot.sh` — builds `argot` from an argo-tizen checkout
   (debug by default, `release` optional) and copies it out with the commit.
+  It builds with `argot-host-tv/test-util`: since argo-tizen #1644 a chat
+  needs a signed-in TV account and profile, and only that feature lets the
+  daemon read them from a fixture file.
 - `scripts/mock_llm.py` — OpenAI-compatible mock (SSE and JSON). Directives
   in the newest user message: `TOOL <name> <json>` (a tool call, then
   `FINAL: …`), `RESUME-PLAY <key>` (a `bash_run` call, then the reply is
@@ -81,6 +84,8 @@ Python 3.8+ scripts. Paths below are relative to this skill's directory
 
 - Each suite gets its own temporary `HOME` and `ARGOT_DATA_ROOT` — never the
   operator's `~/.argot`.
+- Each suite gets a test account identity: an `identity.json` (one account,
+  one profile) named by `ARGOT_ACCOUNT_IDENTITY_FIXTURE`, as argot-e2e does.
 - The driver picks a free port for the mock and gives the daemon its own
   Unix socket under `/tmp` (`ARGOT_BIND=uds:<path>`; the daemon serves only
   on a Unix socket since argo-tizen `df843f51`), so an operator's own daemon

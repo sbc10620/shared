@@ -85,9 +85,17 @@ class Suite:
         # the socket path short: macOS caps sun_path at 104 bytes and the
         # per-suite temp dir under /var/folders is already long.
         self.sock_dir = tempfile.mkdtemp(prefix="ae2e-", dir="/tmp")
+        # Since argo-tizen #1644 a chat needs a signed-in TV account and
+        # profile. A build with `argot-host-tv/test-util` reads them from the
+        # file ARGOT_ACCOUNT_IDENTITY_FIXTURE names, as argot-e2e does.
+        identity = os.path.join(self.work, "identity.json")
+        with open(identity, "w") as f:
+            json.dump({"account": "e2e-account", "active_profile": "e2e-default",
+                       "profiles": [{"account": "e2e-account", "profile": "e2e-default"}]}, f)
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(STRIP)}
         self.env.update(HOME=os.path.join(self.work, "home"), ARGOT_DATA_ROOT=self.root,
                         ARGOT_BIND=f"uds:{os.path.join(self.sock_dir, 'argot.sock')}",
+                        ARGOT_ACCOUNT_IDENTITY_FIXTURE=identity,
                         TZ="UTC", RUST_LOG="info")
         self.mock = self.daemon = None
         self.results = []

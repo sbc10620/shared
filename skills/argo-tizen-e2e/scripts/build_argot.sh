@@ -16,10 +16,10 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 cd "$repo"
 if [ "$profile" = "release" ]; then
-    cargo build --locked -p argot --release
+    cargo build --locked -p argot --features argot-host-tv/test-util --release
     src="target/release/argot"
 else
-    cargo build --locked -p argot
+    cargo build --locked -p argot --features argot-host-tv/test-util
     src="target/debug/argot"
 fi
 mkdir -p "$out"
