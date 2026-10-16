@@ -199,5 +199,5 @@ common 을 제외한 모든 locale 문서(en_US 포함)는 같은 절 구성을 
 
 | 작업 | 상태 |
 |---|---|
-| 나머지 locale 문서 작성 (en_GB, en_IN, pl_PL, pt_BR, th_TH, vi_VN) | 진행 중. ko_KR, de_DE, fr_FR, es_ES, es_MX, it_IT 완료. 한 나라씩 진행 |
+| 나머지 locale 문서 작성 (en_GB, en_IN, pl_PL, th_TH, vi_VN) | 진행 중. ko_KR, de_DE, fr_FR, es_ES, es_MX, it_IT, pt_BR 완료. 한 나라씩 진행 |
 | 규칙 수 경계와 locale 선택 장치의 설계. 번역 규칙을 core 에 둘지, Product layer(ARGO `config.toml` 의 호스트 규칙 키 등)로 옮길지 | 미결정 |
