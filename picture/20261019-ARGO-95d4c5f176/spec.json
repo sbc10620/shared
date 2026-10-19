@@ -1,0 +1,448 @@
+{
+ "title": "kr_bank_account 경계 검사에 - 추가 (설정만 변경)",
+ "repo": "/Users/byungchulso/Works/ARGO-guardrails-pin",
+ "before": "95d4c5f176~1",
+ "after": "95d4c5f176",
+ "range": "ARGO · 95d4c5f176~1..95d4c5f176 · argo (argo-cli) main()",
+ "not_drawn": {},
+ "figures": [
+  {
+   "title": "그림 1 · 사용자 입력이 경계 검사에 닿는 길",
+   "caption": "이 커밋은 코드가 아니라 YAML 설정만 바꿈: pii_filter_config.yaml 의 kr_bank_account 에서 boundary_check_reject_before/after 가 _ 에서 _- 로. 그래서 상자는 모두 기존. 이 값은 PatternMeta 필드에 담겨 passes_boundary_check 로 넘어감. 이제 매치 바로 앞이나 뒤가 - 이면 계좌번호로 보지 않음 (UUID 가운데 1234-4123-8123 이 더는 입력 가드레일을 막지 않음).",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "명령 처리 진입",
+       "to": "cli_run"
+      }
+     ]
+    },
+    {
+     "id": "cli_run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 번 실행 모드로 턴 하나 처리",
+       "to": "run_single_turn"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "run_single_turn",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        tinicore::agent::guardrails::run_input_guardrails_with_text(user_input, None).await",
+       "note": "저장 전에 사용자 입력을 입력 가드레일로 검사",
+       "to": "with_text"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "with_text",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::run_input_guardrails_with_text()",
+     "file": "tinicore/src/agent/guardrails.rs:358",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    tinicore_traits::run_input_guardrails(&guardrail_set.input, &gi)",
+       "note": "등록된 입력 가드레일 목록 실행",
+       "to": "run_input_guardrails"
+      },
+      {
+       "code": "        .await"
+      },
+      {
+       "code": "        .map(|_| ())"
+      }
+     ]
+    },
+    {
+     "id": "run_input_guardrails",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicore_traits::run_input_guardrails()",
+     "file": "tinicore-traits/src/guardrail.rs:1031",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let res = g.check(input).await;",
+       "note": "가드레일마다 check (여기선 pii.input)",
+       "to": "check"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "check",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::check()",
+     "file": "tinicore/src/sensitive/guardrail.rs:274",
+     "lines": [
+      {
+       "code": "        self.evaluate(input.text).await",
+       "note": "입력 문자열 판정",
+       "to": "evaluate"
+      }
+     ]
+    },
+    {
+     "id": "evaluate",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::evaluate()",
+     "file": "tinicore/src/sensitive/guardrail.rs:138",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let outcome = self.chain.detect_any_of(text, &self.block).await;",
+       "note": "막을 종류가 있는지 검출기 체인에 물음",
+       "to": "detect_any_of"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "detect_any_of",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::detect_any_of()",
+     "file": "tinicore/src/sensitive/chain.rs:264",
+     "lines": [
+      {
+       "code": "        self.scan_until_hit(text, Some(wanted)).await",
+       "note": "막을 종류만 골라 검사",
+       "to": "scan_until_hit"
+      }
+     ]
+    },
+    {
+     "id": "scan_until_hit",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::scan_until_hit()",
+     "file": "tinicore/src/sensitive/chain.rs:270",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            match m.detect(text).await {",
+       "note": "검출기를 하나씩 실행 (PII 검출기)",
+       "to": "detect"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "detect",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::detect()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:550",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        match tokio::task::spawn_blocking(move || filter.analyze(&text)).await {",
+       "note": "별도 스레드에서 PII 패턴 검사",
+       "to": "analyze"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "analyze",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:156",
+     "lines": [
+      {
+       "code": "        self.analyze_with(text, PatternEngine::scan)",
+       "note": "PatternEngine::scan 으로 검사",
+       "to": "analyze_with"
+      }
+     ]
+    },
+    {
+     "id": "analyze_with",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_with()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:175",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);",
+       "note": "이번 턴의 엔진으로 문자열 검사",
+       "to": "scan"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "scan",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:376",
+     "lines": [
+      {
+       "code": "        self.scan_inner(text, true)",
+       "note": "중첩 매치를 버리는 모드로 검사",
+       "to": "scan_inner"
+      }
+     ]
+    },
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:392",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let collapsed = self.validate_and_collapse(resolved, text);",
+       "note": "경계 검사와 값 검증 단계",
+       "to": "validate_and_collapse"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "validate_and_collapse",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::validate_and_collapse()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "                && !passes_boundary_check(",
+       "note": "매치 앞뒤 문자 검사, 실패면 매치를 버림",
+       "to": "passes_boundary_check"
+      },
+      {
+       "code": "                    text,"
+      },
+      {
+       "code": "                    start,"
+      },
+      {
+       "code": "                    end,"
+      },
+      {
+       "code": "                    &meta.boundary_check_reject_before,",
+       "to": "PatternMeta",
+       "edge": "use"
+      },
+      {
+       "code": "                    &meta.boundary_check_reject_after,"
+      },
+      {
+       "code": "                )"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "passes_boundary_check",
+     "kind": "fn",
+     "status": "same",
+     "name": "passes_boundary_check()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:1194",
+     "desc": "앞뒤 바이트가 영숫자이거나 거부 목록에 있으면 false",
+     "lines": [
+      {
+       "code": "    let bytes = text.as_bytes();"
+      },
+      {
+       "code": "    let before_ok = start == 0 || {"
+      },
+      {
+       "code": "        let b = bytes[start - 1];"
+      },
+      {
+       "code": "        !b.is_ascii_alphanumeric()"
+      },
+      {
+       "code": "            && !reject_before"
+      },
+      {
+       "code": "                .as_ref()"
+      },
+      {
+       "code": "                .is_some_and(|r| r.as_bytes().contains(&b))"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let after_ok = end >= text.len() || {"
+      },
+      {
+       "code": "        let b = bytes[end];"
+      },
+      {
+       "code": "        !b.is_ascii_alphanumeric()"
+      },
+      {
+       "code": "            && !reject_after"
+      },
+      {
+       "code": "                .as_ref()"
+      },
+      {
+       "code": "                .is_some_and(|r| r.as_bytes().contains(&b))"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    before_ok && after_ok"
+      }
+     ]
+    },
+    {
+     "id": "PatternMeta",
+     "kind": "struct",
+     "status": "same",
+     "name": "PatternMeta",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:76",
+     "lines": [
+      {
+       "code": "pub struct PatternMeta {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub boundary_check_reject_before: Option<String>,",
+       "note": "kr_bank_account: _ 에서 _- 로 (이번 커밋)"
+      },
+      {
+       "code": "    pub boundary_check_reject_after: Option<String>,",
+       "note": "kr_bank_account: _ 에서 _- 로 (이번 커밋)"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "95d4c5f176",
+   "fix(guardrails): do not report a bank account joined to an identifier by a hyphen"
+  ]
+ ]
+}
