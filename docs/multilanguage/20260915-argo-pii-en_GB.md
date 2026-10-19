@@ -80,6 +80,26 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | Fraud Act 2006 | 검찰 (CPS) | 신원 사기 처벌 (감독기관 없음) |
 | Companies Act 2006; Value Added Tax Act 1994 | Companies House, HMRC | 회사 번호·VAT 번호는 공개 사업자 번호 |
 
+## 구현 반영 (ARGO `7a82a5e5b7`, 2026-10-19)
+
+다국어 브랜치에서 아래와 같이 구현했다. 이 문서의 권장과 다르게 정한 것은 굵게 표시한다. 열 개 모두 손으로 쓴 FixedShape 형식이라 regex 패턴은 늘지 않는다.
+
+| recognizer | label | score | 검증기 | 비고 |
+|---|---|---|---|---|
+| `gb_national_insurance_number` | national_id | 0.5 | `gb_nino` | 미배정 접두 7종 배제 |
+| `gb_nhs_number` | national_id | **0.3** | `gb_nhs` | 10자리 숫자열의 1/11 이 검증기를 통과해 주문번호 등과 겹침. 문맥 단어에서 `hospital`, `gp`, `patient` 제외(아무 숫자 옆에나 나오는 말) |
+| `gb_utr` | national_id | **0.3** | `gb_utr` | 10자리 숫자열의 1/10 통과 |
+| `gb_driver_license` | driver_license | 0.5 | `gb_dvla` | 월·일 범위는 검출기, 그 달에 있는 날인지는 검증기 |
+| `gb_passport` | passport | 0.3 | `mrz_731` | |
+| `gb_bank_account` | bank_account | 0.5 | `gb_iban` | IBAN 은 공통 항목이 아니라 나라별 파일에 둠 |
+| `gb_bank_account_weak` | bank_account | 0.3 | 없음 | sort code + 계좌번호 |
+| `gb_phonenumber` | phone | 0.5 | 없음 | 휴대전화(구분자 없는 11자리 포함)와 **`+44` 유선** |
+| `gb_phonenumber_weak` | phone | 0.3 | 없음 | 국내 `01`/`02` 유선(이 문서의 `gb_phonenumber_landline`) |
+| `gb_vehicle_plate` | vehicle_plate | **0.3** | 없음 | 공백 없는 `AB12CDE` 는 제품 코드와 겹침(KR·ES·MX 번호판도 0.3). 문맥 단어에 `registration plate` 추가, `registration` 단독은 제외 |
+
+- 우편번호(`gb_postcode`)와 VAT 는 구현하지 않았다.
+- Latin 문맥 단어는 이제 단어 경계로 비교하므로, 3글자 이하 단어(`nhs`, `utr`, `tel`)도 넣었다.
+
 ## 2. 요약 표
 
 | pii_type | 설명 | 결정론적 검출 | 권장 검출 방식 | 검증기 (현재 / 구현 가능) | score | 기존 구현 | 채택 |
@@ -165,7 +185,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 
     | regex | 매칭 예시 | 비고 (score 사용 필요 등) |
     |---|---|---|
-    | `[0-9]{5} ?[0-9]{5}` | `11234 56789`, `1123456789` | score 사용 고려. 구분자 없는 10자리는 NHS 번호·전화번호와 겹치므로 `gb_utr` 검증기(1/11) 병행이 사실상 필수. 검증기 없이 등록한다면 score 사용 필요. NHS 번호와 같은 값이 두 검증기를 모두 통과할 확률은 약 1/121 이다. `boundary_check: true` 적용 |
+    | `[0-9]{5} ?[0-9]{5}` | `11234 56789`, `1123456789` | score 사용 고려. 구분자 없는 10자리는 NHS 번호·전화번호와 겹치므로 `gb_utr` 검증기(1/10. 체크 표 `21987654321` 에 0 이 없어 나머지 9자리가 맞는 첫 자리 하나를 정하고, 첫 자리는 10가지 중 하나이므로 정확히 1/10) 병행이 사실상 필수. 검증기 없이 등록한다면 score 사용 필요. NHS 번호와 같은 값이 두 검증기를 모두 통과할 확률은 약 1/110 이다. `boundary_check: true` 적용 |
 
     오탐: 검증기 없이는 높고, 검증기를 붙이면 중간이다.
   - **byte-scan handwritten**: 가능. 오탐률은 regex + `gb_utr` 조합과 **동일**하다.
