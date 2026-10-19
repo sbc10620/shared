@@ -81,6 +81,24 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | Kodeks karny 제190a조 제2항, 제267조 | (감독기관 없음. 검찰이 소추) | 신원 도용(타인 개인정보 사칭), 정보 무단 취득 처벌 |
 | Ustawa o statystyce publicznej (REGON); Ustawa o Krajowym Rejestrze Sądowym (KRS) | GUS, 법무부 | REGON·KRS 는 공개 사업자 번호 |
 
+## 구현 반영 (ARGO `2e63f66f88`, 2026-10-19)
+
+다국어 브랜치에서 아래와 같이 구현했다. 이 문서의 권장과 다르게 정한 것은 굵게 표시한다. 일곱 개 모두 손으로 쓴 FixedShape 형식이라 regex 패턴은 늘지 않는다.
+
+| recognizer | label | score | 검증기 | 비고 |
+|---|---|---|---|---|
+| `pl_pesel` | national_id | 0.5 | `pl_pesel` | 월·일 범위는 검출기, 체크 디지트와 실제 날짜(세기를 반영한 윤년)는 검증기 |
+| `pl_id_card` | national_id | **0.3** | `pl_id_card` | 가중치 7 3 1 9 7 3 1 7 3, 합이 10의 배수(정부 견본 `ABA300000` 통과). 같은 형식의 제품 코드 10개 중 1개가 통과하고 ES 여권과 형식이 같음 |
+| `pl_passport` | passport | 0.3 | `pl_passport` | 공백을 빼고 MRZ 7-3-1 검사(10자 표기만). 여권 자체 체크 디지트는 규칙을 확인하지 못해 검사하지 않음 |
+| `pl_bank_account` | bank_account | 0.5 | `pl_iban` | IBAN 과 26자리 NRB(앞에 `PL` 을 붙여 같은 mod 97 검사) |
+| `pl_phonenumber` | phone | 0.5 | `pl_phone` | **`+48` 번호(유선 포함)**와 구분자가 있는 국내 휴대전화(접두 45, 50, 51, 53, 57, 60, 66, 69, 72, 73, 78, 79, 88) |
+| `pl_phonenumber_weak` | phone | 0.3 | 없음 | 국내 유선(2-3-2-2)과 구분자 없는 9자리 |
+| `pl_vehicle_plate` | vehicle_plate | 0.3 | `pl_plate` | 통화·규격 접두(PLN, EUR, USD, GBP, CHF, ISO, NIP, VAT) 거부, 일련번호에 B, D, I, O, Q, Z 없음 |
+
+- 운전면허(`pl_driver_license`)와 NIP 는 구현하지 않았다.
+- 문맥 단어에는 실제로 쓰이는 격변화형(`dowodzie osobistym`, `paszporcie`, `numerze rejestracyjnym` 등)과 악센트 없는 형태를 함께 넣었고, `tel`, `nrb`, `telephone` 을 추가했다. `bank`, `konto` 단독, `kontakt`, `pojazd`, `samochód` 는 아무 숫자 옆에나 나오는 말이라 뺐다.
+- 모든 나라를 함께 로드하면 FixedShape 형식이 75개가 되어 바이트 마스크 표가 2장(텍스트를 두 번 훑음)이 된다. 측정값(Apple Silicon, 10KB): 모든 나라를 넣은 영어 평문 85 → 87 µs, 힙 407 → 416 KB. pl 만 넣으면 표 1장이고, 같은 형식을 regex 로 쓸 때보다 폴란드어 평문은 94 → 76 µs, 폴란드 PII 밀집 텍스트는 14.8 → 1.3 ms 로 빠르다.
+
 ## 2. 요약 표
 
 | pii_type | 설명 | 결정론적 검출 | 권장 검출 방식 | 검증기 (현재 / 구현 가능) | score | 기존 구현 | 채택 |
