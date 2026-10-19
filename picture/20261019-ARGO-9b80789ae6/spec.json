@@ -1,0 +1,1209 @@
+{
+ "title": "comment_directive 규칙을 손으로 쓴 탐지기로 전환",
+ "repo": "/Users/byungchulso/Works/ARGO-guardrails-pin",
+ "before": "9b80789ae6~1",
+ "after": "9b80789ae6",
+ "range": "ARGO · 9b80789ae6~1..9b80789ae6 · argo 바이너리 main() 부터 comment_directive 탐지기 코드 흐름",
+ "not_drawn": {},
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 때 comment_directive 탐지기 생성",
+   "caption": "main() 에서 가드레일 설치를 거쳐, 엔진 빌드가 확장 함수 build_handwritten_detectors 로 새 탐지기를 만든다.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "tokio 런타임 위에서 CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "설정을 읽고 부팅 절차 시작",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "가드레일 설치 (부팅 때 1회)",
+       "to": "install_gfc"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 턴 실행, 프롬프트 가드 검사 → 그림 2"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "install_gfc",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:190",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let injection =",
+       "note": "prompt injection 가드레일 빌드"
+      },
+      {
+       "code": "        super::prompt_injection::install::build(config.prompt_injection, &mut warnings)?;",
+       "to": "pi_build"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "pi_build",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::install::build()",
+     "file": "tinicore/src/guardrails/prompt_injection/install.rs:73",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        drop(engine.slot().acquire().map_err(config_error)?);",
+       "note": "엔진 고정 시 부팅 때 엔진을 미리 빌드",
+       "to": "acquire"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "acquire",
+     "kind": "fn",
+     "status": "same",
+     "name": "TurnSlot::acquire()",
+     "file": "tinicore/src/sensitive/turn_scope.rs:274",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let value = Arc::new((self.build)()?);",
+       "note": "슬롯에 등록된 build_engine 실행",
+       "to": "build_engine",
+       "callee": "build"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "build_engine",
+     "kind": "fn",
+     "status": "same",
+     "name": "shared::build_engine()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:91",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    PatternEngine::from_config(&config, None, &extensions())",
+       "note": "규칙 파일로 엔진 생성 (확장 함수 포함)",
+       "to": "from_config"
+      }
+     ]
+    },
+    {
+     "id": "from_config",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::from_config()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:311",
+     "lines": [
+      {
+       "code": "        Self::from_config_with_chunk_size(config, layer, DEFAULT_CHUNK_SIZE, ext)",
+       "note": "기본 chunk 크기로 빌드",
+       "to": "fcwcs"
+      }
+     ]
+    },
+    {
+     "id": "fcwcs",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::from_config_with_chunk_size()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:334",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let (pattern_strs, pattern_meta, handwritten_detectors) =",
+       "note": "regex 패턴과 손으로 쓴 탐지기 모으기"
+      },
+      {
+       "code": "            collect_patterns_and_detectors(config, layer, ext);",
+       "to": "collect"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "collect",
+     "kind": "fn",
+     "status": "same",
+     "name": "collect_patterns_and_detectors()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:757",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        Some(build) => build(&deferred_handwritten, start_pid),",
+       "note": "ext.handwritten 함수 포인터 호출",
+       "to": "bhd",
+       "callee": "build"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "bhd",
+     "kind": "fn",
+     "status": "changed",
+     "name": "handwritten::build_handwritten_detectors()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/mod.rs:30",
+     "lines": [
+      {
+       "code": "    let mut detectors: Vec<Box<dyn MatchEngine>> = Vec::new();"
+      },
+      {
+       "code": "    let mut handled = Vec::new();"
+      },
+      {
+       "code": "    let mut pid = start_pid;"
+      },
+      {
+       "code": "    for cfg in configs {"
+      },
+      {
+       "code": "        let detector: Box<dyn MatchEngine> = if cfg.entity_type == BASE64_RULE_ID {",
+       "mark": "+"
+      },
+      {
+       "code": "            Box::new(Base64ShellDetector::new(pid))",
+       "mark": "+"
+      },
+      {
+       "code": "        } else if cfg.entity_type == COMMENT_DIRECTIVE_RULE_ID {",
+       "mark": "+",
+       "note": "comment_directive 규칙인지 id 로 비교",
+       "to": "RULE_ID",
+       "edge": "use"
+      },
+      {
+       "code": "            Box::new(CommentDirectiveDetector::new(pid))",
+       "mark": "+",
+       "note": "새 탐지기를 pid 와 함께 생성",
+       "to": "cd_new"
+      },
+      {
+       "code": "        } else {"
+      },
+      {
+       "code": "            tracing::warn!("
+      },
+      {
+       "code": "                entity_type = %cfg.entity_type,"
+      },
+      {
+       "code": "                \"no hand-written prompt-injection detector — skipping recognizer\""
+      },
+      {
+       "code": "            );"
+      },
+      {
+       "code": "            continue;",
+       "mark": "+",
+       "note": "모르는 규칙은 경고 후 건너뜀"
+      },
+      {
+       "code": "        };"
+      },
+      {
+       "code": "        detectors.push(detector);",
+       "mark": "+"
+      },
+      {
+       "code": "        handled.push(*cfg);"
+      },
+      {
+       "code": "        pid += 1;"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    (detectors, handled)"
+      }
+     ]
+    },
+    {
+     "id": "RULE_ID",
+     "kind": "static",
+     "status": "new",
+     "name": "comment_directive_detector::RULE_ID",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:46",
+     "lines": [
+      {
+       "code": "pub(crate) const RULE_ID: &str = \"comment_directive\";",
+       "mark": "+",
+       "note": "YAML 항목의 entity_type"
+      }
+     ]
+    },
+    {
+     "id": "cd_new",
+     "kind": "fn",
+     "status": "new",
+     "name": "CommentDirectiveDetector::new()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:210",
+     "lines": [
+      {
+       "code": "        Self { pid }",
+       "mark": "+",
+       "to": "CDD",
+       "edge": "use"
+      }
+     ]
+    },
+    {
+     "id": "CDD",
+     "kind": "struct",
+     "status": "new",
+     "name": "CommentDirectiveDetector",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:204",
+     "lines": [
+      {
+       "code": "pub(crate) struct CommentDirectiveDetector {",
+       "mark": "+"
+      },
+      {
+       "code": "    pid: usize,",
+       "mark": "+",
+       "note": "보고할 때 쓰는 패턴 번호"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · 턴마다 공유 엔진이 새 탐지기를 실행",
+   "caption": "프롬프트 가드 검사가 공유 prompt injection 엔진을 돌리고, 엔진은 dyn MatchEngine 로 새 탐지기의 scan_raw 를 부른다.",
+   "nodes": [
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 턴 실행 (그림 1 의 run 에서 이어짐)",
+       "to": "rst"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "rst",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let user_input: &str = match crate::guardrails::prompt_guard::gate(ctx, user_input).await {",
+       "note": "사용자 입력을 프롬프트 가드에 통과",
+       "to": "gate"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "gate",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::prompt_guard::gate()",
+     "file": "tinicli/src/guardrails/prompt_guard.rs:225",
+     "lines": [
+      {
+       "code": "    match prompt_guard::admit(ctx, user_input).await {",
+       "note": "입력 검사 요청",
+       "to": "admit"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "admit",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::admit()",
+     "file": "tinicore/src/agent/prompt_guard.rs:451",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    Ok(match evaluate_off_thread(guard, text.to_owned()).await? {",
+       "note": "블로킹 스레드에서 규칙 검사",
+       "to": "eot"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "eot",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::evaluate_off_thread()",
+     "file": "tinicore/src/agent/prompt_guard.rs:770",
+     "lines": [
+      {
+       "code": "    tokio::task::spawn_blocking(move || evaluate(&guard, &text))",
+       "note": "spawn_blocking 안에서 evaluate 실행",
+       "to": "evaluate"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "evaluate",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::evaluate()",
+     "file": "tinicore/src/agent/prompt_guard.rs:686",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let mut spans = match spans_by_rule(guard, filter, text) {",
+       "note": "규칙별 매치 위치 구하기",
+       "to": "sbr"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "sbr",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::spans_by_rule()",
+     "file": "tinicore/src/agent/prompt_guard.rs:630",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    for m in filter.analyze_keep_nested(text)? {",
+       "note": "공유 엔진으로 텍스트 검사",
+       "to": "akn"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "akn",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_keep_nested()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:169",
+     "lines": [
+      {
+       "code": "        self.analyze_with(text, PatternEngine::scan_keep_nested)",
+       "note": "중첩 매치를 남기는 scan 으로 실행",
+       "to": "aw"
+      }
+     ]
+    },
+    {
+     "id": "aw",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_with()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:175",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let engine = self.engine.acquire()?;",
+       "note": "그림 1 에서 본 acquire: 없으면 빌드"
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);",
+       "note": "함수 포인터 scan_keep_nested 호출",
+       "to": "skn",
+       "callee": "scan"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "skn",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_keep_nested()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:388",
+     "lines": [
+      {
+       "code": "        self.scan_inner(text, false)",
+       "note": "공통 스캔 본체",
+       "to": "scan_inner"
+      }
+     ]
+    },
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:392",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let resolved = self.collect_raw_matches(text);",
+       "note": "모든 엔진의 raw 매치 모으기",
+       "to": "crm"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "crm",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::collect_raw_matches()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:414",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            resolved.extend(engine.scan_raw(text));",
+       "note": "dyn MatchEngine 마다 scan_raw 호출",
+       "to": "scan_raw"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "scan_raw",
+     "kind": "fn",
+     "status": "new",
+     "name": "CommentDirectiveDetector::scan_raw()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:216",
+     "lines": [
+      {
+       "code": "        raw_matches(text)",
+       "mark": "+",
+       "note": "raw 매치 계산 → 그림 3"
+      },
+      {
+       "code": "            .into_iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .map(|(start, end)| (self.pid, start, end))",
+       "mark": "+"
+      },
+      {
+       "code": "            .collect()",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 3 · 손으로 쓴 comment_directive 탐지",
+   "caption": "opener 와 trigger 를 한 번씩 훑어 모은 뒤, 창 크기를 바이트가 아닌 글자 800 개로 재며 앞으로만 걷는다.",
+   "nodes": [
+    {
+     "id": "scan_raw",
+     "kind": "fn",
+     "status": "new",
+     "name": "CommentDirectiveDetector::scan_raw()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:216",
+     "lines": [
+      {
+       "code": "        raw_matches(text)",
+       "mark": "+",
+       "note": "opener 부터 trigger 끝까지의 매치 목록",
+       "to": "raw_matches"
+      },
+      {
+       "code": "            .into_iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .map(|(start, end)| (self.pid, start, end))",
+       "mark": "+"
+      },
+      {
+       "code": "            .collect()",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "raw_matches",
+     "kind": "fn",
+     "status": "new",
+     "name": "raw_matches()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:153",
+     "lines": [
+      {
+       "code": "    let bytes = text.as_bytes();",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut openers = Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut triggers = Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    for pos in 0..bytes.len() {",
+       "mark": "+"
+      },
+      {
+       "code": "        if let Some(end) = opener_at(bytes, pos) {",
+       "mark": "+",
+       "note": "<!--, /*, # maintainer-note 인지",
+       "to": "opener_at"
+      },
+      {
+       "code": "            openers.push((pos, end));",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        if let Some(end) = trigger_at(bytes, pos) {",
+       "mark": "+",
+       "note": "also run, please include, ~/.ssh/ 인지",
+       "to": "trigger_at"
+      },
+      {
+       "code": "            triggers.push((pos, end));",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    if openers.is_empty() {",
+       "mark": "+",
+       "note": "opener 가 없으면 매치 없음"
+      },
+      {
+       "code": "        return Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let mut opener_ends = CharCursor {",
+       "mark": "+",
+       "note": "글자 수를 세는 커서",
+       "to": "CharCursor",
+       "edge": "use"
+      },
+      {
+       "code": "        bytes,",
+       "mark": "+"
+      },
+      {
+       "code": "        byte: 0,",
+       "mark": "+"
+      },
+      {
+       "code": "        chars: 0,",
+       "mark": "+"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let mut trigger_starts = CharCursor {",
+       "mark": "+"
+      },
+      {
+       "code": "        bytes,",
+       "mark": "+"
+      },
+      {
+       "code": "        byte: 0,",
+       "mark": "+"
+      },
+      {
+       "code": "        chars: 0,",
+       "mark": "+"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let mut first = 0;",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut first_end_chars = opener_ends.chars_at(openers[0].1);",
+       "mark": "+",
+       "note": "첫 opener 끝의 글자 위치",
+       "to": "chars_at"
+      },
+      {
+       "code": "    let mut out = Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    for (start, end) in triggers {",
+       "mark": "+"
+      },
+      {
+       "code": "        let start_chars = trigger_starts.chars_at(start);",
+       "mark": "+",
+       "note": "trigger 시작의 글자 위치",
+       "to": "chars_at"
+      },
+      {
+       "code": "        while start_chars.saturating_sub(first_end_chars) > WINDOW {",
+       "mark": "+",
+       "note": "800 글자보다 먼 opener 는 버림",
+       "to": "WINDOW",
+       "edge": "use"
+      },
+      {
+       "code": "            first += 1;",
+       "mark": "+"
+      },
+      {
+       "code": "            let Some(&(_, opener_end)) = openers.get(first) else {",
+       "mark": "+"
+      },
+      {
+       "code": "                return out;",
+       "mark": "+",
+       "note": "남은 opener 가 없으면 끝"
+      },
+      {
+       "code": "            };"
+      },
+      {
+       "code": "            first_end_chars = opener_ends.chars_at(opener_end);",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        let (opener_start, opener_end) = openers[first];",
+       "mark": "+"
+      },
+      {
+       "code": "        if opener_end <= start {",
+       "mark": "+",
+       "note": "opener 가 trigger 앞에서 끝날 때만"
+      },
+      {
+       "code": "            out.push((opener_start, end));",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    out"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "opener_at",
+     "kind": "fn",
+     "status": "new",
+     "name": "opener_at()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:90",
+     "lines": [
+      {
+       "code": "    match bytes.get(pos)? {",
+       "mark": "+"
+      },
+      {
+       "code": "        b'<' => word_at(bytes, pos, \"<!--\"),",
+       "mark": "+",
+       "note": "<!-- 비교",
+       "to": "word_at"
+      },
+      {
+       "code": "        b'/' => word_at(bytes, pos, \"/*\"),",
+       "mark": "+"
+      },
+      {
+       "code": "        b'#' => {",
+       "mark": "+"
+      },
+      {
+       "code": "            let end = word_at(bytes, skip_whitespace(bytes, pos + 1), \"maintainer-note\")?;",
+       "mark": "+",
+       "note": "공백 건너뛰고 maintainer-note 비교",
+       "to": [
+        "skip_whitespace",
+        "word_at"
+       ]
+      },
+      {
+       "code": "            (!bytes.get(end).copied().is_some_and(is_word_byte)).then_some(end)",
+       "mark": "+",
+       "note": "뒤가 단어 글자면 opener 아님",
+       "to": "is_word_byte"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        _ => None,",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "trigger_at",
+     "kind": "fn",
+     "status": "new",
+     "name": "trigger_at()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:105",
+     "lines": [
+      {
+       "code": "    let after_whitespace = |end: usize| {",
+       "mark": "+"
+      },
+      {
+       "code": "        let verb = skip_whitespace(bytes, end);",
+       "mark": "+",
+       "note": "공백을 하나 이상 건너뛰기",
+       "to": "skip_whitespace"
+      },
+      {
+       "code": "        (verb > end).then_some(verb)",
+       "mark": "+"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    match bytes.get(pos)?.to_ascii_lowercase() {",
+       "mark": "+"
+      },
+      {
+       "code": "        b'a' => {",
+       "mark": "+"
+      },
+      {
+       "code": "            let verb = after_whitespace(word_at(bytes, pos, \"also\")?)?;",
+       "mark": "+",
+       "note": "also 다음 공백",
+       "to": "word_at"
+      },
+      {
+       "code": "            any_word_at(",
+       "mark": "+",
+       "note": "동사 run·dump·cat·read·show·exfil",
+       "to": "any_word_at"
+      },
+      {
+       "code": "                bytes,",
+       "mark": "+"
+      },
+      {
+       "code": "                verb,",
+       "mark": "+"
+      },
+      {
+       "code": "                &[\"run\", \"dump\", \"cat\", \"read\", \"show\", \"exfil\"],",
+       "mark": "+"
+      },
+      {
+       "code": "            )"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        b'p' => {",
+       "mark": "+"
+      },
+      {
+       "code": "            let verb = after_whitespace(word_at(bytes, pos, \"please\")?)?;",
+       "mark": "+",
+       "note": "please 다음 공백",
+       "to": "word_at"
+      },
+      {
+       "code": "            any_word_at(bytes, verb, &[\"include\", \"always\", \"verify\"])",
+       "mark": "+",
+       "note": "동사 include·always·verify",
+       "to": "any_word_at"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        b'~' => any_word_at(bytes, pos, &[\"~/.ssh/\", \"~/.aws/\"]),",
+       "mark": "+",
+       "note": "~/.ssh/ 또는 ~/.aws/",
+       "to": "any_word_at"
+      },
+      {
+       "code": "        _ => None,",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "CharCursor",
+     "kind": "struct",
+     "status": "new",
+     "name": "CharCursor",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:131",
+     "lines": [
+      {
+       "code": "struct CharCursor<'a> {",
+       "mark": "+"
+      },
+      {
+       "code": "    bytes: &'a [u8],",
+       "mark": "+"
+      },
+      {
+       "code": "    byte: usize,",
+       "mark": "+"
+      },
+      {
+       "code": "    chars: usize,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "chars_at",
+     "kind": "fn",
+     "status": "new",
+     "name": "CharCursor::chars_at()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:139",
+     "lines": [
+      {
+       "code": "        self.chars += self.bytes[self.byte..byte]",
+       "mark": "+",
+       "note": "continuation 바이트가 아닌 바이트만 셈"
+      },
+      {
+       "code": "            .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .filter(|&&b| b & 0xC0 != 0x80)",
+       "mark": "+"
+      },
+      {
+       "code": "            .count();",
+       "mark": "+"
+      },
+      {
+       "code": "        self.byte = byte;",
+       "mark": "+"
+      },
+      {
+       "code": "        self.chars",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "WINDOW",
+     "kind": "static",
+     "status": "new",
+     "name": "WINDOW",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:50",
+     "lines": [
+      {
+       "code": "const WINDOW: usize = 800;",
+       "mark": "+",
+       "note": "opener 끝과 trigger 시작 사이 최대 글자 수"
+      }
+     ]
+    },
+    {
+     "id": "word_at",
+     "kind": "fn",
+     "status": "new",
+     "name": "word_at()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:72",
+     "lines": [
+      {
+       "code": "    let end = pos.checked_add(word.len())?;",
+       "mark": "+"
+      },
+      {
+       "code": "    bytes",
+       "mark": "+"
+      },
+      {
+       "code": "        .get(pos..end)?",
+       "mark": "+"
+      },
+      {
+       "code": "        .eq_ignore_ascii_case(word.as_bytes())",
+       "mark": "+"
+      },
+      {
+       "code": "        .then_some(end)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "any_word_at",
+     "kind": "fn",
+     "status": "new",
+     "name": "any_word_at()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:81",
+     "lines": [
+      {
+       "code": "    words.iter().find_map(|word| word_at(bytes, pos, word))",
+       "mark": "+",
+       "note": "후보 단어를 차례로 비교",
+       "to": "word_at"
+      }
+     ]
+    },
+    {
+     "id": "skip_whitespace",
+     "kind": "fn",
+     "status": "new",
+     "name": "skip_whitespace()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:64",
+     "lines": [
+      {
+       "code": "    while let Some(len) = whitespace_at(bytes, pos) {",
+       "mark": "+",
+       "note": "공백 길이만큼 전진",
+       "to": "whitespace_at"
+      },
+      {
+       "code": "        pos += len;",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    pos"
+      }
+     ]
+    },
+    {
+     "id": "whitespace_at",
+     "kind": "fn",
+     "status": "new",
+     "name": "whitespace_at()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:54",
+     "lines": [
+      {
+       "code": "    match bytes.get(pos..)? {",
+       "mark": "+"
+      },
+      {
+       "code": "        [b' ' | b'\\t' | b'\\n' | b'\\x0B' | b'\\x0C' | b'\\r', ..] => Some(1),",
+       "mark": "+"
+      },
+      {
+       "code": "        [0xC2, 0xA0, ..] => Some(2),",
+       "mark": "+"
+      },
+      {
+       "code": "        [0xE3, 0x80, 0x80, ..] => Some(3),",
+       "mark": "+"
+      },
+      {
+       "code": "        _ => None,",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "is_word_byte",
+     "kind": "fn",
+     "status": "new",
+     "name": "is_word_byte()",
+     "file": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs:85",
+     "lines": [
+      {
+       "code": "    b.is_ascii_alphanumeric() || b == b'_'",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "9b80789ae6",
+   "perf(guardrails): comment_directive as a hand-written detector with an 800-character window"
+  ]
+ ]
+}

@@ -1,0 +1,1306 @@
+{
+ "title": "가드레일 프롬프트 인젝션 공유 엔진과 pin_engines",
+ "repo": "/Users/byungchulso/Works/ARGO-guardrails-pin",
+ "before": "077da95088",
+ "after": "5b3e7a0909",
+ "range": "ARGO · 077da95088..5b3e7a0909 · argo-cli main()",
+ "not_drawn": {
+  "reset_for_tests": "테스트 전용 (#[cfg(test)])",
+  "from_yaml": "테스트 전용 (#[cfg(test)])",
+  "engine_build_count": "테스트에서만 호출 (빌드 횟수 확인용)",
+  "validation_build_count": "테스트에서만 호출 (검증 빌드 횟수 확인용)",
+  "clash": "거부 오류 메시지만 만드는 함수",
+  "invalid_rule_error": "거부 오류 메시지만 만드는 함수",
+  "prompt_guard_on_resume_ignores_the_internal_carrier": "테스트 함수 (loop_ e2e 테스트 모듈)"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅에서 두 검사 지점이 공유 엔진에 규칙을 등록하기까지",
+   "caption": "guardrails 기능 빌드 기준. 도구 출력 설치와 입력 프롬프트 가드 컴파일이 같은 shared::register() 로 규칙을 등록한다. pin_engines 는 설치 맨 앞에서 프로세스 고정을 켠다.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "CLI 본체를 Tokio 런타임에서 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "부팅과 대화 처리",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "changed",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    if let Err(msg) = crate::guardrails::prompt_guard::check_guardrail_keys(&cfg) {",
+       "note": "가드레일 설정 키가 틀리면 부팅 중단"
+      },
+      {
+       "code": "        crate::guardrails::refuse_to_start(format_args!(\"{msg} (config.toml)\"));"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "가드레일 엔진 설치 (부팅 때 1회)",
+       "to": [
+        "install",
+        "GuardrailsConfig"
+       ],
+       "edge": [
+        "call",
+        "use"
+       ]
+      },
+      {
+       "code": "            pii: PiiConfig {"
+      },
+      {
+       "code": "                mode: pii_mode,"
+      },
+      {
+       "code": "                tool_args: cfg.pii.demask_tool_args.clone(),"
+      },
+      {
+       "code": "                filter_labels: cfg.pii.filter_labels.clone(),"
+      },
+      {
+       "code": "            },"
+      },
+      {
+       "code": "            prompt_injection,"
+      },
+      {
+       "code": "            pin_engines: false,",
+       "mark": "+",
+       "note": "ARGO CLI 는 엔진 상주를 쓰지 않음"
+      },
+      {
+       "code": "        }) {"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            Err(e @ GuardrailsInstallError::LayerBuild { .. }) => {"
+      },
+      {
+       "code": "                refuse_to_start(format_args!(\"{e} (config.toml)\"))"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            Err(GuardrailsInstallError::PromptInjection { detail }) => {",
+       "note": "도구 출력 엔진 실패면 부팅 중단"
+      },
+      {
+       "code": "                refuse_to_start(format_args!("
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "            Err(e) => refuse_to_start(e),"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            context_builder::build_context(cfg.clone(), doc_dir_str.clone(), db, None, None).await;",
+       "note": "컨텍스트 구성 (프롬프트 가드 포함)",
+       "to": "build_context"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "GuardrailsConfig",
+     "kind": "struct",
+     "status": "changed",
+     "name": "GuardrailsConfig",
+     "file": "tinicore/src/guardrails/install.rs:43",
+     "lines": [
+      {
+       "code": "pub struct GuardrailsConfig {"
+      },
+      {
+       "code": "    pub pii: PiiConfig,"
+      },
+      {
+       "code": "    pub prompt_injection: PromptInjectionConfig,"
+      },
+      {
+       "code": "    pub pin_engines: bool,",
+       "mark": "+",
+       "note": "true 면 엔진을 프로세스 내내 유지"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "changed",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:190",
+     "lines": [
+      {
+       "code": "    if config.pin_engines {",
+       "mark": "+",
+       "note": "켜져 있으면 무엇이든 짓기 전에 고정"
+      },
+      {
+       "code": "        crate::sensitive::turn_scope::pin_for_process();",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;"
+      },
+      {
+       "code": "    let injection ="
+      },
+      {
+       "code": "        super::prompt_injection::install::build(config.prompt_injection, &mut warnings)?;",
+       "note": "도구 출력 레이어 빌드",
+       "to": "build"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            return Err(GuardrailsInstallError::GuardrailMerge);"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            return Err(GuardrailsInstallError::MaskingSlotTaken);"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    Ok(GuardrailsInstall { warnings })"
+      }
+     ]
+    },
+    {
+     "id": "build",
+     "kind": "fn",
+     "status": "changed",
+     "name": "prompt_injection::install::build()",
+     "file": "tinicore/src/guardrails/prompt_injection/install.rs:73",
+     "lines": [
+      {
+       "code": "    if !config.tool_output.enabled {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        if !config.tool_output.rules.is_empty() {"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            check_added_rules(&rules().map_err(config_error)?, &config.tool_output.rules)"
+      },
+      {
+       "code": "                .map_err(config_error)?;"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        return Ok(PromptInjectionBuild { tool_output: None });",
+       "note": "레이어가 꺼져 있으면 아무것도 안 지음"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let engine = ToolOutputEngine::new(&config.tool_output.rules).map_err(config_error)?;",
+       "note": "추가 규칙을 공유 엔진에 등록",
+       "to": "new"
+      },
+      {
+       "code": "    if crate::sensitive::turn_scope::is_pinned_for_process() {",
+       "mark": "+",
+       "note": "상주 모드면 부팅 때 엔진을 지어 둠"
+      },
+      {
+       "code": "        drop(engine.slot().acquire().map_err(config_error)?);",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let tool_output = build_tool_output(&engine, config.tool_output.labels, warnings)?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "new",
+     "kind": "fn",
+     "status": "changed",
+     "name": "ToolOutputEngine::new()",
+     "file": "tinicore/src/guardrails/prompt_injection/tool_output.rs:91",
+     "lines": [
+      {
+       "code": "        let embedded = rules()?;",
+       "mark": "+"
+      },
+      {
+       "code": "        check_added_rules(&embedded, added)?;"
+      },
+      {
+       "code": "        let pairs: Vec<(&str, &str)> = added",
+       "mark": "+"
+      },
+      {
+       "code": "            .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .map(|rule| (rule.id.as_str(), rule.pattern.as_str()))",
+       "mark": "+"
+      },
+      {
+       "code": "            .collect();",
+       "mark": "+"
+      },
+      {
+       "code": "        shared::register(Layer::ToolOutput, &embedded, &pairs)?;",
+       "mark": "+",
+       "note": "도구 출력 규칙을 공유 엔진에 등록",
+       "to": [
+        "register",
+        "Layer"
+       ],
+       "edge": [
+        "call",
+        "use"
+       ]
+      },
+      {
+       "code": "        Self::from_parts(embedded, added, Arc::clone(shared::slot()))",
+       "mark": "+",
+       "note": "규칙 표 만들고 공유 슬롯 연결 → 그림 2",
+       "to": "from_parts"
+      }
+     ]
+    },
+    {
+     "id": "from_parts",
+     "kind": "fn",
+     "status": "changed",
+     "name": "ToolOutputEngine::from_parts()",
+     "file": "tinicore/src/guardrails/prompt_injection/tool_output.rs:117",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            let Some(label) = rule.label else {"
+      },
+      {
+       "code": "                return Err(EngineError::Config(format!(",
+       "note": "tool_output 규칙에 라벨이 없으면 거부"
+      },
+      {
+       "elide": true,
+       "indent": 20
+      },
+      {
+       "code": "        Ok(Self {"
+      },
+      {
+       "code": "            slot,"
+      },
+      {
+       "code": "            order,"
+      },
+      {
+       "code": "            rules: table,"
+      },
+      {
+       "code": "        })"
+      }
+     ]
+    },
+    {
+     "id": "build_context",
+     "kind": "fn",
+     "status": "same",
+     "name": "context_builder::build_context()",
+     "file": "tinicli/src/context_builder.rs:556",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        core.prompt_guard = crate::guardrails::prompt_guard::prompt_guard_config(&cfg)",
+       "note": "입력 프롬프트 가드 규칙 준비",
+       "to": "prompt_guard_config"
+      },
+      {
+       "code": "            .unwrap_or_else(|msg| {"
+      },
+      {
+       "code": "                crate::guardrails::refuse_to_start(format_args!(\"{msg} (config.toml)\"))"
+      },
+      {
+       "code": "            });"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "prompt_guard_config",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::prompt_guard::prompt_guard_config()",
+     "file": "tinicli/src/guardrails/prompt_guard.rs:190",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        prompt_guard::compile_cached(&config)",
+       "note": "부팅 때 내장 규칙을 컴파일해 검증",
+       "to": "compile_cached"
+      },
+      {
+       "code": "            .map_err(|e| format!(\"the prompt-injection rules did not compile: {e}\"))?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "compile_cached",
+     "kind": "fn",
+     "status": "same",
+     "name": "agent::prompt_guard::compile_cached()",
+     "file": "tinicore/src/agent/prompt_guard.rs:546",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let compiled = Arc::new(compile(config)?);",
+       "note": "캐시에 없으면 컴파일",
+       "to": "compile"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "compile",
+     "kind": "fn",
+     "status": "changed",
+     "name": "agent::prompt_guard::compile()",
+     "file": "tinicore/src/agent/prompt_guard.rs:301",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    if rules.is_empty() {"
+      },
+      {
+       "code": "        return Ok(CompiledGuard::from_parts(rules, None));"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    check_unique_ids(&config.rules)?;"
+      },
+      {
+       "code": "    let filter = filter_for(&config.rules)?;",
+       "mark": "+",
+       "note": "공유 엔진을 이 가드의 규칙으로 좁힘",
+       "to": "filter_for"
+      },
+      {
+       "code": "    Ok(CompiledGuard::from_parts(rules, Some(filter)))"
+      }
+     ]
+    },
+    {
+     "id": "filter_for",
+     "kind": "fn",
+     "status": "new",
+     "name": "agent::prompt_guard::filter_for()",
+     "file": "tinicore/src/agent/prompt_guard.rs:327",
+     "lines": [
+      {
+       "code": "    use crate::guardrails::prompt_injection::shared;",
+       "mark": "+"
+      },
+      {
+       "code": "    let pairs: Vec<(&str, &str)> = rules",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|rule| (rule.id.as_str(), rule.pattern.as_str()))",
+       "mark": "+"
+      },
+      {
+       "code": "        .collect();",
+       "mark": "+"
+      },
+      {
+       "code": "    let config_error = |e: EngineError| match e {",
+       "mark": "+"
+      },
+      {
+       "code": "        EngineError::Config(msg) => TinicoreError::Config(msg),",
+       "mark": "+"
+      },
+      {
+       "code": "        other => TinicoreError::Config(other.to_string()),",
+       "mark": "+"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let embedded = crate::guardrails::prompt_injection::rules().map_err(config_error)?;",
+       "mark": "+"
+      },
+      {
+       "code": "    shared::register(shared::Layer::PromptGuard, &embedded, &pairs).map_err(config_error)?;",
+       "mark": "+",
+       "note": "가드 규칙을 공유 엔진에 등록",
+       "to": [
+        "register",
+        "Layer"
+       ],
+       "edge": [
+        "call",
+        "use"
+       ]
+      },
+      {
+       "code": "    let ids = rules.iter().map(|rule| rule.id.clone()).collect();",
+       "mark": "+"
+      },
+      {
+       "code": "    Ok(PatternFilter::new(",
+       "mark": "+"
+      },
+      {
+       "code": "        Arc::clone(shared::slot()),",
+       "mark": "+",
+       "note": "공유 슬롯을 스캔 대상으로 → 그림 2"
+      },
+      {
+       "code": "        ActiveFilter::PiiTypes(ids),",
+       "mark": "+",
+       "note": "이 가드의 규칙 id 결과만 남김"
+      },
+      {
+       "code": "        AUDIT_TAG,",
+       "mark": "+"
+      },
+      {
+       "code": "    ))"
+      }
+     ]
+    },
+    {
+     "id": "Layer",
+     "kind": "enum",
+     "status": "new",
+     "name": "shared::Layer",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:29",
+     "lines": [
+      {
+       "code": "pub(crate) enum Layer {",
+       "mark": "+"
+      },
+      {
+       "code": "    PromptGuard,",
+       "mark": "+",
+       "note": "입력 프롬프트 가드가 등록"
+      },
+      {
+       "code": "    ToolOutput,",
+       "mark": "+",
+       "note": "도구 출력 레이어가 등록"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "register",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::register()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:153",
+     "lines": [
+      {
+       "code": "    let _registration = lock(registration());",
+       "mark": "+",
+       "note": "등록은 한 번에 하나씩",
+       "to": [
+        "lock",
+        "registration"
+       ]
+      },
+      {
+       "code": "    let mut host: Vec<HostRule> = snapshot().as_ref().clone();",
+       "mark": "+",
+       "note": "등록된 호스트 규칙 복사 → 그림 2"
+      },
+      {
+       "code": "    let mut added: Vec<&str> = Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    for &(id, pattern) in new_rules {",
+       "mark": "+"
+      },
+      {
+       "code": "        if let Some(rule) = embedded.iter().find(|rule| rule.id() == id) {",
+       "mark": "+",
+       "note": "내장 규칙과 같은 id 인가"
+      },
+      {
+       "code": "            let same = rule.config.recognizer_type == \"PatternRecognizer\"",
+       "mark": "+"
+      },
+      {
+       "code": "                && matches!(rule.config.patterns.as_slice(), [p] if p == pattern);",
+       "mark": "+"
+      },
+      {
+       "code": "            if same {",
+       "mark": "+"
+      },
+      {
+       "code": "                continue;",
+       "mark": "+",
+       "note": "내장 규칙 사본: 추가할 것 없음"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            return Err(clash(id));",
+       "mark": "+",
+       "note": "같은 id 다른 패턴: 거부"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        match host.iter_mut().find(|rule| rule.id == id) {",
+       "mark": "+"
+      },
+      {
+       "code": "            Some(rule) if rule.pattern == pattern => {",
+       "mark": "+"
+      },
+      {
+       "code": "                if !rule.layers.iter().any(|l| l == layer.name()) {",
+       "mark": "+",
+       "note": "같은 규칙: 이 레이어만 추가 → 그림 2"
+      },
+      {
+       "code": "                    rule.layers.push(layer.name().to_string());",
+       "mark": "+"
+      },
+      {
+       "code": "                }"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            Some(_) => return Err(clash(id)),",
+       "mark": "+",
+       "note": "등록된 id 에 다른 패턴: 거부"
+      },
+      {
+       "code": "            None => {",
+       "mark": "+"
+      },
+      {
+       "code": "                host.push(HostRule {",
+       "mark": "+"
+      },
+      {
+       "code": "                    id: id.to_string(),",
+       "mark": "+"
+      },
+      {
+       "code": "                    pattern: pattern.to_string(),",
+       "mark": "+"
+      },
+      {
+       "code": "                    layers: vec![layer.name().to_string()],",
+       "mark": "+"
+      },
+      {
+       "code": "                });"
+      },
+      {
+       "code": "                added.push(id);",
+       "mark": "+",
+       "note": "새 규칙으로 기록"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let mut validated = None;",
+       "mark": "+"
+      },
+      {
+       "code": "    if !added.is_empty() {",
+       "mark": "+",
+       "note": "새 규칙이 있을 때만 검증 빌드"
+      },
+      {
+       "code": "        let pinned = crate::sensitive::turn_scope::is_pinned_for_process();",
+       "mark": "+"
+      },
+      {
+       "code": "        if !pinned {",
+       "mark": "+"
+      },
+      {
+       "code": "            VALIDATION_BUILDS.fetch_add(1, Ordering::Relaxed);",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        match build_engine(&host) {",
+       "mark": "+",
+       "note": "엔진 전체로 검증 빌드 → 그림 2"
+      },
+      {
+       "code": "            Ok(engine) if pinned => validated = Some(engine),",
+       "mark": "+",
+       "note": "상주 모드면 이 빌드를 엔진으로 씀"
+      },
+      {
+       "code": "            Ok(_) => {}",
+       "mark": "+"
+      },
+      {
+       "code": "            Err(e) => return Err(invalid_rule_error(layer, &host, &added, e)),",
+       "mark": "+",
+       "note": "못 지으면 규칙 이름을 넣어 거부"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    if *snapshot() == host {",
+       "mark": "+",
+       "note": "바뀐 게 없으면 지은 엔진 유지"
+      },
+      {
+       "code": "        return Ok(());",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    *lock(host_rules()) = Arc::new(host);",
+       "mark": "+",
+       "note": "새 규칙 목록 반영 → 그림 2"
+      },
+      {
+       "code": "    match validated {",
+       "mark": "+"
+      },
+      {
+       "code": "        Some(engine) => drop(slot().put(engine)),",
+       "mark": "+",
+       "note": "검증 빌드를 슬롯에 넣음 → 그림 2"
+      },
+      {
+       "code": "        None => slot().invalidate(),",
+       "mark": "+",
+       "note": "엔진 버리고 다음 스캔에 재빌드 → 그림 2"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    Ok(())",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "lock",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::lock()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:80",
+     "lines": [
+      {
+       "code": "    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "registration",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::registration()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:75",
+     "lines": [
+      {
+       "code": "    static REGISTRATION: Mutex<()> = Mutex::new(());",
+       "mark": "+"
+      },
+      {
+       "code": "    &REGISTRATION",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · shared::register() 안: 새 규칙일 때만 검증 빌드, 상주 모드면 그 빌드를 슬롯에",
+   "caption": "그림 1 의 register() 에서 이어진다. 규칙 목록은 스냅숏으로 읽고, 새 규칙이 없으면 빌드하지 않는다. 상주 모드면 검증 빌드를 TurnSlot::put() 으로 엔진으로 쓰고, 아니면 invalidate() 로 다음 스캔이 다시 짓게 한다.",
+   "nodes": [
+    {
+     "id": "register",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::register()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:153",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let mut host: Vec<HostRule> = snapshot().as_ref().clone();",
+       "mark": "+",
+       "note": "등록된 호스트 규칙 복사",
+       "to": [
+        "snapshot",
+        "HostRule"
+       ],
+       "edge": [
+        "call",
+        "use"
+       ]
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                if !rule.layers.iter().any(|l| l == layer.name()) {",
+       "mark": "+",
+       "note": "같은 규칙: 이 레이어만 추가",
+       "to": "name"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "            VALIDATION_BUILDS.fetch_add(1, Ordering::Relaxed);",
+       "mark": "+",
+       "note": "버려지는 검증 빌드 횟수",
+       "to": "VALIDATION_BUILDS",
+       "edge": "use"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        match build_engine(&host) {",
+       "mark": "+",
+       "note": "엔진 전체로 검증 빌드",
+       "to": "build_engine"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "    *lock(host_rules()) = Arc::new(host);",
+       "mark": "+",
+       "note": "새 규칙 목록 반영",
+       "to": [
+        "lock",
+        "host_rules"
+       ]
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        Some(engine) => drop(slot().put(engine)),",
+       "mark": "+",
+       "note": "상주 모드: 검증 빌드를 슬롯에 넣음",
+       "to": [
+        "slot",
+        "put"
+       ]
+      },
+      {
+       "code": "        None => slot().invalidate(),",
+       "mark": "+",
+       "note": "엔진 버림, 다음 스캔이 다시 지음",
+       "to": "invalidate"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "snapshot",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::snapshot()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:84",
+     "lines": [
+      {
+       "code": "    Arc::clone(&lock(host_rules()))",
+       "mark": "+",
+       "note": "잠그고 규칙 목록 Arc 를 복제",
+       "to": [
+        "lock",
+        "host_rules"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "lock",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::lock()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:80",
+     "lines": [
+      {
+       "code": "    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "host_rules",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::host_rules()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:67",
+     "lines": [
+      {
+       "code": "    static HOST_RULES: OnceLock<Mutex<Arc<Vec<HostRule>>>> = OnceLock::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    HOST_RULES.get_or_init(|| Mutex::new(Arc::new(Vec::new())))",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "HostRule",
+     "kind": "struct",
+     "status": "new",
+     "name": "shared::HostRule",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:46",
+     "lines": [
+      {
+       "code": "struct HostRule {",
+       "mark": "+"
+      },
+      {
+       "code": "    id: String,",
+       "mark": "+"
+      },
+      {
+       "code": "    pattern: String,",
+       "mark": "+"
+      },
+      {
+       "code": "    layers: Vec<String>,",
+       "mark": "+",
+       "note": "이 규칙을 등록한 레이어들"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "name",
+     "kind": "fn",
+     "status": "new",
+     "name": "Layer::name()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:35",
+     "lines": [
+      {
+       "code": "        match self {",
+       "mark": "+"
+      },
+      {
+       "code": "            Self::PromptGuard => super::PROMPT_GUARD_LAYER,",
+       "mark": "+",
+       "to": "Layer",
+       "edge": "use"
+      },
+      {
+       "code": "            Self::ToolOutput => super::TOOL_OUTPUT_LAYER,",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      }
+     ]
+    },
+    {
+     "id": "Layer",
+     "kind": "enum",
+     "status": "new",
+     "name": "shared::Layer",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:29",
+     "lines": [
+      {
+       "code": "pub(crate) enum Layer {",
+       "mark": "+"
+      },
+      {
+       "code": "    PromptGuard,",
+       "mark": "+"
+      },
+      {
+       "code": "    ToolOutput,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "VALIDATION_BUILDS",
+     "kind": "static",
+     "status": "new",
+     "name": "shared::VALIDATION_BUILDS",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:113",
+     "lines": [
+      {
+       "code": "static VALIDATION_BUILDS: AtomicUsize = AtomicUsize::new(0);",
+       "mark": "+",
+       "note": "테스트가 읽는 검증 빌드 횟수"
+      }
+     ]
+    },
+    {
+     "id": "build_engine",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::build_engine()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:91",
+     "lines": [
+      {
+       "code": "    let mut config = EngineConfig::from_yaml(RULES_YAML)?;",
+       "mark": "+",
+       "note": "내장 규칙 파일 전체 (모든 레이어)"
+      },
+      {
+       "code": "    config",
+       "mark": "+"
+      },
+      {
+       "code": "        .recognizers",
+       "mark": "+"
+      },
+      {
+       "code": "        .extend(host.iter().map(|rule| (rule.id.clone(), rule.recognizer())));",
+       "mark": "+",
+       "note": "호스트 규칙을 인식기로 덧붙임",
+       "to": "recognizer"
+      },
+      {
+       "code": "    PatternEngine::from_config(&config, None, &extensions())",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "recognizer",
+     "kind": "fn",
+     "status": "new",
+     "name": "HostRule::recognizer()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:53",
+     "lines": [
+      {
+       "code": "        RecognizerConfig {",
+       "mark": "+"
+      },
+      {
+       "code": "            recognizer_type: \"PatternRecognizer\".into(),",
+       "mark": "+"
+      },
+      {
+       "code": "            entity_type: self.id.clone(),",
+       "mark": "+"
+      },
+      {
+       "code": "            patterns: vec![self.pattern.clone()],",
+       "mark": "+"
+      },
+      {
+       "code": "            layers: self.layers.clone(),",
+       "mark": "+"
+      },
+      {
+       "code": "            ..RecognizerConfig::default()",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      }
+     ]
+    },
+    {
+     "id": "slot",
+     "kind": "fn",
+     "status": "new",
+     "name": "shared::slot()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:100",
+     "lines": [
+      {
+       "code": "    static SLOT: OnceLock<Arc<TurnSlot<PatternEngine, EngineError>>> = OnceLock::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    SLOT.get_or_init(|| TurnSlot::new(SLOT_NAME, || build_engine(&snapshot())))",
+       "mark": "+",
+       "note": "프로세스에 슬롯 하나, 빌드는 필요할 때",
+       "to": [
+        "SLOT_NAME",
+        "build_engine",
+        "snapshot"
+       ],
+       "edge": [
+        "use",
+        "defer",
+        "defer"
+       ],
+       "label": "스캔에서 엔진이 필요할 때"
+      }
+     ]
+    },
+    {
+     "id": "SLOT_NAME",
+     "kind": "static",
+     "status": "new",
+     "name": "shared::SLOT_NAME",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:24",
+     "lines": [
+      {
+       "code": "const SLOT_NAME: &str = \"guardrails:prompt_injection\";",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "put",
+     "kind": "fn",
+     "status": "new",
+     "name": "TurnSlot::put()",
+     "file": "tinicore/src/sensitive/turn_scope.rs:309",
+     "lines": [
+      {
+       "code": "        let value = Arc::new(value);",
+       "mark": "+"
+      },
+      {
+       "code": "        let mut state = lock(&self.state);",
+       "mark": "+"
+      },
+      {
+       "code": "        self.builds.fetch_add(1, Ordering::Relaxed);",
+       "mark": "+"
+      },
+      {
+       "code": "        state.live = Arc::downgrade(&value);",
+       "mark": "+"
+      },
+      {
+       "code": "        state.pinned = (state.pins > 0 || PINNED_FOR_PROCESS.load(Ordering::Acquire))",
+       "mark": "+",
+       "note": "고정 중이면 값을 붙잡아 둠"
+      },
+      {
+       "code": "            .then(|| Arc::clone(&value));",
+       "mark": "+"
+      },
+      {
+       "code": "        value",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "invalidate",
+     "kind": "fn",
+     "status": "new",
+     "name": "TurnSlot::invalidate()",
+     "file": "tinicore/src/sensitive/turn_scope.rs:296",
+     "lines": [
+      {
+       "code": "        let mut state = lock(&self.state);",
+       "mark": "+"
+      },
+      {
+       "code": "        state.live = Weak::new();",
+       "mark": "+"
+      },
+      {
+       "code": "        state.pinned = None;",
+       "mark": "+",
+       "note": "고정도 풀어 다음 acquire 가 새로 지음"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "356bcd50a4",
+   "refactor(guardrails): one prompt-injection engine for the prompt guard and tool output"
+  ],
+  [
+   "461f57dca4",
+   "perf(guardrails): skip the boot validation build when no rule is new"
+  ],
+  [
+   "5b3e7a0909",
+   "feat(guardrails): GuardrailsConfig.pin_engines keeps the engines resident"
+  ]
+ ]
+}

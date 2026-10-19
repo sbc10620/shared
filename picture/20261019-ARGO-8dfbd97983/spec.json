@@ -1,0 +1,978 @@
+{
+ "title": "demask placeholder 매칭을 regex 에서 손으로 짠 스캐너로",
+ "repo": "/Users/byungchulso/Works/ARGO-guardrails-pin",
+ "before": "8dfbd97983~1",
+ "after": "8dfbd97983",
+ "range": "ARGO-guardrails-pin · 8dfbd97983~1..8dfbd97983 · argo main()",
+ "not_drawn": {},
+ "figures": [
+  {
+   "title": "그림 1 · main() 에서 스캐너를 쓰는 세 곳까지",
+   "caption": "에이전트 루프가 보낸 토큰을 모으고(collect_tokens), 답의 토큰을 찾아 복원한다(contains_placeholder, demask_inner). 세 곳 모두 지워진 demask_pattern() regex 대신 placeholders() 스캐너를 쓴다",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "tokio 런타임 위에서 CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "CLI 인자를 읽고 실행 모드 고르기",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            run_with_bg_shutdown(repl::run_repl(&ctx, &cfg, &conv_id), bg_mgr).await;",
+       "note": "대화형 REPL 실행",
+       "to": "run_repl"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_repl",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_repl()",
+     "file": "tinicli/src/repl.rs:148",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                tinicore::agent::loop_::agent_loop(cfg, &ctx, &hooks, &registry, None).await",
+       "note": "하네스 제안자 팩토리가 에이전트 루프 실행",
+       "to": "agent_loop",
+       "edge": "defer",
+       "label": "하네스가 나중에 실행"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "agent_loop",
+     "kind": "fn",
+     "status": "same",
+     "name": "loop_::agent_loop()",
+     "file": "tinicore/src/agent/loop_.rs:1452",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        return Box::pin(agent_loop_inner(config, ctx, hooks, tools, cancel)).await;",
+       "note": "실행 출처가 없으면 바로 본 루프로",
+       "to": "agent_loop_inner"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "agent_loop_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "loop_::agent_loop_inner()",
+     "file": "tinicore/src/agent/loop_.rs:1516",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let (llm_result, dispatch_id, streamed_tool_calls) = acquire_main_turn_response(",
+       "note": "LLM 응답 받기 (보낸 토큰 범위도 갱신)",
+       "to": "acquire"
+      },
+      {
+       "code": "            &mut state.fallback,"
+      },
+      {
+       "code": "            llm_messages,"
+      },
+      {
+       "code": "            &agent_context,"
+      },
+      {
+       "code": "            &config,"
+      },
+      {
+       "code": "            ctx,"
+      },
+      {
+       "code": "            &cancel,"
+      },
+      {
+       "code": "            state.response_id.as_deref(),"
+      },
+      {
+       "code": "            effective_max_tokens,"
+      },
+      {
+       "code": "            response_schema.as_ref(),"
+      },
+      {
+       "code": "            #[cfg(feature = \"sensitive\")]"
+      },
+      {
+       "code": "            pii_masking.as_mut(),"
+      },
+      {
+       "code": "            #[cfg(feature = \"sensitive\")]"
+      },
+      {
+       "code": "            sensitive.as_ref(),"
+      },
+      {
+       "code": "            #[cfg(feature = \"sensitive\")]"
+      },
+      {
+       "code": "            turn_start,"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .await;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        crate::agent::pii_masking::demask_assistant_messages(&mut state.produced, &m.vault);",
+       "note": "최종 답의 토큰을 원래 값으로 복원",
+       "to": "dam"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "acquire",
+     "kind": "fn",
+     "status": "same",
+     "name": "loop_::acquire_main_turn_response()",
+     "file": "tinicore/src/agent/loop_.rs:909",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            m.refresh_visible(llm_messages);",
+       "note": "이번 요청에 보인 토큰으로 범위 갱신",
+       "to": "refresh"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "refresh",
+     "kind": "fn",
+     "status": "same",
+     "name": "TurnMaskingState::refresh_visible()",
+     "file": "tinicore/src/agent/pii_masking.rs:1069",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            crate::sensitive::redaction::collect_tokens(&msg.text_cow(), &mut self.visible);",
+       "note": "메시지마다 토큰을 모아 visible 에 넣기",
+       "to": "collect"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "collect",
+     "kind": "fn",
+     "status": "changed",
+     "name": "collect_tokens()",
+     "file": "tinicore/src/sensitive/redaction.rs:1280",
+     "lines": [
+      {
+       "code": "    for found in placeholders(text) {",
+       "note": "스캐너로 토큰을 하나씩 찾음 → 그림 2",
+       "mark": "+"
+      },
+      {
+       "code": "        out.insert(canonical_token(&found));",
+       "note": "정규 형태 키로 바꿔 범위에 넣기",
+       "to": "canonical",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "dam",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii_masking::demask_assistant_messages()",
+     "file": "tinicore/src/agent/pii_masking.rs:2667",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let carries_token = crate::sensitive::redaction::contains_placeholder(&msg.text_cow());",
+       "note": "토큰이 있는지 빌린 텍스트로 먼저 확인",
+       "to": "contains"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        if let Cow::Owned(restored) = crate::sensitive::redaction::demask(&text, vault) {",
+       "note": "토큰이 있으면 원래 값으로 복원",
+       "to": "demask"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "contains",
+     "kind": "fn",
+     "status": "changed",
+     "name": "contains_placeholder()",
+     "file": "tinicore/src/sensitive/redaction.rs:1113",
+     "lines": [
+      {
+       "code": "    placeholders(text).next().is_some()",
+       "note": "첫 토큰 하나만 찾아 봄 → 그림 2",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "demask",
+     "kind": "fn",
+     "status": "same",
+     "name": "demask()",
+     "file": "tinicore/src/sensitive/redaction.rs:1136",
+     "lines": [
+      {
+       "code": "    demask_inner(text, vault, None)",
+       "note": "범위 제한 없이 공통 본체 호출",
+       "to": "demask_inner"
+      }
+     ]
+    },
+    {
+     "id": "demask_inner",
+     "kind": "fn",
+     "status": "changed",
+     "name": "demask_inner()",
+     "file": "tinicore/src/sensitive/redaction.rs:1196",
+     "lines": [
+      {
+       "code": "    if vault.is_empty() || allow.is_some_and(std::collections::BTreeSet::is_empty) {"
+      },
+      {
+       "code": "        return Cow::Borrowed(text);",
+       "note": "vault 나 범위가 비면 스캔 없이 그대로"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let mut restored: Option<String> = None;",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut copied = 0;",
+       "mark": "+"
+      },
+      {
+       "code": "    for found in placeholders(text) {",
+       "note": "스캐너로 토큰을 하나씩 찾음 → 그림 2",
+       "mark": "+"
+      },
+      {
+       "code": "        let out = restored.get_or_insert_with(|| String::with_capacity(text.len()));",
+       "mark": "+"
+      },
+      {
+       "code": "        out.push_str(&text[copied..found.start]);",
+       "to": "Placeholder",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        copied = found.end;",
+       "mark": "+"
+      },
+      {
+       "code": "        let canonical = canonical_token(&found);",
+       "note": "찾은 토큰을 vault 키 형태로",
+       "to": "canonical",
+       "mark": "+"
+      },
+      {
+       "code": "        let original = if allow.is_some_and(|a| !a.contains(&canonical)) {",
+       "mark": "+"
+      },
+      {
+       "code": "            None",
+       "mark": "+"
+      },
+      {
+       "code": "        } else {",
+       "mark": "+"
+      },
+      {
+       "code": "            vault.forward.get(&canonical)",
+       "mark": "+"
+      },
+      {
+       "code": "        };"
+      },
+      {
+       "code": "        out.push_str(original.map_or(&text[found.start..found.end], String::as_str));",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let result = match restored {",
+       "mark": "+"
+      },
+      {
+       "code": "        Some(mut out) => {",
+       "mark": "+"
+      },
+      {
+       "code": "            out.push_str(&text[copied..]);",
+       "mark": "+"
+      },
+      {
+       "code": "            Cow::Owned(out)",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        None => Cow::Borrowed(text),",
+       "mark": "+"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    result"
+      }
+     ]
+    },
+    {
+     "id": "canonical",
+     "kind": "fn",
+     "status": "changed",
+     "name": "canonical_token()",
+     "file": "tinicore/src/sensitive/redaction.rs:1258",
+     "lines": [
+      {
+       "code": "    format!(",
+       "mark": "+"
+      },
+      {
+       "code": "        \"[SENS:PII:{}:{}:{}]\","
+      },
+      {
+       "code": "        found.label.to_ascii_uppercase(),",
+       "mark": "+"
+      },
+      {
+       "code": "        found.counter,",
+       "mark": "+"
+      },
+      {
+       "code": "        found",
+       "mark": "+"
+      },
+      {
+       "code": "            .nonce",
+       "mark": "+"
+      },
+      {
+       "code": "            .chars()"
+      },
+      {
+       "code": "            .filter(|c| !c.is_whitespace())"
+      },
+      {
+       "code": "            .map(|c| c.to_ascii_lowercase())",
+       "mark": "+"
+      },
+      {
+       "code": "            .collect::<String>()"
+      },
+      {
+       "code": "    )"
+      }
+     ]
+    },
+    {
+     "id": "Placeholder",
+     "kind": "struct",
+     "status": "new",
+     "name": "Placeholder",
+     "file": "tinicore/src/sensitive/redaction.rs:955",
+     "lines": [
+      {
+       "code": "struct Placeholder<'a> {",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    start: usize,",
+       "mark": "+"
+      },
+      {
+       "code": "    end: usize,",
+       "mark": "+"
+      },
+      {
+       "code": "    label: &'a str,",
+       "mark": "+"
+      },
+      {
+       "code": "    counter: &'a str,",
+       "mark": "+"
+      },
+      {
+       "code": "    nonce: &'a str,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · placeholders() 스캐너가 토큰 하나를 읽는 방법",
+   "caption": "'[' 마다 [SENS:PII:<라벨>:<숫자>:<nonce>] 를 한 글자씩 확인한다. 실패하면 다음 '[' 부터 다시 찾는다. 대소문자 무시와 숫자는 ASCII 만 받는다",
+   "nodes": [
+    {
+     "id": "contains",
+     "kind": "fn",
+     "status": "changed",
+     "name": "contains_placeholder()",
+     "file": "tinicore/src/sensitive/redaction.rs:1113",
+     "lines": [
+      {
+       "code": "    placeholders(text).next().is_some()",
+       "note": "스캐너를 만들고 첫 토큰만 찾기",
+       "to": [
+        "placeholders",
+        "next"
+       ],
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "placeholders",
+     "kind": "fn",
+     "status": "new",
+     "name": "placeholders()",
+     "file": "tinicore/src/sensitive/redaction.rs:999",
+     "lines": [
+      {
+       "code": "    Placeholders { text, pos: 0 }",
+       "to": "Placeholders",
+       "edge": "use",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "Placeholders",
+     "kind": "struct",
+     "status": "new",
+     "name": "Placeholders",
+     "file": "tinicore/src/sensitive/redaction.rs:994",
+     "lines": [
+      {
+       "code": "struct Placeholders<'a> {",
+       "mark": "+"
+      },
+      {
+       "code": "    text: &'a str,",
+       "mark": "+"
+      },
+      {
+       "code": "    pos: usize,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "next",
+     "kind": "fn",
+     "status": "new",
+     "name": "Placeholders::next()",
+     "file": "tinicore/src/sensitive/redaction.rs:1006",
+     "lines": [
+      {
+       "code": "        while let Some(offset) = self.text.get(self.pos..)?.find('[') {",
+       "mark": "+"
+      },
+      {
+       "code": "            let start = self.pos + offset;",
+       "mark": "+"
+      },
+      {
+       "code": "            if let Some(found) = placeholder_at(self.text, start) {",
+       "note": "이 '[' 에서 토큰 하나 읽기 시도",
+       "to": "placeholder_at",
+       "mark": "+"
+      },
+      {
+       "code": "                self.pos = found.end;",
+       "mark": "+"
+      },
+      {
+       "code": "                return Some(found);",
+       "note": "찾으면 그 끝에서 다음 스캔 재개",
+       "mark": "+"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            self.pos = start + 1;",
+       "note": "실패하면 다음 '[' 부터 다시",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        self.pos = self.text.len();",
+       "mark": "+"
+      },
+      {
+       "code": "        None",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "placeholder_at",
+     "kind": "fn",
+     "status": "new",
+     "name": "placeholder_at()",
+     "file": "tinicore/src/sensitive/redaction.rs:1058",
+     "lines": [
+      {
+       "code": "    let pos = skip_whitespace(text, start + 1);",
+       "note": "'[' 뒤 공백 건너뛰기",
+       "to": "skip_ws",
+       "mark": "+"
+      },
+      {
+       "code": "    let pos = ascii_word(text, pos, \"SENS\")?;",
+       "note": "SENS (ASCII 대소문자 무시)",
+       "to": "ascii_word",
+       "mark": "+"
+      },
+      {
+       "code": "    let pos = delimiter(text, pos, b':')?;",
+       "note": "':' 와 앞뒤 공백",
+       "to": "delimiter",
+       "mark": "+"
+      },
+      {
+       "code": "    let pos = ascii_word(text, pos, \"PII\")?;",
+       "note": "PII (ASCII 대소문자 무시)",
+       "to": "ascii_word",
+       "mark": "+"
+      },
+      {
+       "code": "    let pos = delimiter(text, pos, b':')?;",
+       "note": "':' 와 앞뒤 공백",
+       "to": "delimiter",
+       "mark": "+"
+      },
+      {
+       "code": "    let label_end = ascii_run(text, pos, |b| {",
+       "note": "라벨: 영숫자·_·- 한 글자 이상",
+       "to": "ascii_run",
+       "mark": "+"
+      },
+      {
+       "code": "        b.is_ascii_alphanumeric() || *b == b'_' || *b == b'-'",
+       "mark": "+"
+      },
+      {
+       "code": "    })?;",
+       "mark": "+"
+      },
+      {
+       "code": "    let label = &text[pos..label_end];",
+       "mark": "+"
+      },
+      {
+       "code": "    let pos = delimiter(text, label_end, b':')?;",
+       "note": "':' 와 앞뒤 공백",
+       "to": "delimiter",
+       "mark": "+"
+      },
+      {
+       "code": "    let counter_end = ascii_run(text, pos, u8::is_ascii_digit)?;",
+       "note": "카운터: ASCII 숫자만",
+       "to": "ascii_run",
+       "mark": "+"
+      },
+      {
+       "code": "    let counter = &text[pos..counter_end];",
+       "mark": "+"
+      },
+      {
+       "code": "    let nonce_start = delimiter(text, counter_end, b':')?;",
+       "note": "':' 뒤부터 nonce",
+       "to": "delimiter",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut pos = nonce_start;",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut nonce_end = nonce_start;",
+       "mark": "+"
+      },
+      {
+       "code": "    for i in 0..NONCE_LEN {",
+       "mark": "+"
+      },
+      {
+       "code": "        if i > 0 {",
+       "mark": "+"
+      },
+      {
+       "code": "            pos = skip_whitespace(text, pos);",
+       "note": "nonce 글자 사이 공백 허용",
+       "to": "skip_ws",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        if !text.as_bytes().get(pos)?.is_ascii_hexdigit() {",
+       "mark": "+"
+      },
+      {
+       "code": "            return None;",
+       "note": "hex 가 아니면 이 후보 포기",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        pos += 1;",
+       "mark": "+"
+      },
+      {
+       "code": "        nonce_end = pos;",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let close = skip_whitespace(text, nonce_end);",
+       "note": "']' 앞 공백 건너뛰기",
+       "to": "skip_ws",
+       "mark": "+"
+      },
+      {
+       "code": "    if text.as_bytes().get(close) != Some(&b']') {",
+       "mark": "+"
+      },
+      {
+       "code": "        return None;",
+       "note": "']' 가 없으면 포기",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let end = close + 1;",
+       "mark": "+"
+      },
+      {
+       "code": "    Some(Placeholder {",
+       "to": "Placeholder",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        start,",
+       "mark": "+"
+      },
+      {
+       "code": "        end,",
+       "mark": "+"
+      },
+      {
+       "code": "        label,",
+       "mark": "+"
+      },
+      {
+       "code": "        counter,",
+       "mark": "+"
+      },
+      {
+       "code": "        nonce: &text[nonce_start..nonce_end],",
+       "mark": "+"
+      },
+      {
+       "code": "    })"
+      }
+     ]
+    },
+    {
+     "id": "skip_ws",
+     "kind": "fn",
+     "status": "new",
+     "name": "skip_whitespace()",
+     "file": "tinicore/src/sensitive/redaction.rs:1022",
+     "lines": [
+      {
+       "code": "    while let Some(c) = text.get(pos..).and_then(|rest| rest.chars().next()) {",
+       "mark": "+"
+      },
+      {
+       "code": "        if !c.is_whitespace() {",
+       "mark": "+"
+      },
+      {
+       "code": "            break;",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        pos += c.len_utf8();",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    pos"
+      }
+     ]
+    },
+    {
+     "id": "ascii_word",
+     "kind": "fn",
+     "status": "new",
+     "name": "ascii_word()",
+     "file": "tinicore/src/sensitive/redaction.rs:1033",
+     "lines": [
+      {
+       "code": "    let end = pos.checked_add(word.len())?;",
+       "mark": "+"
+      },
+      {
+       "code": "    let found = text.as_bytes().get(pos..end)?;",
+       "mark": "+"
+      },
+      {
+       "code": "    found.eq_ignore_ascii_case(word.as_bytes()).then_some(end)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "delimiter",
+     "kind": "fn",
+     "status": "new",
+     "name": "delimiter()",
+     "file": "tinicore/src/sensitive/redaction.rs:1040",
+     "lines": [
+      {
+       "code": "    let pos = skip_whitespace(text, pos);",
+       "note": "구분자 앞 공백 건너뛰기",
+       "to": "skip_ws",
+       "mark": "+"
+      },
+      {
+       "code": "    (text.as_bytes().get(pos) == Some(&byte)).then(|| skip_whitespace(text, pos + 1))",
+       "note": "구분자가 맞으면 뒤 공백도 건너뛰기",
+       "to": "skip_ws",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "ascii_run",
+     "kind": "fn",
+     "status": "new",
+     "name": "ascii_run()",
+     "file": "tinicore/src/sensitive/redaction.rs:1047",
+     "lines": [
+      {
+       "code": "    let len = text",
+       "mark": "+"
+      },
+      {
+       "code": "        .as_bytes()",
+       "mark": "+"
+      },
+      {
+       "code": "        .get(pos..)?",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .take_while(|b| accept(b))",
+       "mark": "+"
+      },
+      {
+       "code": "        .count();",
+       "mark": "+"
+      },
+      {
+       "code": "    (len > 0).then_some(pos + len)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "Placeholder",
+     "kind": "struct",
+     "status": "new",
+     "name": "Placeholder",
+     "file": "tinicore/src/sensitive/redaction.rs:955",
+     "lines": [
+      {
+       "code": "struct Placeholder<'a> {",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    start: usize,",
+       "mark": "+"
+      },
+      {
+       "code": "    end: usize,",
+       "mark": "+"
+      },
+      {
+       "code": "    label: &'a str,",
+       "mark": "+"
+      },
+      {
+       "code": "    counter: &'a str,",
+       "mark": "+"
+      },
+      {
+       "code": "    nonce: &'a str,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "8dfbd97983",
+   "perf(sensitive): match demask placeholders with a scanner, not a regex"
+  ]
+ ]
+}
