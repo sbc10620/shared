@@ -79,6 +79,26 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | D.L. 269/2003 제50조; D.M. 11 marzo 2004 | 경제재정부 (MEF), Sogei | Tessera Sanitaria(건강 카드) 발급과 번호 |
 | DPR 633/1972 제35조 | Agenzia delle Entrate | Partita IVA 부여. VIES 에서 공개 조회 가능 |
 
+## 구현 반영 (ARGO `585d76c50b`, 2026-10-20)
+
+다국어 브랜치에서 아래와 같이 구현했다. 이 문서의 권장과 다르게 정한 것은 굵게 표시한다. 여덟 개 모두 손으로 쓴 검출기(FixedShape 7개, Aho-Corasick 1개)라 regex 패턴은 늘지 않는다.
+
+| recognizer | label | score | 검증기 | 비고 |
+|---|---|---|---|---|
+| `it_codice_fiscale` | national_id | 0.5 | `it_cf` | 체크 문자와 생년월일(여성 +40, omocodia 문자 해석). 2월 29일은 두 자리 연도가 4의 배수일 때만(python-stdnum 과 같음) |
+| `it_id_card` | national_id | 0.3 | `it_document` | **CIE(`CA12345AB`)만**. 구형 종이 신분증(`AA1234567`)은 EU 규정 2019/1157 로 폐지되어 이 기능이 탑재되기 전에 효력이 끝나므로 넣지 않음. 10자 표기는 MRZ 체크 |
+| `it_passport` | passport | 0.3 | `it_document` | 공백을 빼고 MRZ 체크(PL 여권과 같은 helper `mrz_check_skipping_spaces`) |
+| `it_health_card` | national_id | 0.5 | 없음 | Aho-Corasick anchor `8038`. 체크 디지트 알고리즘 미확인 |
+| `it_bank_account` | bank_account | 0.5 | `it_iban` | 길이 27 + mod 97 + CIN(BBAN 22자, codice fiscale 과 같은 홀짝 표). CIN 은 schwifty 로 대조 |
+| `it_phonenumber` | phone | 0.5 | 없음 | `+39` 번호(휴대·유선)와 공백·대시로 구분한 국내 휴대. 실제 묶음 표기(`333 123 45 67`, `02 1234 5678`, `0577 12 34 56`, `02 12 34 56 78`)도 한 번호로 잡음 |
+| `it_phonenumber_weak` | phone | 0.3 | 없음 | 구분자 없는 휴대(9~10자리)와 국내 유선. 앞에 `.` 가 붙으면 거부 |
+| `it_vehicle_plate` | vehicle_plate | **0.3** | 없음 | 공백 없는 `AB123CD` 는 제품 코드와 겹침(다른 나라 번호판도 0.3) |
+
+- **지역번호 규칙**: 유선 지역번호는 `02`·`06`(유일한 2자리) 또는 `0[1-9]` 로 시작하는 3~4자리로 제한했다(`00` 은 국제전화 접두). 그래서 `01-12-2024` 같은 날짜, `09-13 15-19` 같은 영업시간은 전화로 잡지 않는다. 월이 02·06 인 날짜(`15-06-2024` → `06-2024`)는 문맥 단어가 있으면 잡히는 알려진 한계다.
+- 운전면허(`it_driver_license`)와 Partita IVA 는 구현하지 않았다.
+- 문맥 단어에는 악센트 없는 형태와 두 가지 아포스트로피(`'`, `’`)를 함께 넣었고, `cie`, `tel`, `cell` 은 단어 경계 비교라 넣었다. `banca`, `contatto`, `recapito`, `veicolo`, `automobile`, `tessera` 단독, `ssn` 은 아무 숫자 옆에나 나오는 말이라 뺐다.
+- 모든 나라를 함께 로드하면 FixedShape 형식이 104개(표 2장)다. 측정값(Apple Silicon, 10KB): 모든 나라를 넣은 영어 평문 87 → 88 µs, 힙 416 → 421 KB. it 만 넣으면 같은 형식을 regex 로 쓸 때보다 이탈리아어 평문은 96 → 79 µs, 이탈리아 PII 밀집 텍스트는 17.4 → 1.3 ms 로 빠르고 힙은 310 → 177 KB 다.
+
 ## 2. 요약 표
 
 | pii_type | 설명 | 결정론적 검출 | 권장 검출 방식 | 검증기 (현재 / 구현 가능) | score | 기존 구현 | 채택 |
