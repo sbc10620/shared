@@ -90,6 +90,31 @@ how to run it.
 - Report the cost of newly added types apart from the cost of the
   conversion.
 
+## Memory check (idle footprint of the guardrails)
+
+- Tool: `tinicore/examples/guardrails/bench_idle_after_turns` (release,
+  `--features guardrails,sensitive,test-fixtures`). It drives real
+  in-process `agent_loop` turns against a scripted model and reads live
+  heap and PSS at four points (before install, after install, after the
+  turns plus `--settle`, after `malloc_trim`). Not part of
+  `scanning_benchmark`.
+- Run it on the Ubuntu glibc VM (macOS has no PSS). One configuration per
+  run: `--guardrails off`, `--pin off`, `--pin on`; three runs each.
+- Run the configurations ONE AT A TIME, never concurrently: PSS splits the
+  binary's file pages between processes running it, so concurrent runs
+  distort it (2026-10: the pinned-vs-released gap read 4.5 MB concurrent,
+  1.1 MB sequential). Live heap is unaffected.
+- Report live heap and PSS only, always next to the `--guardrails off`
+  run of the same build, with the points written out ("after install",
+  "idle after 200 turns"), not A/B/C/D.
+- Before/after a series: put the bench file into the base revision too.
+  If the base lacks an API the bench uses (e.g. `pin_engines`), adapt the
+  base copy only (`turn_scope::pin_for_process()` for the pin) and say so.
+  For the VM, build both inside the argo-tizen tree: the base is its
+  `tini/` (check the guardrails paths match ARGO's base), the head is that
+  tree plus `git diff <base> HEAD -- tinicore tinicore-traits` applied with
+  `git apply --directory=tini`.
+
 ## Tests: where they live, who writes them
 
 - Unit tests sit inside implementation files (`#[cfg(test)] mod tests`).
@@ -149,6 +174,18 @@ how to run it.
 - every `argo-e2e` spec that fits the branch, plus the branch's own spec.
 - memory: the work-state note for the branch is current.
 - push, PR and PR comments wait for their own instruction.
+- right before pushing a follow-up to an open PR, check it is still open
+  (`gh pr view <n> --json state`): a PR merged meanwhile does not take the
+  push, and the follow-up needs a new branch from main and a new PR.
+
+## Review fallback (Z.ai runner down)
+
+The Z.ai review job runs only on the self-hosted `zai-review` runner. When
+that runner is down every review job sits queued and fails after 24 h
+(check `gh api repos/AGENTIC/ARGO/actions/workflows/code-review.yml/runs`:
+no recent success, jobs with no runner). Then a subagent runs
+`/code-review` high over the PR range, and the result is posted only on
+instruction, as a "Claude Review" comment.
 
 ## Pitfalls
 
@@ -177,5 +214,19 @@ how to run it.
   tree that already holds part of the change.
 - In an unquoted heredoc, backticks in a commit message run as commands; use
   `<<'EOF'` or a message file.
+- Process-wide state (a shared slot, a registry) and tests: every test
+  that registers into or resets it must be `#[serial]` and reset first.
+  CI's guardrails lanes run `cargo nextest` (one process per test), so a
+  missed one never fails in CI; it flakes only under `cargo test`
+  (locally and in `regress_tests.sh`). When adding such state, grep every
+  test that touches it.
+- An issue in another repository is never written `argo-tizen #1689` in an
+  ARGO commit message or PR body: GitHub links `#1689` to ARGO's own
+  number. Write "argo-tizen issue 1689" (plain text, which also leaves no
+  cross-reference on that issue).
+- Gate a commit on cargo's exit code (`if cargo clippy …; then git commit
+  …; fi`), never `cargo clippy … | grep …; git commit …` (the pipe's status
+  is grep's). `cargo clippy` does not refresh the binary: `cargo build`
+  before running it.
 - `commands_hub::devices_skips_enroll_when_resolved_name_is_invalid` (tinicli)
   fails intermittently; it passes alone and on re-run.
