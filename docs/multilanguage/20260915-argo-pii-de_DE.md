@@ -80,6 +80,27 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | Umsatzsteuergesetz (UStG) 제14조 | 재무부 | 송장에 Steuernummer 또는 USt-IdNr 기재 의무 (이 번호들이 준공개인 근거) |
 | Geldwäschegesetz (GwG), Zahlungsdiensteaufsichtsgesetz (ZAG) | BaFin | 금융 거래 정보와 계좌 식별자(IBAN) 취급 |
 
+## 구현 반영 (ARGO `d77cc279f6`, 2026-10-21)
+
+다국어 브랜치에서 아래와 같이 구현했다. 이 문서의 권장과 다르게 정한 것은 굵게 표시한다. 아홉 개 모두 손으로 쓴 FixedShape 형식이라 regex 패턴은 늘지 않는다.
+
+| recognizer | label | score | 검증기 | 비고 |
+|---|---|---|---|---|
+| `de_tax_id` | national_id | 0.5 | `de_idnr` | 붙여 쓰기와 2-3-3-3. 반복 규칙(**세 번 나온 숫자가 셋 다 붙어 있으면 거부**, python-stdnum 은 검사하지 않음)과 MOD 11,10. 무작위 11자리의 약 0.4% 통과 |
+| `de_social_security_number` | national_id | 0.5 | `de_svnr` | 일 01-31 또는 **32-63**(일련번호 소진 규칙), 월 01-12, 체크 디지트 |
+| `de_id_card` | national_id | 0.3 | `mrz_731` | 모음이 없는 문자 집합이라 대문자 단어는 맞지 않음 |
+| `de_passport` | passport | 0.3 | `mrz_731` | 첫 글자 C F G H J K |
+| `de_health_insurance_number` | national_id | **0.3** | `de_kvnr` | 문자 + 숫자 9자리는 주문 코드와 겹치고 10개 중 1개가 통과 |
+| `de_bank_account` | bank_account | 0.5 | `de_iban` | IBAN 은 나라별 파일에 둠 |
+| `de_phonenumber` | phone | 0.5 | 없음 | 휴대(015x/016x/017x, `0`·`+49`·`+49 (0)`·`0049`, **015xx 다섯 자리 접두**)와 `+49` 유선. 실제 묶음 표기(`0151 1234 5678`, `0171 123 45 67`, `0176 123 456 78`, `0176 12 34 56 78`, `+49 221 123 45 67`, `+49 711 123456-12`)를 모두 형식으로 적어 끝자리가 남지 않음 |
+| `de_phonenumber_weak` | phone | 0.3 | 없음 | 국내 유선, **지역번호 뒤 구분자 필수**, 지역번호는 0 + 2~5자리라 `15-06-2024`·`12/06/2024` 같은 날짜는 맞지 않음. 내선은 `-0` 또는 0으로 시작하지 않는 1~4자리 |
+| `de_vehicle_plate` | vehicle_plate | **0.3** | 없음 | **하이픈 구분만**(공백 구분은 `DIN EN 1234`·`BMW X5` 와 겹침), 움라우트 지역 코드(`WÜ`, `GÖ`, `ÖHR`) 포함 |
+
+- 운전면허와 Steuernummer 는 구현하지 않았다.
+- 문맥 단어에는 실제로 쓰는 복합어·약어(`telefonnr`, `telefax`, `ausweisnr`, `passnr`, `versichertennr` 등)를 형태마다 넣었고, `seriennummer`, `pass`, `krankenkasse`, `bank`, `konto`, `kfz`, `pkw` 는 일상어라 뺐다.
+- 알려진 한계: `(030) 1234-5678`, `089 / 1234567`, 구분자 없는 국내 유선, `01520 123 4567`, 3-3-3 묶음, `-01` 같은 0으로 시작하는 두 자리 이상 내선, 짧은 가입자 번호 뒤에 붙은 다른 번호(`0711 1234-030 7654321`), 지역번호 표가 없어 문맥 단어 옆의 주문번호(`0815-4711`)·시간 범위(`0900-1700`)가 전화로 잡힘.
+- 형식 62개(독일 단독 표 1장, 다른 나라와 함께면 2장, 모든 나라 182개로 3장). 측정값(Apple Silicon, 10KB): 독일 단독 영어 평문 79 µs·독일 PII 밀집 1.5 ms(같은 형식을 regex 로 쓰면 16.3 ms), 힙 178 KB(regex 320 KB). 모든 나라 영어 평문 89 → 93 µs.
+
 ## 2. 요약 표
 
 | pii_type | 설명 | 결정론적 검출 | 권장 검출 방식 | 검증기 (현재 / 구현 가능) | score | 기존 구현 | 채택 |
