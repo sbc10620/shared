@@ -1,6 +1,6 @@
 ---
 name: dev-cycle
-description: "Run a code change through the development cycle that ends in a PR: for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range with /code-review, fix, and repeat until the review asks for no change or only doc changes; slow checks at the end of the phase, then the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
+description: "Run a code change through the development cycle that ends in a PR: the first plan reviewed once by a read-only subagent before user feedback; for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range with /code-review, fix, and repeat until the review asks for no change or only doc changes; slow checks at the end of the phase, then the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
 user-invocable: true
 ---
 
@@ -9,6 +9,8 @@ user-invocable: true
 One loop for every code change that will become a PR:
 
 ```
+plan ─► plan review (read-only subagent, once) ─► user feedback ─► agreed plan
+
 for each planned commit:
   spec ─► tests from the spec (separate agent) ─► implement ─► verify what it affects ─► commit
 
@@ -23,7 +25,7 @@ end of the phase: the slow checks the profile defers to it
 then, once, before the PR: full suites + full e2e on the final HEAD
 ```
 
-Running everything on every round is wasted time: a full test suite or a
+Running everything on every verification is wasted time: a full test suite or a
 release e2e build takes tens of minutes, and a fix to one module cannot break
 another module's tests. The full run happens once, on the commit that will be
 reviewed.
@@ -37,8 +39,9 @@ The one running this skill is the **orchestrator**: it implements, and it
 writes the prompt for every helper agent from the plan. There are no fixed
 agent definitions; each prompt has two parts.
 
-| Role | Always in the prompt | Chosen from the plan for this round |
+| Role | Always in the prompt | Chosen from the plan for this call |
 | --- | --- | --- |
+| Plan reviewer (step 1) | Read-only; the plan and the repository, never a draft implementation; report only, change nothing | The plan, the user's request and decisions so far, the profile's path table |
 | Test agent (step 1a) | Spec only, never the implementation; edit test files only, or return values as a list when tests live inside implementation files; a spec that contradicts itself, or an example that fails its own rule, is reported, not fixed | The spec for this commit's scope (the design doc's sections, shapes, rules, labels, layers), the user's decisions that override the doc, where the tests go |
 | Reviewer (step 3) | Read-only; the required method (step 3) and the method on the first line; earlier rounds' decisions are not re-argued | The range, what changed this round, earlier findings and their decisions, the user's decisions, what was already verified |
 
@@ -58,7 +61,7 @@ second.
 
 | moment | what runs |
 | --- | --- |
-| every round: after implementing a commit, after each review fix | the fast checks of step 2, for the affected set |
+| every verification: after implementing a commit, after each review fix | the fast checks of step 2, for the affected set |
 | end of the phase: the review loop has ended and the commits are settled | the slow checks the profile defers here (regression comparisons, e2e suites, performance measurements) |
 | before the PR: once, on the final HEAD | step 6 |
 
@@ -68,7 +71,10 @@ phase is fixed and re-checked there (only the affected part), then goes
 through the review loop like any other fix. The review loop never waits for
 the slow checks.
 
-When the profile assigns no moment to a check, it runs every round.
+When the profile assigns no moment to a check, it runs at every verification.
+
+"Round" in this document means one pass of the review loop (step 3 to
+step 5), never a verification.
 
 ## When the review runs
 
@@ -101,6 +107,22 @@ profile.
 ## 1. Before the first edit
 
 - Agree on the plan first; this skill does not replace planning.
+- Have the first complete plan reviewed once, by a read-only subagent, before
+  showing it to the user for feedback. The reviewer checks:
+  - facts: every file, function, line, call site and config value the plan
+    names exists and says what the plan claims;
+  - the spec: each commit's spec is concrete enough for the test agent to
+    fix expected values, and does not contradict itself;
+  - the commits: order and dependencies, and the allowed regression
+    differences of each;
+  - verification: each commit's changed paths get the checks the profile
+    ties to them;
+  - the repository's own rules (`AGENTS.md`, `CLAUDE.md`) and risks the plan
+    misses.
+
+  Check every finding against the code, as in step 3, then show the plan with
+  the findings: fold in the ones that hold, and list the ones left out with
+  the reason. A plan revised from the user's feedback is not reviewed again.
 - If the profile asks for a baseline (a regression comparison, recorded test
   outcomes), take it NOW, on the commit the change starts from. A baseline
   taken after editing compares the change with itself.
@@ -306,7 +328,7 @@ A profile holds:
 | changed path | tests | extra checks | e2e suite |
 
 ## When each check runs
-| when | checks |   (every round / end of the phase / before the PR)
+| when | checks |   (every verification / end of the phase / before the PR)
 
 ## Tests: where they live, who writes them
 - where new behaviour's tests go (files, tables), and whether unit tests sit

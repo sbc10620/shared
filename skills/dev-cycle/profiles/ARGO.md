@@ -36,7 +36,7 @@ lists in `bash -c '...'`.
 
 ## Path → affected checks
 
-| changed path | tests | extra checks | e2e suite |
+| changed path | tests (every verification) | extra checks (end of the phase, except `parity.sh` and `cargo check --workspace`: every verification) | e2e suite (end of the phase) |
 | --- | --- | --- | --- |
 | `tinicore/src/guardrails/pii/config/*.yaml` | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | matching regression; `parity.sh` for a hand-written type | PII suites |
 | `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | matching regression; `parity.sh` | PII suites |
@@ -60,7 +60,7 @@ country" or "convert KR/US to hand-written detectors".
 
 | when | checks |
 | --- | --- |
-| every round (after implementing, after each review fix) | fmt, the clippy lane(s) of the touched crates, the affected tests from the table above; `parity.sh` when a hand-written detector's shapes changed |
+| every verification (after implementing a commit, after each review fix) | fmt, the clippy lane(s) of the touched crates, the tests column of the table above; `parity.sh` when a hand-written detector's shapes changed; `cargo check --workspace --all-targets` when `tinicore-traits` changed |
 | end of a phase (the review loop has ended and the commits are settled) | matching regression against the commit before the phase; the e2e suites of the behaviour the phase changed; for a PII detector or engine change, the speed check below |
 | before the PR (once, on the final HEAD) | the Pre-PR checklist: full suites, every e2e spec, the Core audits |
 
@@ -80,7 +80,7 @@ how to run it.
   commit onto it in a temporary worktree (take the bench side of
   `examples/guardrails/common.rs`), and delete the worktree afterwards.
 - Build each revision's binaries once, copy them out, then run them
-  interleaved for three rounds and take the median: the machine may carry
+  interleaved three times and take the median: the machine may carry
   other load (a qemu VM moved results by 10-20 %).
 - Report the cost of newly added types apart from the cost of the
   conversion.
