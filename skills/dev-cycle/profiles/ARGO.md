@@ -70,6 +70,12 @@ country" or "convert KR/US to hand-written detectors".
 `tinicore/src/guardrails/AGENTS.md` "Check it twice" is the rule; this is
 how to run it.
 
+No moment of its own: the plan names it for a commit that can change scan
+speed (the scan path, a detector, the engine, a validator), or the user
+asks. It is reported once, at the end of the phase (every commit made and
+the review loop over), next to the base; the user decides what to do with
+it. It does not stop the cycle.
+
 - Compare against the commit before the phase, not only against the same
   shapes as regex: each detector can match its regex and the whole set
   still be several times slower (2026-10: 3.6x on plain English, found
@@ -80,17 +86,22 @@ how to run it.
 - For an older revision without the bench commit, cherry-pick the bench
   commit onto it in a temporary worktree (take the bench side of
   `examples/guardrails/common.rs`), and delete the worktree afterwards.
-- Build each revision's binaries once, copy them out, then run them
-  interleaved three times and take the median: the machine may carry
-  other load (a qemu VM moved results by 10-20 %).
+- Build the base binaries before the first edit (step 1) and keep them,
+  copied out of the target directory. At the end, build the head's, then
+  run base and head once each, back to back. Rerun only a row whose
+  difference looks large: three times, interleaved, and take the median
+  (the machine may carry other load; a qemu VM moved results by 10-20 %).
 - Report the cost of newly added types apart from the cost of the
   conversion.
 
 ## Memory check (idle footprint of the guardrails)
 
 No moment of its own: the plan names it for a commit that can change the
-guardrails' resident memory (engine residency, pinning, caches), or the
-user asks.
+guardrails' memory (engine building or residency, pinning, the compiled
+rule set, scan caches and vaults, anything kept across turns), or the user
+asks. It is reported once, at the end of the phase (every commit made and
+the review loop over), next to the base; the user decides what to do with
+it. It does not stop the cycle.
 
 - Tool: `tinicore/examples/guardrails/bench_idle_after_turns` (release,
   `--features guardrails,sensitive,test-fixtures`). It drives real
@@ -99,7 +110,10 @@ user asks.
   turns plus `--settle`, after `malloc_trim`). Not part of
   `scanning_benchmark`.
 - Run it on the Ubuntu glibc VM (macOS has no PSS). One configuration per
-  run: `--guardrails off`, `--pin off`, `--pin on`; three runs each.
+  run: `--guardrails off`, `--pin off`, `--pin on`.
+- Build the base binary before the first edit (step 1) and keep it. At the
+  end, build the head's and run each configuration once per side. Rerun
+  (three runs each) only where a difference looks large.
 - Run the configurations ONE AT A TIME, never concurrently: PSS splits the
   binary's file pages between processes running it, so concurrent runs
   distort it (2026-10: the pinned-vs-released gap read 4.5 MB concurrent,
@@ -139,6 +153,10 @@ user asks.
   there is no mapping list to update.)
 
 ## Baselines to take before editing
+
+- Speed and memory checks the plan names: build the base binaries now
+  (from the commit the phase starts from) and keep them; see those
+  sections. Nothing is measured up front.
 
 - Matching regression (any change to PII rules, detectors or the engine).
   The dump compares, per country set and layer, the raw matches (A), the
