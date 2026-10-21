@@ -396,3 +396,29 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | 9 | `in_vehicle_plate` recognizer 추가 (일반 + BH 시리즈) | in_vehicle_plate | YAML 신규 |
 | 10 | ABHA 번호 형식·체크섬 확인 후 `in_abha` 등록 여부 결정 | in_abha | 조사 |
 | 선택 | `in_gstin` recognizer (사업자 번호 마스킹 요구 시) | in_gstin | validator 신규, YAML 신규 |
+
+## 구현 반영 (ARGO `d46fb268b7`, 2026-10-21)
+
+다국어 브랜치에서 아래와 같이 구현했다. 이 문서의 권장과 다르게 정한 것은 굵게 표시한다. 계좌를 뺀 아홉 개는 손으로 쓴 FixedShape 형식(21개)이고, 계좌만 regex 다.
+
+| recognizer | label | score | 검증기 | 비고 |
+|---|---|---|---|---|
+| `in_aadhaar` | national_id | 0.5 | `in_aadhaar` | **구분자(공백·하이픈)가 있는 4-4-4 만**. Verhoeff, 회문 거부(python-stdnum 과 같음), **세 묶음이 모두 1900~2099 이면 거부**(`2023 2024 2025`). **더 긴 숫자 묶음의 일부이면 detector 가 버림**(카드번호 뒤 12자리, VID): 앞이 `숫자+구분자`이거나 뒤가 `구분자+숫자`인 경우 |
+| `in_aadhaar_weak` | national_id | **0.3** | `in_aadhaar` | 구분자 없는 12자리. 무작위 12자리의 1/10 이 Verhoeff 를 통과하므로 문맥 단어 필요 |
+| `in_pan` | national_id | 0.5 | `in_pan` | 4번째 글자는 python-stdnum 의 보유자 유형 11개(**K 포함**), 일련번호 `0000` 거부 |
+| `in_voter_id` | national_id | 0.3 | `luhn`(공용) | 숫자 7자리에 대한 Luhn |
+| `in_passport` | passport | 0.3 | 없음 | **8자 `[A-Z][0-9]{7}` 만**. 9자 MRZ 표기는 잡지 않음 |
+| `in_driver_license` | driver_license | **0.5** | `in_driver_license` | 주 코드 표 + 발급 연도 19xx/20xx |
+| `in_vehicle_plate` | vehicle_plate | **0.3** | `in_vehicle_plate` | 일반, 델리 차종 문자(`DL 1C AB 1234`), BH 시리즈. 주 코드 표(옛 코드 TS OR UA DN CT 포함), BH 는 통과. **BH 도 같은 recognizer 라 0.3** |
+| `in_bank_account` | bank_account | **0.5** | 없음 | IFSC + 계좌번호 9~18자리, 사이 구분자 `[ ,:/-] ?`. regex 로 둠(형식으로 쓰면 선택 숫자 9개가 연속되어 중복 경로가 생김) |
+| `in_phonenumber` | phone | 0.5 | 없음 | **`+91`·`0` 접두가 있는 것만**: `+91`·`0` 휴대(6~9 시작), `+91` 유선(지역번호 길이별) |
+| `in_phonenumber_weak` | phone | **0.3** | 없음 | 맨 휴대(5-5, 3-3-4, 4-3-3, 붙여 쓰기)와 국내 유선(0 + 지역번호, 모두 11자리). 급여 범위 `75000-80000` 같은 숫자 때문에 문맥 단어 필요 |
+
+- VID, ABHA, GSTIN 은 구현하지 않았다.
+- 문맥 단어에서 일상 뜻이 있는 맨 `pan`, `uid`, `vid`, `contact`, `call`, `epic` 은 뺐고, `pan card`, `epic no` 처럼 묶어 넣었다. 짧은 영어 단어도 단어 경계 검사 덕분에 긴 단어 안에서 걸리지 않으므로 `tel`, `mob`, `rto` 는 넣었다. 0.3 recognizer 에는 붙여 쓴 형태(`aadhaarno`, `passportno`, `voterid`)도 넣었다.
+- 알려진 한계:
+  - 소문자 입력은 잡지 않는다.
+  - Aadhaar 앞뒤 거부 규칙의 대가: 다른 숫자 바로 뒤(날짜 `15-08-1990 2345 6789 0124`, `Sr 3 …`)나 바로 앞(전화번호, 공백으로 나열한 두 번째 Aadhaar)에 공백·하이픈으로 붙은 번호는 놓친다. 쉼표가 있으면 둘 다 잡힌다.
+  - IFSC 와 계좌번호 사이에 라벨이 있으면 놓치고, 계좌번호 단독은 잡지 않는다.
+  - 주 코드 표에 없는 코드의 번호판은 놓친다.
+- 모든 나라를 함께 로드하면 FixedShape 형식이 203개(표 4장)다. 인도 단독은 1장, 독일과 함께면 2장이다. 측정값(10 KB, Apple Silicon): 인도 단독은 일반 영어 76 us, 인도 영어 80 us, 인도 PII 밀집 1.6 ms, DFA 캐시 warm 180 KB 이다. 같은 형식을 regex 로 쓰면 78 us, 92 us, 16.1 ms, 284 KB 다. 모든 나라 로드에서 인도와 4번째 표가 더해져 일반 영어 91 → 96 us, warm heap 440 → 486 KB 가 됐다.
