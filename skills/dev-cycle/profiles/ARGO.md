@@ -168,8 +168,17 @@ it. It does not stop the cycle.
   up front. For a per-commit check inside a series:
   `match_regress.sh dump <workdir> <name>` at each commit, then
   `match_diff.py <workdir>/<a>.tsv <workdir>/<b>.tsv`.
-  The allowed differences are decided in the plan, per commit; any other
-  difference stops the cycle. The dump adds 20k seeded random texts
+  The dump follows the tree it builds: `zz_match_dump.rs` for the
+  per-country layout (one set per country plus `all`), and
+  `zz_match_dump_single.rs` for the single `pii_filter_config.yaml` layout
+  (one set, `all`); `parity.sh` reads whichever rule files the tree has
+  and reports a type the tree lacks as SKIPPED.
+  At the end of the phase: one `compare` of the base against HEAD (the
+  skill's before/after rule). The per-commit `dump` is only for narrowing
+  down a difference the plan does not explain. Neither runs while the
+  commits are being made.
+  The allowed differences are decided in the plan; any other difference
+  stops the cycle. The dump adds 20k seeded random texts
   (`MATCH_RANDOM=<n>` changes it; base and head must use the same count,
   so never edit the dump tool while a compare is running: each dump copies
   it in when it starts).
@@ -219,6 +228,10 @@ instruction, as a "Claude Review" comment.
   about 400 differing texts for paypal, braintree and
   google_oauth_2_0_refresh_token that origin/main has too — compare the
   count with the base, do not read it as a regression.
+  On the single-file layout (main before the multilingual split),
+  `kr_mutated_templates` compares `kr_phonenumber` with the landline and
+  internet-phone shapes the multilingual tree added (about 4,500 differing
+  texts) — expected there; compare the count with the base.
 
 - A dump or test binary compiles whatever is on disk when cargo reaches it.
   Do not edit the tree between starting a run and the binary starting; check

@@ -79,6 +79,12 @@ needs it.
 "Round" in this document means one pass of the review loop (step 3 to
 step 5), never a verification.
 
+A check that compares before and after (a regression comparison, a test
+outcome comparison, a performance measurement) compares the base with HEAD
+once. When every difference is one the plan explains, it is done. Only an
+unexplained difference is narrowed down commit by commit, to find the
+commit that made it.
+
 ## When the review runs
 
 The review covers the whole change, not each commit on its own. A change
@@ -188,6 +194,13 @@ the PR is not run here:
 A step the project cannot run (no e2e, no linter) is skipped, and the report
 says so in one line: what was skipped, and what it would have covered. Never
 skip silently. Do not build a new e2e harness on the fly; propose one instead.
+
+A profile tool that does not fit the branch under test (it calls an API the
+branch or the base lacks, or expects a file layout the tree does not have)
+is adapted in a scratch copy for this change, never in the profile and
+never in the repository. The verification note says what was adapted and
+why. A lasting fix goes to the profile through step 7, with the user's
+approval.
 
 A failing check stops the cycle until its cause is found and fixed; that is
 the orchestrator's work, not a wait for the user. A test expectation is
