@@ -199,8 +199,15 @@ A profile tool that does not fit the branch under test (it calls an API the
 branch or the base lacks, or expects a file layout the tree does not have)
 is adapted in a scratch copy for this change, never in the profile and
 never in the repository. The verification note says what was adapted and
-why. A lasting fix goes to the profile through step 7, with the user's
-approval.
+why.
+
+When the cycle ends, judge each adaptation: would the profile's tool be
+better off working this way on every branch (a layout or API difference
+that will recur, not a one-off workaround)? If so, propose folding it into
+the profile's tool so that one tool serves both, together with the profile
+text that describes the tool. Once the user agrees, change the tool, update
+the profile, and sync the shared copy (step 7). A one-off adaptation stays
+in scratch and is not carried forward.
 
 A failing check stops the cycle until its cause is found and fixed; that is
 the orchestrator's work, not a wait for the user. A test expectation is
