@@ -1,6 +1,6 @@
 ---
 name: dev-cycle
-description: "Run a code change through the development cycle that ends in a PR: tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects, review with /code-review, fix, and repeat until the review asks for no change or only doc changes; then run the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
+description: "Run a code change through the development cycle that ends in a PR: for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range with /code-review, fix, and repeat until the review asks for no change or only doc changes; slow checks at the end of the phase, then the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
 user-invocable: true
 ---
 
@@ -9,19 +9,21 @@ user-invocable: true
 One loop for every code change that will become a PR:
 
 ```
-spec ─► tests from the spec (separate agent) ─► implement
-                                                   │
-        ┌──────────────────────────────────────────┘
-        ▼
-verify what it affects ─► /code-review ─► report, wait for decisions
+for each planned commit:
+  spec ─► tests from the spec (separate agent) ─► implement ─► verify what it affects ─► commit
+
+once every planned commit exists:
+  /code-review over the whole range ─► report, wait for decisions
         ▲                                         │
-        └────────── fix the chosen findings ◄─────┘
-ends when a review round asks for no change, only doc changes, or only
-spec-derived test rows that pass
+        └── verify the fix ◄── fix the chosen findings (amend into their commits)
+  ends when a review round asks for no change, only doc changes, or only
+  spec-derived test rows that pass
+
+end of the phase: the slow checks the profile defers to it
 then, once, before the PR: full suites + full e2e on the final HEAD
 ```
 
-Running everything on every round is wasted time: a full Rust test suite or a
+Running everything on every round is wasted time: a full test suite or a
 release e2e build takes tens of minutes, and a fix to one module cannot break
 another module's tests. The full run happens once, on the commit that will be
 reviewed.
@@ -46,6 +48,39 @@ agent definitions; each prompt has two parts.
   reviewer prompt (step 3).
 - When reporting a helper's result, say in a line or two what it was given.
   Show the full prompt only when the user asks.
+
+## When each check runs
+
+Every check belongs to one of three moments. The profile assigns its checks
+to them; without a profile, put fast checks (formatter, linter, the touched
+modules' tests) in the first and anything that takes tens of minutes in the
+second.
+
+| moment | what runs |
+| --- | --- |
+| every round: after implementing a commit, after each review fix | the fast checks of step 2, for the affected set |
+| end of the phase: the review loop has ended and the commits are settled | the slow checks the profile defers here (regression comparisons, e2e suites, performance measurements) |
+| before the PR: once, on the final HEAD | step 6 |
+
+A phase is one unit of work that ends in settled commits: the commits of one
+plan, or one milestone of a longer plan. A failure found at the end of the
+phase is fixed and re-checked there (only the affected part), then goes
+through the review loop like any other fix. The review loop never waits for
+the slow checks.
+
+When the profile assigns no moment to a check, it runs every round.
+
+## When the review runs
+
+The review covers the whole change, not each commit on its own. A change
+planned as several commits goes through steps 1a and 2 commit by commit, and
+each commit is made as soon as its checks pass. Step 3 starts once every
+planned commit exists and reviews `<base>..HEAD` in one pass. Fixes go into
+the commit they belong to (step 5), and every later round reviews the whole
+range again. A change of one commit is the same loop with a range of one.
+
+Reviewing after each commit is not wrong, just slower: a later commit often
+changes what an earlier finding was about. Do it only when the user asks.
 
 ## 0. Find the project profile
 
@@ -115,7 +150,9 @@ code is the bias this step exists to remove.
 
 Work out the affected set from the changed paths
 (`git diff --name-only <base>...HEAD` plus the working tree) and the profile's
-path table. Run, in order:
+path table. Run, in order, the checks that belong to this moment (see "When
+each check runs"); a check the profile defers to the end of the phase or to
+the PR is not run here:
 
 1. formatter and linter in the profile's configurations;
 2. the project's audit / policy scripts, if any;
@@ -127,9 +164,22 @@ A step the project cannot run (no e2e, no linter) is skipped, and the report
 says so in one line: what was skipped, and what it would have covered. Never
 skip silently. Do not build a new e2e harness on the fly; propose one instead.
 
-A failing check stops the cycle. Find the cause before going on; a test
-expectation is changed only when the change intends it, and the report names
-each one.
+A failing check stops the cycle until its cause is found and fixed; that is
+the orchestrator's work, not a wait for the user. A test expectation is
+changed only when the change intends it, and the report names each one.
+
+Report each verification as a progress note and keep going: once a commit's
+checks pass, move on to the next planned commit, and after the last one, to
+the review (step 3). The note carries:
+
+- the result lines as the tools printed them (e.g. `test result: ok. 364
+  passed; 0 failed`) and the name of every failing test;
+- every edit to a spec-derived test since the test agent wrote it, as a diff
+  with its reason, or "no test edits".
+
+Before the review, stop and wait for the user only when a spec-derived test
+and the implementation disagree (step 1a), or a regression comparison shows
+a difference the plan does not allow.
 
 ## 3. Review
 
@@ -254,6 +304,9 @@ A profile holds:
 
 ## Path → affected checks
 | changed path | tests | extra checks | e2e suite |
+
+## When each check runs
+| when | checks |   (every round / end of the phase / before the PR)
 
 ## Tests: where they live, who writes them
 - where new behaviour's tests go (files, tables), and whether unit tests sit

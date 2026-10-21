@@ -53,21 +53,16 @@ tests by design.
 
 ## When each check runs
 
-The slow checks (matching regression: two debug builds and two dumps,
-20-40 min; e2e: a release build and the suite, 20+ min) do not run on every
-fix round. A phase is one unit of work that ends in settled commits (e.g.
-"finish one country", "convert KR/US to hand-written detectors").
+The moments are the skill's ("When each check runs"). Here the slow checks
+are the matching regression (two debug builds and two dumps, 20-40 min) and
+e2e (a release build and the suite, 20+ min). A phase is e.g. "finish one
+country" or "convert KR/US to hand-written detectors".
 
 | when | checks |
 | --- | --- |
 | every round (after implementing, after each review fix) | fmt, the clippy lane(s) of the touched crates, the affected tests from the table above; `parity.sh` when a hand-written detector's shapes changed |
 | end of a phase (the review loop has ended and the commits are settled) | matching regression against the commit before the phase; the e2e suites of the behaviour the phase changed; for a PII detector or engine change, the speed check below |
 | before the PR (once, on the final HEAD) | the Pre-PR checklist: full suites, every e2e spec, the Core audits |
-
-A failure found at the end of a phase is fixed and re-checked there (only
-the affected part), then goes through the review loop like any other fix.
-The review loop itself never waits for the slow checks: review → report →
-wait for decisions → fix → re-review.
 
 ## Speed check (PII detectors and engine)
 
