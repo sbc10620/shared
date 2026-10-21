@@ -16,10 +16,11 @@ lists in `bash -c '...'`.
   - `cargo clippy -p tinicli --features guardrails --all-targets`
   - `cargo clippy -p tinicore --features guardrails,sensitive,test-fixtures --all-targets`
   - `cargo clippy -p tinicore-traits --all-targets`
-- Core audits (all must exit 0):
+- Core audits (before the PR; all must exit 0):
   `python3 scripts/<a>.py` for `audit_core_layer_deps`, `audit_core_product_leak`,
   `audit_core_crate_name_leak`, `audit_reimpl`.
-- Panic audits (input-handling changes; baseline in the root `CLAUDE.md`):
+- Panic audits (before the PR, for input-handling changes; baseline in the
+  root `CLAUDE.md`):
   `scripts/panic_filter.py`, `scripts/unreachable_filter.py`, `scripts/risky_unwrap.py`.
 - A `tinicore-traits` type change: `cargo check --workspace --all-targets`
   (other crates' exhaustive matches) and `cargo test -p tinicore-traits`.
@@ -86,6 +87,10 @@ how to run it.
   conversion.
 
 ## Memory check (idle footprint of the guardrails)
+
+No moment of its own: the plan names it for a commit that can change the
+guardrails' resident memory (engine residency, pinning, caches), or the
+user asks.
 
 - Tool: `tinicore/examples/guardrails/bench_idle_after_turns` (release,
   `--features guardrails,sensitive,test-fixtures`). It drives real
@@ -173,7 +178,7 @@ how to run it.
   (`gh pr view <n> --json state`): a PR merged meanwhile does not take the
   push, and the follow-up needs a new branch from main and a new PR.
 
-## Review fallback (Z.ai runner down)
+## Outside the cycle: review fallback (after the PR, Z.ai runner down)
 
 The Z.ai review job runs only on the self-hosted `zai-review` runner. When
 that runner is down every review job sits queued and fails after 24 h

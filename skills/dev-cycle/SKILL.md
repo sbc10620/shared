@@ -71,7 +71,10 @@ phase is fixed and re-checked there (only the affected part), then goes
 through the review loop like any other fix. The review loop never waits for
 the slow checks.
 
-When the profile assigns no moment to a check, it runs at every verification.
+A check the profile assigns no moment runs only when it is called for: the
+plan names it for the commits that need it, or the user asks. The plan
+reviewer (step 1) checks that the plan names such a check where the change
+needs it.
 
 "Round" in this document means one pass of the review loop (step 3 to
 step 5), never a verification.
