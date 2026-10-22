@@ -424,3 +424,34 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | 10 | `br_vehicle_plate` recognizer 추가 (메르코수르 패턴만). 구형 패턴은 **선행 작업 완료 후에만** 낮은 `score` 로 등록 | br_vehicle_plate | YAML 신규 |
 | 11 | `br_rg` recognizer 추가 (`score` 낮게, 선택적 `br_rg_sp` 검증기). **선행 작업 완료 후에만**. 다른 주 규칙 수집은 별도 조사 | br_rg | YAML 신규, 조사 |
 | 선택 | `br_cnpj` recognizer 와 검증기 (MEI 보호 요구 시). 2026년 영숫자 형식 패턴 포함 | br_cnpj | validator 신규, YAML 신규 |
+
+## 구현 반영 (ARGO `db845da1ca`, 2026-10-22)
+
+다국어 브랜치에서 아래와 같이 구현했다. 이 문서의 권장과 다르게 정한 것은 굵게 표시한다. 14개 모두 손으로 쓴 FixedShape 형식(22개)이라 regex 패턴은 늘지 않는다.
+
+| recognizer | label | score | 검증기 | 비고 |
+|---|---|---|---|---|
+| `br_cpf` | national_id | 0.5 | `br_cpf` | 3.3.3-2 와 맨 11자리 모두. python-stdnum 과 같은 이중 mod 11 + **같은 숫자 11개 반복 거부**(stdnum 은 허용) |
+| `br_pis` | national_id | 0.5 | `br_pis` | **점이 있는 3.5.2-1 표기만** |
+| `br_pis_weak` | national_id | **0.3** | `br_pis` | 맨 11자리(무작위 11개 중 1개 통과) |
+| `br_cnh` | driver_license | **0.3** | `br_cnh` | 커뮤니티 규칙(보정값 2). 공식 명세 없음 |
+| `br_voter_id` | national_id | 0.5 | `br_titulo` | **공백 두 개가 있는 4-4-4 만**. **UF 범위(01~28)는 regex 가 아니라 검증기가 검사** |
+| `br_voter_id_weak` | national_id | **0.3** | `br_titulo` | 맨 12자리. 시각값 `202610221350`(yyyymmddhhmm)이 약 1/100 통과해서 분리 |
+| `br_cns` | national_id | 0.5 | `br_cns` | **공백이 있는 3-4-4-4 만** |
+| `br_cns_weak` | national_id | **0.3** | `br_cns` | 맨 15자리(첫 자리 7~9 는 11개 중 1개 통과, IMEI 도 맨 15자리) |
+| `br_rg` | national_id | 0.3 | 없음 | **점·하이픈 표기만**, 주마다 규칙이 달라 체크 검사 없음 |
+| `br_passport` | passport | 0.3 | `br_passport` | 8자는 통과, 9자는 `AB123456<` + 끝자리를 MRZ 로 검사. **문서 예시 `FA1234567` 은 체크 디지트가 6이라 거부**(`FA1234566` 이 유효) |
+| `br_bank_account` | bank_account | 0.5 | `br_iban` | 29자 + mod 97. IBAN 은 나라별 파일에 둠 |
+| `br_phonenumber` | phone | 0.5 | `br_phone` | **표기별로 나눔**: `+55`, 괄호 DDD, 하이픈 있는 휴대(`11 91234-5678`), 괄호 유선. **`(11) 9 1234-5678` 처럼 9 뒤 공백 허용**. DDD 는 배정된 67개만 |
+| `br_phonenumber_weak` | phone | 0.3 | `br_phone` | 붙여 쓴 휴대 11자리, 괄호 없는 유선 |
+| `br_vehicle_plate` | vehicle_plate | **0.3** | 없음 | 메르코수르와 구형 모두 |
+
+- 유권자증 체크 디지트: 나머지 10 은 0, **UF 01·02 에서 나머지가 정확히 0 일 때만 1**(10 에서 나온 0 은 그대로). 두 번째 체크 디지트는 바뀐 첫 번째 값으로 계산한다.
+- CNPJ, RENAVAM, CEP, Pix 키, 출생증명 번호는 구현하지 않았다(4절과 같음).
+- 문맥 단어는 악센트 있는·없는 형태를 함께 넣었다. **맨 `placa` 는 뺐다**(그래픽카드 `placa de vídeo`, 메인보드 `placa-mãe` 뜻이 있어 `RTX3060` 같은 GPU 이름이 구형 번호판으로 잡힘). `fone`(이어폰), `ligar`(전화하다, 켜다)도 일상어라 뺐다. 짧은 단어(`cpf`, `rg`, `cnh`, `pis`, `sus`, `tse`)는 단어 경계 검사로 긴 단어 안에서 걸리지 않으므로 공백 없이 넣었다.
+- 알려진 한계:
+  - 소문자 입력, DDD 없는 시내 번호, 4-4 사이가 공백인 휴대, 점 표기가 아닌 RG, 공백이 하나뿐인 유권자증.
+  - 더 긴 숫자 묶음 안의 띄어 쓴 유권자증 4-4-4 와 CNS 3-4-4-4 는 잡힌다.
+  - CPF 와 CNH 를 모두 통과하는 값(유효 CPF 의 약 10%)이 `cnh`·`detran` 옆에 오면 운전면허로 보고된다.
+  - UUID: 문맥 단어가 없으면 무작위 UUID 40만 개에서 0건. `passaporte` 옆에서는 대문자 UUID 첫 묶음(`CF808938-…`)의 약 0.8%가 여권으로, `eleitor` 옆에서는 10만 개 중 1~3개의 마지막 12자리가 유권자증으로 잡힌다(후속에서 하이픈 거부로 막을 예정).
+- 모든 나라를 함께 로드하면 FixedShape 형식이 225개(표 4장)다. 브라질 단독은 1장, 독일과 함께면 2장이다. 측정값(10 KB, Apple Silicon): 브라질 단독은 일반 영어 77 us, 포르투갈어 75 us, 브라질 PII 밀집 2.3 ms, DFA 캐시 warm 176 KB 이다. 같은 형식을 regex 로 쓰면 72 us, 88 us, 19.3 ms, 283 KB 다. 모든 나라 로드에서 브라질이 더해져 일반 영어 100 → 102 us, warm heap 486 → 488 KB 가 됐다.
