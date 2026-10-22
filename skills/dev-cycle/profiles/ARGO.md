@@ -24,9 +24,9 @@ lists in `bash -c '...'`.
   `scripts/panic_filter.py`, `scripts/unreachable_filter.py`, `scripts/risky_unwrap.py`.
 - A `tinicore-traits` type change: `cargo check --workspace --all-targets`
   (other crates' exhaustive matches) and `cargo test -p tinicore-traits`.
-- Full suites (pre-PR, ~30-60 min): `scripts/regress_tests.sh <outdir>`
+- Full suites (pre-PR, ~30-60 min): `scripts/test_outcomes_record.sh <outdir>`
   (tinicore all tests, tinicli lib with and without `guardrails`, per-test
-  outcomes), then `scripts/compare_tests.py <baseline-dir> <outdir>`.
+  outcomes), then `scripts/test_outcomes_diff.py <baseline-dir> <outdir>`.
 - e2e: the `argo-e2e` skill (release `argo` with and without `guardrails`
   against a mock LLM). The release build takes tens of minutes; run the
   phase's suites with `--only <suite>` at the end of a phase, every spec
@@ -39,9 +39,9 @@ lists in `bash -c '...'`.
 
 | changed path | tests (every verification) | extra checks (end of the phase, except `cargo check --workspace`: every verification) | e2e suite (end of the phase) |
 | --- | --- | --- | --- |
-| `tinicore/src/guardrails/pii/config/*.yaml` | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | matching regression; `detector_vs_regex.sh` when a hand-written type's matching logic changed | PII suites |
-| `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | matching regression; `detector_vs_regex.sh` when a detector was converted or its matching logic changed | PII suites |
-| `tinicore/src/guardrails/engine/` | lib `-- guardrails`, filter + compile guard + `guardrails_integration_test` | matching regression | PII + prompt guard suites |
+| `tinicore/src/guardrails/pii/config/*.yaml` | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | PII base-vs-head comparison; `detector_vs_regex.sh` when a hand-written type's matching logic changed | PII suites |
+| `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | PII base-vs-head comparison; `detector_vs_regex.sh` when a detector was converted or its matching logic changed | PII suites |
+| `tinicore/src/guardrails/engine/` | lib `-- guardrails`, filter + compile guard + `guardrails_integration_test` | PII base-vs-head comparison | PII + prompt guard suites |
 | `tinicore/src/guardrails/prompt_injection/` | lib `-- prompt_injection prompt_guard`, `--test prompt_guard_e2e --test prompt_injection_install_e2e --test gateway_prompt_guard_gate` | — | prompt guard suites |
 | `tinicore/src/guardrails/install.rs`, `pii/install.rs` | lib `-- guardrails`, `--test guardrails_country_install_test --test pii_real_rules_egress_e2e` | — | PII + boot suites |
 | `tinicore/src/sensitive/` | lib `-- sensitive`, `--test sensitive_slim` | — | PII masking suites |
@@ -55,14 +55,14 @@ tests by design.
 ## When each check runs
 
 The moments are the skill's ("When each check runs"). Here the slow checks
-are the matching regression (two debug builds and two dumps, 20-40 min) and
+are the PII base-vs-head comparison (two debug builds and two dumps, 20-40 min) and
 e2e (a release build and the suite, 20+ min). A phase is e.g. "finish one
 country" or "convert KR/US to hand-written detectors".
 
 | when | checks |
 | --- | --- |
 | every verification (after implementing a commit, after each review fix) | fmt, the clippy lane(s) of the touched crates, the tests column of the table above; `cargo check --workspace --all-targets` when `tinicore-traits` changed |
-| end of a phase (the review loop has ended and the commits are settled) | matching regression against the commit before the phase; the e2e suites of the behaviour the phase changed; `detector_vs_regex.sh` when the phase converted a regex to a hand-written detector or changed a detector's matching logic (shape, boundaries, separators); for a PII detector or engine change, the speed check below |
+| end of a phase (the review loop has ended and the commits are settled) | PII base-vs-head comparison against the commit before the phase; the e2e suites of the behaviour the phase changed; `detector_vs_regex.sh` when the phase converted a regex to a hand-written detector or changed a detector's matching logic (shape, boundaries, separators); for a PII detector or engine change, the speed check below |
 | before the PR (once, on the final HEAD) | the Pre-PR checklist: full suites, every e2e spec, the Core audits |
 
 ## Speed check (PII detectors and engine)
@@ -158,19 +158,19 @@ it. It does not stop the cycle.
   (from the commit the phase starts from) and keep them; see those
   sections. Nothing is measured up front.
 
-- Matching regression (any change to PII rules, detectors or the engine).
+- PII base-vs-head comparison (any change to PII rules, detectors or the engine).
   The dump compares, per country set and layer, the raw matches (A), the
   detector's spans and kinds (S), each layer's `kinds()` set (K), and the
   `filter_labels` override detector per label on the shared slot
   (`override/<label>`, set name `override`):
-  `scripts/match_regress.sh compare <base-rev> <workdir>` after the change
+  `scripts/pii_base_vs_head.sh compare <base-rev> <workdir>` after the change
   is committed; it dumps the base revision itself, so nothing has to be taken
   up front. For a per-commit check inside a series:
-  `match_regress.sh dump <workdir> <name>` at each commit, then
-  `match_diff.py <workdir>/<a>.tsv <workdir>/<b>.tsv`.
-  The dump follows the tree it builds: `zz_match_dump.rs` for the
+  `pii_base_vs_head.sh dump <workdir> <name>` at each commit, then
+  `pii_dump_diff.py <workdir>/<a>.tsv <workdir>/<b>.tsv`.
+  The dump follows the tree it builds: `zz_pii_dump.rs` for the
   per-country layout (one set per country plus `all`), and
-  `zz_match_dump_single.rs` for the single `pii_filter_config.yaml` layout
+  `zz_pii_dump_single.rs` for the single `pii_filter_config.yaml` layout
   (one set, `all`); `detector_vs_regex.sh` reads whichever rule files the tree has
   and reports a type the tree lacks as SKIPPED.
   At the end of the phase: one `compare` of the base against HEAD (the
@@ -188,15 +188,15 @@ it. It does not stop the cycle.
   common.yaml, a shared validator); none for a commit that only adds a
   country (it has no base to compare with: its spec tests, `detector_vs_regex.sh` and e2e
   cover it). Add `all` only when cross-country overlaps matter.
-- Full-suite outcomes: run `regress_tests.sh` on the base commit when the
-  change may move tests (renames, count changes), so `compare_tests.py` can
+- Full-suite outcomes: run `test_outcomes_record.sh` on the base commit when the
+  change may move tests (renames, count changes), so `test_outcomes_diff.py` can
   show exactly which tests appeared, disappeared or started failing.
 
 ## Pre-PR checklist
 
 - fmt, every clippy lane, the four Core audits (and the panic audits for
   input handling) on the final HEAD.
-- `regress_tests.sh` + `compare_tests.py` against the baseline: no newly
+- `test_outcomes_record.sh` + `test_outcomes_diff.py` against the baseline: no newly
   failing test; every renamed or removed test is intended and named.
 - every `argo-e2e` spec that fits the branch, plus the branch's own spec.
 - memory: the work-state note for the branch is current.
@@ -249,7 +249,7 @@ instruction, as a "Claude Review" comment.
   that registers into or resets it must be `#[serial]` and reset first.
   CI's guardrails lanes run `cargo nextest` (one process per test), so a
   missed one never fails in CI; it flakes only under `cargo test`
-  (locally and in `regress_tests.sh`). When adding such state, grep every
+  (locally and in `test_outcomes_record.sh`). When adding such state, grep every
   test that touches it.
 - An issue in another repository is never written `argo-tizen #1689` in an
   ARGO commit message or PR body: GitHub links `#1689` to ARGO's own
