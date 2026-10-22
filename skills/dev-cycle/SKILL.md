@@ -25,9 +25,9 @@ end of the phase: the slow checks the profile defers to it
 then, once, before the PR: full suites + full e2e on the final HEAD
 ```
 
-Running everything on every verification is wasted time: a full test suite or a
-release e2e build takes tens of minutes, and a fix to one module cannot break
-another module's tests. The full run happens once, on the commit that will be
+Running everything on every verification is wasted time: a cold full test
+suite or a release e2e build is the costliest work in the cycle, and a fix to
+one module cannot break another module's tests. The full run happens once, on the commit that will be
 reviewed.
 
 This document is Claude-facing and stays in English. Reports to the user are in
@@ -54,13 +54,15 @@ agent definitions; each prompt has two parts.
 
 ## When each check runs
 
-Every check belongs to one of three moments. The profile assigns its checks
+Every check belongs to one of four moments. The profile assigns its checks
 to them; without a profile, put fast checks (formatter, linter, the touched
-modules' tests) in the first and anything that takes tens of minutes in the
-second.
+modules' tests) in every verification, and anything that needs a release
+build, a whole-suite run or a base-vs-head comparison at the end of the
+phase or before the PR.
 
 | moment | what runs |
 | --- | --- |
+| before editing: step 1, on the commit the change starts from | the baselines and kept base binaries the profile or the plan asks for |
 | every verification: after implementing a commit, after each review fix | the fast checks of step 2, for the affected set |
 | end of the phase: the review loop has ended and the commits are settled | the slow checks the profile defers here (regression comparisons, e2e suites, performance measurements) |
 | before the PR: once, on the final HEAD | step 6 |
@@ -83,7 +85,17 @@ A check that compares before and after (a regression comparison, a test
 outcome comparison, a performance measurement) compares the base with HEAD
 once. When every difference is one the plan explains, it is done. Only an
 unexplained difference is narrowed down commit by commit, to find the
-commit that made it.
+commit that made it. When such a check needs a base build, build the base
+binaries before the first edit (step 1) and keep them outside the target
+directory; at the end only HEAD is built. Checking the base out later
+rebuilds both sides and changes the tree under any other running check.
+
+Checks share a build only when the compiled library is the same: the
+package, check vs codegen, the build profile and the feature set. At one moment, run
+the checks that share a build back to back so the build happens once, and
+run a wider check (a full suite) after the narrower ones whose builds it
+reuses. The profile lists its groups of checks that share a build, ordered
+from the cheapest to the costliest.
 
 ## When the review runs
 
@@ -133,8 +145,11 @@ profile.
   the findings: fold in the ones that hold, and list the ones left out with
   the reason. A plan revised from the user's feedback is not reviewed again.
 - If the profile asks for a baseline (a regression comparison, recorded test
-  outcomes), take it NOW, on the commit the change starts from. A baseline
-  taken after editing compares the change with itself.
+  outcomes, base binaries kept for a comparison or a measurement the plan
+  names), take it NOW, on the commit the change starts from, and let every
+  baseline build and run finish before the first edit: each compiles the
+  tree on disk. A baseline taken after editing compares the change with
+  itself.
 - Never use a bare `git stash` (the stash is shared across worktrees). Set
   work aside with a temporary commit.
 
@@ -293,8 +308,8 @@ before that.
   home (e.g. a change to a file the series never touched for that purpose).
 - Rewriting history while a background check has the tree checked out (a
   regression dump at a base revision) breaks that check: wait for it first.
-- Keep the pre-amend SHA for the next verification: it is the base of the
-  fix's regression comparison, when the profile has one.
+- Keep the pre-amend SHA while an unexplained difference is being narrowed
+  down commit by commit: it is the base of that per-commit comparison.
 - When a finding is about a test:
   - a spec-derived expectation is wrong, or a case the spec covers has no
     test → the test agent fixes it (step 1a), given the finding and the
@@ -344,14 +359,17 @@ A profile holds:
 ## Commands
 - formatter / linter (every configuration that CI runs)
 - audits
-- full test suites (pre-PR), and how long they take
+- full test suites (pre-PR), and what they reuse from the earlier checks
 - e2e: the skill or script, how to pick one suite
 
 ## Path → affected checks
 | changed path | tests | extra checks | e2e suite |
 
+## Check cost and shared builds
+| group (what must match to share the build) | checks | cost |   (cheapest first; coarse units, not minutes)
+
 ## When each check runs
-| when | checks |   (every verification / end of the phase / before the PR)
+| when | checks |   (before editing / every verification / end of the phase / before the PR)
 
 ## Tests: where they live, who writes them
 - where new behaviour's tests go (files, tables), and whether unit tests sit

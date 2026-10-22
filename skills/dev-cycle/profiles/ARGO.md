@@ -24,26 +24,53 @@ lists in `bash -c '...'`.
   `scripts/panic_filter.py`, `scripts/unreachable_filter.py`, `scripts/risky_unwrap.py`.
 - A `tinicore-traits` type change: `cargo check --workspace --all-targets`
   (other crates' exhaustive matches) and `cargo test -p tinicore-traits`.
-- Full suites (pre-PR, ~30-60 min): `scripts/test_outcomes_record.sh <outdir>`
+- Full suites (pre-PR): `scripts/test_outcomes_record.sh <outdir>`
   (tinicore all tests, tinicli lib with and without `guardrails`, per-test
   outcomes), then `scripts/test_outcomes_diff.py <baseline-dir> <outdir>`.
+  Run it last at its moment: it reuses the lib-test, integration and
+  tinicli builds the path tests left, and builds only the remaining test
+  binaries, examples and doctests. Do not rerun the path tests only to warm
+  the build.
 - e2e: the `argo-e2e` skill (release `argo` with and without `guardrails`
-  against a mock LLM). The release build takes tens of minutes; run the
-  phase's suites with `--only <suite>` at the end of a phase, every spec
-  before the PR. A
+  against a mock LLM). Its two release builds of `argo-cli` are the costliest
+  builds here and share nothing with the other checks; run the phase's
+  suites with `--only <suite>` at the end of a phase, every spec before the
+  PR. A
   spec must use the config format of the branch under test (flat `pii_*`
   keys vs the `[pii]` section); write a branch spec when the shipped ones do
   not fit, and keep it out of the repository.
+- PII release checks (they share one release build of the tinicore
+  library, `--features guardrails,sensitive,test-fixtures`; each binary
+  still does its own LTO link):
+  - `scripts/detector_vs_regex.sh [test-filter]`: each hand-written
+    recognizer against the original regex kept in its YAML comment, on
+    shape-focused random and mutated-template texts with the validators
+    removed. It reads whichever rule files the tree has. "SKIPPED (not … in
+    this tree)" is expected; "SKIPPED (regex or detector did not build)" is
+    a failure to investigate.
+  - `scripts/pii_base_vs_head.sh`: the base's and HEAD's detection results
+    on one corpus (see Baselines). `keep-base <keepdir>` before the first
+    edit, `compare-kept <keepdir>` at the end of the phase; `compare
+    <base-rev> <workdir>` only when no base was kept or base and HEAD use
+    different rule layouts (it checks the base out, so both sides rebuild);
+    `dump <workdir> <name>` for the current tree alone, reading
+    `<workdir>/corpus.json`.
+  - the speed check's `bench_scan` (see Speed check).
 
 ## Path → affected checks
 
+The tests column gives the arguments only: tinicore tests are
+`cargo test -p tinicore --features guardrails,sensitive,test-fixtures <args>`
+(without the features the filters match nothing and the build is not the
+one the other checks share).
+
 | changed path | tests (every verification) | extra checks (end of the phase, except `cargo check --workspace`: every verification) | e2e suite (end of the phase) |
 | --- | --- | --- | --- |
-| `tinicore/src/guardrails/pii/config/*.yaml` | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | PII base-vs-head comparison; `detector_vs_regex.sh` when a hand-written type's matching logic changed | PII suites |
-| `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | PII base-vs-head comparison; `detector_vs_regex.sh` when a detector was converted or its matching logic changed | PII suites |
+| `tinicore/src/guardrails/pii/config/*.yaml` | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | PII base-vs-head comparison when `common.yaml` changed (not for a country's own YAML file: its spec tests cover it); `detector_vs_regex.sh` when a hand-written type was added or its matching logic changed | PII suites |
+| `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | PII base-vs-head comparison when a hand-written detector's logic, a shared validator or `labels.rs` changed (not a country's own validator); `detector_vs_regex.sh` when a detector was converted, added or its matching logic changed | PII suites |
 | `tinicore/src/guardrails/engine/` | lib `-- guardrails`, filter + compile guard + `guardrails_integration_test` | PII base-vs-head comparison | PII + prompt guard suites |
 | `tinicore/src/guardrails/prompt_injection/` | lib `-- prompt_injection prompt_guard`, `--test prompt_guard_e2e --test prompt_injection_install_e2e --test gateway_prompt_guard_gate` | — | prompt guard suites |
-| `tinicore/src/guardrails/install.rs`, `pii/install.rs` | lib `-- guardrails`, `--test guardrails_country_install_test --test pii_real_rules_egress_e2e` | — | PII + boot suites |
+| `tinicore/src/guardrails/install.rs`, `pii/install.rs`, `pii/detector.rs`, `pii/shared.rs` | lib `-- guardrails`, `--test guardrails_filter_test --test guardrails_country_install_test --test pii_real_rules_egress_e2e` | PII base-vs-head comparison when detection, a layer or the override path changed (`detect`, `resolve_overlaps`, `kinds_for_layer`, `try_from_filter` / `try_for_kinds` in `pii/detector.rs`; the layer, override and country-set filters in `pii/shared.rs`). The dump does not reach `try_for_layer`, `select_countries` or `pii/install.rs`: their own tests cover them | PII + boot suites |
 | `tinicore/src/sensitive/` | lib `-- sensitive`, `--test sensitive_slim` | — | PII masking suites |
 | `tinicore-traits/src/sensitive.rs` | `cargo test -p tinicore-traits`, lib `-- sensitive guardrails` | `cargo check --workspace --all-targets` | — |
 | `tinicli/src/config.rs`, `cli_entry.rs` | `cargo test -p tinicli --lib` with and without `--features guardrails` | — | boot suites |
@@ -52,25 +79,48 @@ lists in `bash -c '...'`.
 Lib tests run in debug: some release builds fail `debug_assert`-dependent
 tests by design.
 
+## Check cost and shared builds
+
+A build is shared when the compiled library is the same: the package,
+check (clippy, `cargo check`) vs codegen (tests, examples, binaries), the
+profile and the feature set (`$F` = `guardrails,sensitive,test-fixtures`).
+A crate's lib-test binary (`--lib`) is its own build; its integration
+tests and examples link the ordinary library. Groups, cheapest first:
+
+| group (one build) | checks that share it | cost |
+| --- | --- | --- |
+| no build | fmt, the Core and panic audits | seconds each |
+| `tinicore-traits` | `cargo test -p tinicore-traits` | seconds |
+| tinicore library, debug, `$F` | every `--test <name>` (each adds its own test binary); the full suites | build about a minute; each test runs in seconds |
+| tinicore lib-test binary, debug, `$F` | every `--lib -- <filter>`; the full suites | build a few minutes; each filter runs in seconds |
+| tinicli lib-test binary, one per lane | `cargo test -p tinicli --lib` with and without `guardrails`; the full suites | build a few minutes; runs in seconds |
+| check build, one per clippy lane | that lane only (tinicore is re-checked per feature set; lanes share third-party crates when features overlap) | a few minutes per lane |
+| check build of the workspace | `cargo check --workspace --all-targets` (shares nothing with the clippy lanes: other feature sets) | a few minutes |
+| tinicore library, release, `$F` | `detector_vs_regex.sh`, `pii_base_vs_head.sh`, `bench_scan`, `bench_engine` (each binary does its own LTO link) | build a few minutes; the PII dump runs a few minutes per side, the others seconds |
+| tinicore library, release, `$F`, on the VM | the memory check | a VM build per side; about a minute per configuration |
+| `argo-cli`, release, two feature sets | every `argo-e2e` spec | the costliest build; each spec under a minute |
+
+Run the checks of one group back to back. Run the full suites last at
+their moment.
+
 ## When each check runs
 
-The moments are the skill's ("When each check runs"). Here the slow checks
-are the PII base-vs-head comparison (two debug builds and two dumps, 20-40 min) and
-e2e (a release build and the suite, 20+ min). A phase is e.g. "finish one
-country" or "convert KR/US to hand-written detectors".
+The moments are the skill's ("When each check runs"). A phase is e.g.
+"finish one country" or "convert KR/US to hand-written detectors".
 
 | when | checks |
 | --- | --- |
+| before editing (step 1, on the clean commit the phase starts from) | `pii_base_vs_head.sh keep-base` when a path the plan changes asks for the PII base-vs-head comparison (path table); the speed check's bench binaries (same release build) and the memory check's VM binary when the plan names those checks; `test_outcomes_record.sh` on the base when the change may move tests. All of them finish before the first edit: each compiles the tree on disk |
 | every verification (after implementing a commit, after each review fix) | fmt, the clippy lane(s) of the touched crates, the tests column of the table above; `cargo check --workspace --all-targets` when `tinicore-traits` changed |
-| end of a phase (the review loop has ended and the commits are settled) | PII base-vs-head comparison against the commit before the phase; the e2e suites of the behaviour the phase changed; `detector_vs_regex.sh` when the phase converted a regex to a hand-written detector or changed a detector's matching logic (shape, boundaries, separators); for a PII detector or engine change, the speed check below |
-| before the PR (once, on the final HEAD) | the Pre-PR checklist: full suites, every e2e spec, the Core audits |
+| end of a phase (the review loop has ended and the commits are settled) | on ONE release build of HEAD, back to back: `pii_base_vs_head.sh compare-kept` when the path table asks for the PII base-vs-head comparison; `detector_vs_regex.sh` when the phase converted a regex to a hand-written detector, added hand-written detectors (a new country's included) or changed a detector's matching logic (shape, boundaries, separators); the speed check when the plan names it. Then the e2e suites of the behaviour the phase changed, and the memory check when the plan names it |
+| before the PR (once, on the final HEAD) | the Pre-PR checklist: full suites (last), every e2e spec, the Core audits |
 
 ## Speed check (PII detectors and engine)
 
 `tinicore/src/guardrails/AGENTS.md` "Check it twice" is the rule; this is
 how to run it.
 
-No moment of its own: the plan names it for a commit that can change scan
+No path triggers it: the plan names it for a commit that can change scan
 speed (the scan path, a detector, the engine, a validator), or the user
 asks. It is reported once, at the end of the phase (every commit made and
 the review loop over), next to the base; the user decides what to do with
@@ -87,7 +137,10 @@ it. It does not stop the cycle.
   commit onto it in a temporary worktree (take the bench side of
   `examples/guardrails/common.rs`), and delete the worktree afterwards.
 - Build the base binaries before the first edit (step 1) and keep them,
-  copied out of the target directory. At the end, build the head's, then
+  copied out of the target directory (the same release build as
+  `pii_base_vs_head.sh keep-base`: same features; not when the bench commit
+  is cherry-picked into a temporary worktree, which is a separate build).
+  At the end, build the head's, then
   run base and head once each, back to back. Rerun only a row whose
   difference looks large: three times, interleaved, and take the median
   (the machine may carry other load; a qemu VM moved results by 10-20 %).
@@ -96,7 +149,7 @@ it. It does not stop the cycle.
 
 ## Memory check (idle footprint of the guardrails)
 
-No moment of its own: the plan names it for a commit that can change the
+No path triggers it: the plan names it for a commit that can change the
 guardrails' memory (engine building or residency, pinning, the compiled
 rule set, scan caches and vaults, anything kept across turns), or the user
 asks. It is reported once, at the end of the phase (every commit made and
@@ -121,13 +174,16 @@ it. It does not stop the cycle.
 - Report live heap and PSS only, always next to the `--guardrails off`
   run of the same build, with the points written out ("after install",
   "idle after 200 turns"), not A/B/C/D.
-- Before/after a series: put the bench file into the base revision too.
+- Before/after a series: put the bench file and its `[[example]]` entry in
+  `tinicore/Cargo.toml` into the base revision too (and into the head when
+  it lacks them).
   If the base lacks an API the bench uses (e.g. `pin_engines`), adapt the
   base copy only (`turn_scope::pin_for_process()` for the pin) and say so.
-  For the VM, build both inside the argo-tizen tree: the base is its
-  `tini/` (check the guardrails paths match ARGO's base), the head is that
-  tree plus `git diff <base> HEAD -- tinicore tinicore-traits` applied with
-  `git apply --directory=tini`.
+  On the VM, build the ARGO tree itself, never the argo-tizen tree: rsync
+  the checkout without `target/` and `.git`, build
+  `cargo build -p tinicore --example bench_idle_after_turns --release
+  --features guardrails,sensitive,test-fixtures`, and copy the binary out
+  (the base before the first edit, the head at the end).
 
 ## Tests: where they live, who writes them
 
@@ -158,36 +214,57 @@ it. It does not stop the cycle.
   (from the commit the phase starts from) and keep them; see those
   sections. Nothing is measured up front.
 
-- PII base-vs-head comparison (any change to PII rules, detectors or the engine).
-  The dump compares, per country set and layer, the raw matches (A), the
+- PII base-vs-head comparison, when the path table asks for it: a change
+  that must keep detection as it was (the engine, a hand-written detector's
+  logic, a shared validator, `labels.rs`, `common.yaml`, the layer, country
+  set and `filter_labels` override wiring, and the span selection itself:
+  `detect`, `resolve_overlaps`, `kinds_for_layer`, `try_from_filter`,
+  `try_for_kinds` in `pii/detector.rs`; the layer, override and
+  country-set filters in `pii/shared.rs`). The dump builds its detectors
+  through `try_from_filter` and `try_for_kinds`, so it does not reach
+  `try_for_layer`, `select_countries` or `pii/install.rs`: those are
+  covered by `guardrails_country_install_test` and
+  `pii_real_rules_egress_e2e`. A country's own rules and validators are
+  covered by their spec tests instead.
+  `scripts/pii_base_vs_head.sh keep-base <keepdir>` NOW, on the clean
+  commit the phase starts from: it keeps the release dump binary, its
+  commit, its rule layout and the dump tool's hash. At the end of the phase
+  `compare-kept <keepdir>` extracts the corpus from HEAD, builds HEAD's
+  binary, runs both and diffs, with no checkout. Without a kept base,
+  `compare <base-rev> <workdir>` checks the base out instead (both sides
+  rebuild).
+  The dump records, per country set and layer, the raw matches (A), the
   detector's spans and kinds (S), each layer's `kinds()` set (K), and the
   `filter_labels` override detector per label on the shared slot
-  (`override/<label>`, set name `override`):
-  `scripts/pii_base_vs_head.sh compare <base-rev> <workdir>` after the change
-  is committed; it dumps the base revision itself, so nothing has to be taken
-  up front. For a per-commit check inside a series:
-  `pii_base_vs_head.sh dump <workdir> <name>` at each commit, then
-  `pii_dump_diff.py <workdir>/<a>.tsv <workdir>/<b>.tsv`.
-  The dump follows the tree it builds: `zz_pii_dump.rs` for the
-  per-country layout (one set per country plus `all`), and
+  (`override/<label>`, set name `override`). It is a release build and
+  spreads the texts over every core; its rows are byte-identical to a
+  sequential run. The dump follows the tree it builds: `zz_pii_dump.rs`
+  for the per-country layout (one set per country plus `all`), and
   `zz_pii_dump_single.rs` for the single `pii_filter_config.yaml` layout
-  (one set, `all`); `detector_vs_regex.sh` reads whichever rule files the tree has
-  and reports a type the tree lacks as SKIPPED.
-  At the end of the phase: one `compare` of the base against HEAD (the
-  skill's before/after rule). The per-commit `dump` is only for narrowing
+  (one set, `all`).
+  For a per-commit check inside a series:
+  `pii_base_vs_head.sh dump <workdir> <name>` at each commit, then
+  `pii_dump_diff.py <workdir>/<a>.tsv <workdir>/<b>.tsv`; only to narrow
   down a difference the plan does not explain. Neither runs while the
   commits are being made.
   The allowed differences are decided in the plan; any other difference
   stops the cycle. The dump adds 20k seeded random texts
-  (`MATCH_RANDOM=<n>` changes it; base and head must use the same count,
-  so never edit the dump tool while a compare is running: each dump copies
-  it in when it starts).
-  Which country sets to dump (`MATCH_SETS=kr,us`, default every set plus
-  `all`): the countries whose own files changed; every existing country
-  when shared code changed (the engine, a hand-written detector,
-  common.yaml, a shared validator); none for a commit that only adds a
-  country (it has no base to compare with: its spec tests, `detector_vs_regex.sh` and e2e
-  cover it). Add `all` only when cross-country overlaps matter.
+  (`MATCH_RANDOM=<n>` changes it; base and head must use the same count).
+  Do not edit the dump tool between `keep-base` and `compare-kept`: the
+  kept binary carries the old tool (`compare-kept` refuses when the tool's
+  hash changed). It also refuses when base and HEAD use different rule
+  layouts (single file vs per country): across the split, use
+  `compare <base-rev>`. Both refusals come before any build.
+  For a per-commit `dump`, use the keepdir as `<workdir>` so every dump
+  reads the same `corpus.json`; without one, run
+  `python3 scripts/pii_corpus.py <workdir>/corpus.json <repo-root>` first.
+  Leave `MATCH_SETS` unset: the dump then covers every country set, `all`
+  and `override`. If you narrow it (`MATCH_SETS=kr,us,all,override`),
+  always keep `override` (it gates the `filter_labels` comparison), keep
+  `all` on the single-file layout (its only rule set), and give base and
+  head the same value. A phase that only adds a country needs no
+  comparison (no base to compare with: its spec tests,
+  `detector_vs_regex.sh` and e2e cover it).
 - Full-suite outcomes: run `test_outcomes_record.sh` on the base commit when the
   change may move tests (renames, count changes), so `test_outcomes_diff.py` can
   show exactly which tests appeared, disappeared or started failing.
@@ -196,8 +273,13 @@ it. It does not stop the cycle.
 
 - fmt, every clippy lane, the four Core audits (and the panic audits for
   input handling) on the final HEAD.
-- `test_outcomes_record.sh` + `test_outcomes_diff.py` against the baseline: no newly
-  failing test; every renamed or removed test is intended and named.
+- `test_outcomes_record.sh` (last, reusing the path tests' builds) +
+  `test_outcomes_diff.py` against the baseline: no newly failing test;
+  every renamed or removed test is intended and named. Without a baseline,
+  every `*_outcomes.txt` must report a non-zero ok count and the run must
+  print no `BUILD FAILED` line (a failed build may print no FAILED line),
+  and the FAILED lines may name only the intermittent tests listed in
+  Pitfalls (rerun those alone to confirm).
 - every `argo-e2e` spec that fits the branch, plus the branch's own spec.
 - memory: the work-state note for the branch is current.
 - push, PR and PR comments wait for their own instruction.
@@ -239,10 +321,11 @@ instruction, as a "Claude Review" comment.
   matches the shell running the wait loop, and returns at once).
 - A `PatternFilter` scan with no turn guard builds the engine on EVERY call;
   a tool that scans many texts must call
-  `tinicore::sensitive::turn_scope::pin_for_process()` first (a 43k-text
-  dump: 15 min pinned, far longer unpinned).
-- A base dump must be built from the base commit checked out, never from a
-  tree that already holds part of the change.
+  `tinicore::sensitive::turn_scope::pin_for_process()` first (unpinned,
+  a dump rebuilds the engine for every text).
+- A kept base binary must come from the clean commit the phase starts
+  from, never from a tree that already holds part of the change
+  (`keep-base` refuses a dirty tree).
 - In an unquoted heredoc, backticks in a commit message run as commands; use
   `<<'EOF'` or a message file.
 - Process-wide state (a shared slot, a registry) and tests: every test
@@ -261,3 +344,11 @@ instruction, as a "Claude Review" comment.
   before running it.
 - `commands_hub::devices_skips_enroll_when_resolved_name_is_invalid` (tinicli)
   fails intermittently; it passes alone and on re-run.
+- `agent::loop_::e2e::checkpoint_resume::prompt_guard_on_resume_still_blocks_the_real_user_message`
+  (tinicore lib) failed once in a filtered `--lib` run and passed in the
+  full suite (observed once, 2026-10-22).
+- The Ubuntu VM (6 GB, no swap) gets rustc SIGKILLed on ARGO's LTO release
+  build of tinicore. Add a temporary swap file before building
+  (`sudo fallocate -l 8G /swap.tmp && sudo chmod 600 /swap.tmp && sudo
+  mkswap /swap.tmp && sudo swapon /swap.tmp`) and remove it afterwards
+  (`sudo swapoff /swap.tmp && sudo rm /swap.tmp`).
