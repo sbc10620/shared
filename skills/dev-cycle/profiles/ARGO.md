@@ -37,10 +37,10 @@ lists in `bash -c '...'`.
 
 ## Path → affected checks
 
-| changed path | tests (every verification) | extra checks (end of the phase, except `parity.sh` and `cargo check --workspace`: every verification) | e2e suite (end of the phase) |
+| changed path | tests (every verification) | extra checks (end of the phase, except `cargo check --workspace`: every verification) | e2e suite (end of the phase) |
 | --- | --- | --- | --- |
-| `tinicore/src/guardrails/pii/config/*.yaml` | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | matching regression; `parity.sh` for a hand-written type | PII suites |
-| `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | matching regression; `parity.sh` | PII suites |
+| `tinicore/src/guardrails/pii/config/*.yaml` | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | matching regression; `detector_vs_regex.sh` when a hand-written type's matching logic changed | PII suites |
+| `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | matching regression; `detector_vs_regex.sh` when a detector was converted or its matching logic changed | PII suites |
 | `tinicore/src/guardrails/engine/` | lib `-- guardrails`, filter + compile guard + `guardrails_integration_test` | matching regression | PII + prompt guard suites |
 | `tinicore/src/guardrails/prompt_injection/` | lib `-- prompt_injection prompt_guard`, `--test prompt_guard_e2e --test prompt_injection_install_e2e --test gateway_prompt_guard_gate` | — | prompt guard suites |
 | `tinicore/src/guardrails/install.rs`, `pii/install.rs` | lib `-- guardrails`, `--test guardrails_country_install_test --test pii_real_rules_egress_e2e` | — | PII + boot suites |
@@ -61,8 +61,8 @@ country" or "convert KR/US to hand-written detectors".
 
 | when | checks |
 | --- | --- |
-| every verification (after implementing a commit, after each review fix) | fmt, the clippy lane(s) of the touched crates, the tests column of the table above; `parity.sh` when a hand-written detector's shapes changed; `cargo check --workspace --all-targets` when `tinicore-traits` changed |
-| end of a phase (the review loop has ended and the commits are settled) | matching regression against the commit before the phase; the e2e suites of the behaviour the phase changed; for a PII detector or engine change, the speed check below |
+| every verification (after implementing a commit, after each review fix) | fmt, the clippy lane(s) of the touched crates, the tests column of the table above; `cargo check --workspace --all-targets` when `tinicore-traits` changed |
+| end of a phase (the review loop has ended and the commits are settled) | matching regression against the commit before the phase; the e2e suites of the behaviour the phase changed; `detector_vs_regex.sh` when the phase converted a regex to a hand-written detector or changed a detector's matching logic (shape, boundaries, separators); for a PII detector or engine change, the speed check below |
 | before the PR (once, on the final HEAD) | the Pre-PR checklist: full suites, every e2e spec, the Core audits |
 
 ## Speed check (PII detectors and engine)
@@ -171,7 +171,7 @@ it. It does not stop the cycle.
   The dump follows the tree it builds: `zz_match_dump.rs` for the
   per-country layout (one set per country plus `all`), and
   `zz_match_dump_single.rs` for the single `pii_filter_config.yaml` layout
-  (one set, `all`); `parity.sh` reads whichever rule files the tree has
+  (one set, `all`); `detector_vs_regex.sh` reads whichever rule files the tree has
   and reports a type the tree lacks as SKIPPED.
   At the end of the phase: one `compare` of the base against HEAD (the
   skill's before/after rule). The per-commit `dump` is only for narrowing
@@ -186,7 +186,7 @@ it. It does not stop the cycle.
   `all`): the countries whose own files changed; every existing country
   when shared code changed (the engine, a hand-written detector,
   common.yaml, a shared validator); none for a commit that only adds a
-  country (it has no base to compare with: its spec tests, parity and e2e
+  country (it has no base to compare with: its spec tests, `detector_vs_regex.sh` and e2e
   cover it). Add `all` only when cross-country overlaps matter.
 - Full-suite outcomes: run `regress_tests.sh` on the base commit when the
   change may move tests (renames, count changes), so `compare_tests.py` can
@@ -223,7 +223,7 @@ instruction, as a "Claude Review" comment.
 - `argo-e2e`'s `build_release.sh` needs `~/.cargo/bin` on PATH; without it
   it fails at once, and a pipeline ending in `tail` reports exit 0 while
   the old binaries stay in place.
-- `parity.sh`'s KR entries name `kr_phonenumber` (landline and internet
+- `detector_vs_regex.sh`'s KR entries name `kr_phonenumber` (landline and internet
   phone are its shapes since the KR commit); the Aho-Corasick test shows
   about 400 differing texts for paypal, braintree and
   google_oauth_2_0_refresh_token that origin/main has too — compare the
