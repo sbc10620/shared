@@ -425,7 +425,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 | 11 | `br_rg` recognizer 추가 (`score` 낮게, 선택적 `br_rg_sp` 검증기). **선행 작업 완료 후에만**. 다른 주 규칙 수집은 별도 조사 | br_rg | YAML 신규, 조사 |
 | 선택 | `br_cnpj` recognizer 와 검증기 (MEI 보호 요구 시). 2026년 영숫자 형식 패턴 포함 | br_cnpj | validator 신규, YAML 신규 |
 
-## 구현 반영 (ARGO `db845da1ca`, 2026-10-22)
+## 구현 반영 (ARGO `4314a21b0a`, 2026-10-22)
 
 다국어 브랜치에서 아래와 같이 구현했다. 이 문서의 권장과 다르게 정한 것은 굵게 표시한다. 14개 모두 손으로 쓴 FixedShape 형식(22개)이라 regex 패턴은 늘지 않는다.
 
