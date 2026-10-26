@@ -1,0 +1,721 @@
+{
+ "title": "스캔 캐시 깨짐 log",
+ "repo": "/Users/byungchulso/Works/ARGO-card-number-uuid-fp",
+ "before": "1c266b7d0e",
+ "after": "b61255b6d7",
+ "range": "ARGO · 1c266b7d0e..b61255b6d7 · argo (argo-cli) main() · 기본 빌드",
+ "not_drawn": {},
+ "figures": [
+  {
+   "title": "그림 1 · 스캔 캐시 checkpoint 가 안 맞으면 INFO log 한 줄",
+   "caption": "입력 guardrail · 입력 마스킹 · 출력 마스킹 세 곳이 같은 log 함수를 부름",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "tokio 런타임 위에서 CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "CLI 인자를 읽고 실행 모드 고르기",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 번 묻고 끝나는 단일 턴 실행",
+       "to": "run_single_turn"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "run_single_turn",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let result = tinicore::agent::loop_::agent_loop(config, ctx, hooks, &*tools_guard, None).await;",
+       "note": "에이전트 루프 실행",
+       "to": "agent_loop"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "agent_loop",
+     "kind": "fn",
+     "status": "same",
+     "name": "loop_::agent_loop()",
+     "file": "tinicore/src/agent/loop_.rs:1452",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        return Box::pin(agent_loop_inner(config, ctx, hooks, tools, cancel)).await;",
+       "note": "실행 출처가 없으면 바로 본 루프로",
+       "to": "agent_loop_inner"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "agent_loop_inner",
+     "kind": "fn",
+     "status": "changed",
+     "name": "loop_::agent_loop_inner()",
+     "file": "tinicore/src/agent/loop_.rs:1516",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    if !guardrail_set.input.is_empty() && !texts_to_check.is_empty() {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let stored = session_key.and_then(|k| {",
+       "mark": "+",
+       "note": "이 세션에 저장된 checkpoint 읽기"
+      },
+      {
+       "code": "            crate::agent::guardrail_scan_cache::checkpoint_for(&guardrail_set.input, k)"
+      },
+      {
+       "code": "        });"
+      },
+      {
+       "code": "        let checkpoint = stored",
+       "mark": "+",
+       "note": "이력 앞부분이 그대로인지 확인"
+      },
+      {
+       "code": "            .filter(|cp| crate::agent::guardrail_scan_cache::verify_prefix(cp, &texts_to_check));"
+      },
+      {
+       "code": "        if let (Some(cp), None) = (stored, checkpoint) {",
+       "mark": "+",
+       "note": "저장본은 있는데 안 맞을 때만"
+      },
+      {
+       "code": "            crate::agent::guardrail_scan_cache::log_checkpoint_break(",
+       "mark": "+",
+       "note": "input_guardrail 깨짐 log 한 줄",
+       "to": "log"
+      },
+      {
+       "code": "                \"input_guardrail\",",
+       "mark": "+"
+      },
+      {
+       "code": "                cp.verified_len,",
+       "mark": "+"
+      },
+      {
+       "code": "                texts_to_check.len(),",
+       "mark": "+"
+      },
+      {
+       "code": "            );"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        let start = checkpoint.map_or(0, |cp| cp.verified_len);"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        for i in start..texts_to_check.len() {"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            if let Err(e) = verdict {"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "                return Ok(AgentLoopResult {",
+       "note": "입력 guardrail 에 걸리면 거부로 끝냄"
+      },
+      {
+       "elide": true,
+       "indent": 20
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let (llm_result, dispatch_id, streamed_tool_calls) = acquire_main_turn_response(",
+       "note": "LLM 요청 보내기 (입력 마스킹 포함)",
+       "to": "acquire"
+      },
+      {
+       "code": "            &mut state.fallback,"
+      },
+      {
+       "code": "            llm_messages,"
+      },
+      {
+       "code": "            &agent_context,"
+      },
+      {
+       "code": "            &config,"
+      },
+      {
+       "code": "            ctx,"
+      },
+      {
+       "code": "            &cancel,"
+      },
+      {
+       "code": "            state.response_id.as_deref(),"
+      },
+      {
+       "code": "            effective_max_tokens,"
+      },
+      {
+       "code": "            response_schema.as_ref(),"
+      },
+      {
+       "code": "            #[cfg(feature = \"sensitive\")]"
+      },
+      {
+       "code": "            pii_masking.as_mut(),"
+      },
+      {
+       "code": "            #[cfg(feature = \"sensitive\")]"
+      },
+      {
+       "code": "            sensitive.as_ref(),"
+      },
+      {
+       "code": "            #[cfg(feature = \"sensitive\")]"
+      },
+      {
+       "code": "            turn_start,"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .await;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let _ = crate::agent::pii_masking::mask_llm_output_in_session(",
+       "note": "답의 PII 마스킹 (세션 캐시 사용)",
+       "to": "mlo"
+      },
+      {
+       "code": "            chain,"
+      },
+      {
+       "code": "            &mut messages,"
+      },
+      {
+       "code": "            sensitive.on_error,"
+      },
+      {
+       "code": "            site.roles,"
+      },
+      {
+       "code": "            config.session_key(),"
+      },
+      {
+       "code": "            turn_start,"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .await;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "acquire",
+     "kind": "fn",
+     "status": "same",
+     "name": "loop_::acquire_main_turn_response()",
+     "file": "tinicore/src/agent/loop_.rs:909",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                let masked = crate::agent::pii_masking::mask_messages_for_cloud_in_session(",
+       "note": "보낼 메시지의 PII 마스킹 (세션 캐시 사용)",
+       "to": "mmc"
+      },
+      {
+       "code": "                    sensitive.outbound.chain(&sensitive.detectors),"
+      },
+      {
+       "code": "                    llm_messages,"
+      },
+      {
+       "code": "                    m,"
+      },
+      {
+       "code": "                    sensitive.on_error,"
+      },
+      {
+       "code": "                    sensitive.outbound.roles,"
+      },
+      {
+       "code": "                    config.session_key(),"
+      },
+      {
+       "code": "                    turn_start,"
+      },
+      {
+       "code": "                )"
+      },
+      {
+       "code": "                .await;"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "mmc",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pii_masking::mask_messages_for_cloud_in_session()",
+     "file": "tinicore/src/agent/pii_masking.rs:1288",
+     "lines": [
+      {
+       "code": "    if chain.kinds().is_empty() || roles.is_empty() {"
+      },
+      {
+       "code": "        return Cow::Borrowed(messages);",
+       "note": "검사기·역할이 없으면 스캔 없이 그대로"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let stable_len = messages"
+      },
+      {
+       "code": "        .iter()"
+      },
+      {
+       "code": "        .filter(|m| takes_part_in_scan_cache(m))"
+      },
+      {
+       "code": "        .count();"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let loaded = session"
+      },
+      {
+       "code": "        .filter(|_| memoizable)"
+      },
+      {
+       "code": "        .and_then(|k| crate::agent::masking_scan_cache::checkpoint_for(chain, k));"
+      },
+      {
+       "code": "    let verified = loaded.as_ref().and_then(|cp| {"
+      },
+      {
+       "code": "        crate::agent::masking_scan_cache::verify_records("
+      },
+      {
+       "code": "            cp,"
+      },
+      {
+       "code": "            messages"
+      },
+      {
+       "code": "                .iter()"
+      },
+      {
+       "code": "                .filter(|m| takes_part_in_scan_cache(m))"
+      },
+      {
+       "code": "                .map(|m| m.text_cow()),"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .map(|v| (cp, v))"
+      },
+      {
+       "code": "    });"
+      },
+      {
+       "code": "    if let (Some(cp), None) = (loaded.as_ref(), verified) {",
+       "mark": "+",
+       "note": "W·X 기록 둘 다 안 맞을 때만"
+      },
+      {
+       "code": "        crate::agent::guardrail_scan_cache::log_checkpoint_break(",
+       "mark": "+",
+       "note": "input_masking 깨짐 log 한 줄",
+       "to": "log"
+      },
+      {
+       "code": "            \"input_masking\",",
+       "mark": "+"
+      },
+      {
+       "code": "            cp.verified_len_x,",
+       "mark": "+"
+      },
+      {
+       "code": "            stable_len,",
+       "mark": "+"
+      },
+      {
+       "code": "        );"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "mlo",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pii_masking::mask_llm_output_in_session()",
+     "file": "tinicore/src/agent/pii_masking.rs:1691",
+     "lines": [
+      {
+       "code": "    if chain.kinds().is_empty() || roles.is_empty() {"
+      },
+      {
+       "code": "        return 0;",
+       "note": "검사기·역할이 없으면 바꾸지 않음"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let takes_part = |m: &ChatMessage| roles.covers(&m.role) && takes_part_in_scan_cache(m);"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let loaded = session_key"
+      },
+      {
+       "code": "        .as_deref()"
+      },
+      {
+       "code": "        .and_then(|k| crate::agent::masking_scan_cache::checkpoint_for(chain, k));"
+      },
+      {
+       "code": "    let verified = loaded.as_ref().filter(|cp| {"
+      },
+      {
+       "code": "        crate::agent::masking_scan_cache::verify_x("
+      },
+      {
+       "code": "            cp,"
+      },
+      {
+       "code": "            messages"
+      },
+      {
+       "code": "                .iter()"
+      },
+      {
+       "code": "                .filter(|m| takes_part(m))"
+      },
+      {
+       "code": "                .map(|m| m.text_cow()),"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "    });"
+      },
+      {
+       "code": "    if let (Some(cp), None) = (loaded.as_ref(), verified) {",
+       "mark": "+",
+       "note": "저장본은 있는데 안 맞을 때만"
+      },
+      {
+       "code": "        crate::agent::guardrail_scan_cache::log_checkpoint_break(",
+       "mark": "+",
+       "note": "output_masking 깨짐 log 한 줄",
+       "to": "log"
+      },
+      {
+       "code": "            \"output_masking\",",
+       "mark": "+"
+      },
+      {
+       "code": "            cp.verified_len_x,",
+       "mark": "+"
+      },
+      {
+       "code": "            messages.iter().filter(|m| takes_part(m)).count(),",
+       "mark": "+"
+      },
+      {
+       "code": "        );"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "log",
+     "kind": "fn",
+     "status": "new",
+     "name": "guardrail_scan_cache::log_checkpoint_break()",
+     "file": "tinicore/src/agent/guardrail_scan_cache.rs:441",
+     "lines": [
+      {
+       "code": "    let reason = CheckpointBreak::of(stored_len, current_len).as_str();",
+       "mark": "+",
+       "note": "길이 비교로 깨진 이유 고르기",
+       "to": [
+        "of",
+        "as_str",
+        "CheckpointBreak"
+       ],
+       "edge": [
+        "call",
+        "call",
+        "use"
+       ]
+      },
+      {
+       "code": "    tracing::info!(",
+       "mark": "+",
+       "note": "INFO 한 줄: 개수만, 본문·세션 키 없음"
+      },
+      {
+       "code": "        cache,",
+       "mark": "+"
+      },
+      {
+       "code": "        reason,",
+       "mark": "+"
+      },
+      {
+       "code": "        stored_len,",
+       "mark": "+"
+      },
+      {
+       "code": "        current_len,",
+       "mark": "+"
+      },
+      {
+       "code": "        \"scan-cache checkpoint no longer matches the history; re-scanning it from the start\"",
+       "mark": "+"
+      },
+      {
+       "code": "    );"
+      }
+     ]
+    },
+    {
+     "id": "of",
+     "kind": "fn",
+     "status": "new",
+     "name": "CheckpointBreak::of()",
+     "file": "tinicore/src/agent/guardrail_scan_cache.rs:416",
+     "lines": [
+      {
+       "code": "        if current_len < stored_len {",
+       "mark": "+",
+       "note": "이력이 기록보다 짧아졌으면 Shrunk"
+      },
+      {
+       "code": "            Self::Shrunk",
+       "mark": "+"
+      },
+      {
+       "code": "        } else {",
+       "mark": "+"
+      },
+      {
+       "code": "            Self::Mismatch",
+       "mark": "+",
+       "note": "아니면 Mismatch"
+      },
+      {
+       "code": "        }"
+      }
+     ]
+    },
+    {
+     "id": "as_str",
+     "kind": "fn",
+     "status": "new",
+     "name": "CheckpointBreak::as_str()",
+     "file": "tinicore/src/agent/guardrail_scan_cache.rs:424",
+     "lines": [
+      {
+       "code": "        match self {",
+       "mark": "+"
+      },
+      {
+       "code": "            Self::Shrunk => \"shrunk\",",
+       "mark": "+"
+      },
+      {
+       "code": "            Self::Mismatch => \"mismatch\",",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      }
+     ]
+    },
+    {
+     "id": "CheckpointBreak",
+     "kind": "enum",
+     "status": "new",
+     "name": "guardrail_scan_cache::CheckpointBreak",
+     "file": "tinicore/src/agent/guardrail_scan_cache.rs:404",
+     "lines": [
+      {
+       "code": "pub(crate) enum CheckpointBreak {",
+       "mark": "+"
+      },
+      {
+       "code": "    Shrunk,",
+       "mark": "+",
+       "note": "메시지가 빠져 이력이 짧아짐"
+      },
+      {
+       "code": "    Mismatch,",
+       "mark": "+",
+       "note": "길이는 되지만 앞부분 내용이 다름"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "b61255b6d7",
+   "feat(guardrails): log when a scan-cache checkpoint stops matching"
+  ]
+ ]
+}

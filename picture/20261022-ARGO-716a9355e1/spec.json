@@ -1,0 +1,546 @@
+{
+ "title": "카드 스캐너 — 묶음마다 다시 찾기",
+ "repo": "/Users/byungchulso/Works/ARGO-card-number-uuid-fp",
+ "before": "d9bf9f20cc",
+ "after": "716a9355e1",
+ "range": "ARGO · d9bf9f20cc..716a9355e1 · argo (argo-cli) main() · feature guardrails",
+ "not_drawn": {},
+ "figures": [
+  {
+   "title": "그림 1 · 사용자 입력이 카드 스캐너에 닿는 길",
+   "caption": "바뀐 곳은 CardDetector::scan_bytes() 하나. 구분자가 있는 숫자 묶음에서, 묶음이 끝나는 앞부분마다 브랜드·길이를 보고 후보로 넣고(전체와 짧은 꼬리 앞은 12자리, 그 밖은 13자리 이상), 후보가 있든 없든 두 번째 묶음 시작부터 다시 찾음. 그래서 앞에 다른 숫자 묶음이 있거나 뒤에 유효기간·금액 묶음이 붙은 카드도 찾음. Luhn 검사와 겹침 정리는 그다음 파이프라인에서 함.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "명령 처리 진입",
+       "to": "cli_run"
+      }
+     ]
+    },
+    {
+     "id": "cli_run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 번 실행 모드로 턴 하나 처리",
+       "to": "run_single_turn"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "run_single_turn",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        tinicore::agent::guardrails::run_input_guardrails_with_text(user_input, None).await",
+       "note": "저장 전에 사용자 입력을 입력 가드레일로 검사",
+       "to": "with_text"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "with_text",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::run_input_guardrails_with_text()",
+     "file": "tinicore/src/agent/guardrails.rs:358",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    tinicore_traits::run_input_guardrails(&guardrail_set.input, &gi)",
+       "note": "등록된 입력 가드레일 목록 실행",
+       "to": "run_input_guardrails"
+      },
+      {
+       "code": "        .await"
+      },
+      {
+       "code": "        .map(|_| ())"
+      }
+     ]
+    },
+    {
+     "id": "run_input_guardrails",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicore_traits::run_input_guardrails()",
+     "file": "tinicore-traits/src/guardrail.rs:1031",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let res = g.check(input).await;",
+       "note": "가드레일마다 check (여기선 pii.input)",
+       "to": "check"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "check",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::check()",
+     "file": "tinicore/src/sensitive/guardrail.rs:274",
+     "lines": [
+      {
+       "code": "        self.evaluate(input.text).await",
+       "note": "입력 문자열 판정",
+       "to": "evaluate"
+      }
+     ]
+    },
+    {
+     "id": "evaluate",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::evaluate()",
+     "file": "tinicore/src/sensitive/guardrail.rs:138",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let outcome = self.chain.detect_any_of(text, &self.block).await;",
+       "note": "막을 종류가 있는지 검출기 체인에 물음",
+       "to": "detect_any_of"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "detect_any_of",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::detect_any_of()",
+     "file": "tinicore/src/sensitive/chain.rs:264",
+     "lines": [
+      {
+       "code": "        self.scan_until_hit(text, Some(wanted)).await",
+       "note": "막을 종류만 골라 검사",
+       "to": "scan_until_hit"
+      }
+     ]
+    },
+    {
+     "id": "scan_until_hit",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::scan_until_hit()",
+     "file": "tinicore/src/sensitive/chain.rs:270",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            match m.detect(text).await {",
+       "note": "검출기를 하나씩 실행 (PII 검출기)",
+       "to": "detect"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "detect",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::detect()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:550",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        match tokio::task::spawn_blocking(move || filter.analyze(&text)).await {",
+       "note": "별도 스레드에서 PII 패턴 검사",
+       "to": "analyze"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "analyze",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:156",
+     "lines": [
+      {
+       "code": "        self.analyze_with(text, PatternEngine::scan)",
+       "note": "PatternEngine::scan 으로 검사",
+       "to": "analyze_with"
+      }
+     ]
+    },
+    {
+     "id": "analyze_with",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_with()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:175",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);",
+       "note": "이번 턴의 엔진으로 문자열 검사",
+       "to": "scan"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "scan",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:379",
+     "lines": [
+      {
+       "code": "        self.scan_inner(text, true)",
+       "note": "중첩 매치를 버리는 모드로 검사",
+       "to": "scan_inner"
+      }
+     ]
+    },
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:395",
+     "lines": [
+      {
+       "code": "        let resolved = self.collect_raw_matches(text);",
+       "note": "모든 엔진에서 원시 매치 모으기",
+       "to": "collect_raw_matches"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "collect_raw_matches",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::collect_raw_matches()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:417",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            resolved.extend(engine.scan_raw(text));",
+       "note": "엔진마다 scan_raw (여기선 카드 탐지기)",
+       "to": "card_scan_raw"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "card_scan_raw",
+     "kind": "fn",
+     "status": "same",
+     "name": "CardDetector::scan_raw()",
+     "file": "tinicore/src/guardrails/pii/handwritten/card_detector.rs:43",
+     "lines": [
+      {
+       "code": "        self.scan_bytes(text)",
+       "note": "바이트를 훑어 카드 후보 위치 찾기",
+       "to": "scan_bytes"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "scan_bytes",
+     "kind": "fn",
+     "status": "changed",
+     "name": "CardDetector::scan_bytes()",
+     "file": "tinicore/src/guardrails/pii/handwritten/card_detector.rs:77",
+     "lines": [
+      {
+       "code": "        let bytes = text.as_bytes();"
+      },
+      {
+       "code": "        let mut matches = Vec::new();"
+      },
+      {
+       "code": "        let mut i = 0;"
+      },
+      {
+       "code": "        while i < bytes.len() {"
+      },
+      {
+       "code": "            if bytes[i].is_ascii_digit() {"
+      },
+      {
+       "code": "                let (card_chars, positions) = extract_card_run(bytes, i);"
+      },
+      {
+       "code": "                if card_chars.len() >= 12 {"
+      },
+      {
+       "code": "                    let has_separators ="
+      },
+      {
+       "code": "                        positions.len() > 1 && positions.windows(2).any(|w| w[1] > w[0] + 1);"
+      },
+      {
+       "code": "                    if has_separators {"
+      },
+      {
+       "code": "                        let last_group = (1..positions.len())",
+       "note": "마지막 묶음의 시작 위치",
+       "mark": "+"
+      },
+      {
+       "code": "                            .rev()"
+      },
+      {
+       "code": "                            .find(|&k| positions[k] > positions[k - 1] + 1)",
+       "mark": "+"
+      },
+      {
+       "code": "                            .unwrap_or(0);",
+       "mark": "+"
+      },
+      {
+       "code": "                        let short_tail = (1..=3).contains(&(positions.len() - last_group));",
+       "note": "마지막 묶음이 1~3자리인지",
+       "mark": "+"
+      },
+      {
+       "code": "                        for j in 0..positions.len() {",
+       "note": "앞에서부터 한 글자씩 끝 위치를 늘려 봄",
+       "mark": "+"
+      },
+      {
+       "code": "                            let is_whole = j + 1 == positions.len();",
+       "mark": "+"
+      },
+      {
+       "code": "                            let at_group_end = is_whole || positions[j + 1] > positions[j] + 1;",
+       "mark": "+"
+      },
+      {
+       "code": "                            let len = j + 1;",
+       "mark": "+"
+      },
+      {
+       "code": "                            let before_short_tail = short_tail && len == last_group;",
+       "mark": "+"
+      },
+      {
+       "code": "                            let min_len = if is_whole || before_short_tail {",
+       "note": "전체·짧은 꼬리 앞은 12자리, 그 밖은 13자리",
+       "mark": "+"
+      },
+      {
+       "code": "                                12"
+      },
+      {
+       "code": "                            } else {",
+       "mark": "+"
+      },
+      {
+       "code": "                                13"
+      },
+      {
+       "code": "                            };"
+      },
+      {
+       "code": "                            if at_group_end",
+       "note": "묶음 끝·최소 길이·브랜드가 맞으면 후보",
+       "mark": "+"
+      },
+      {
+       "code": "                                && len >= min_len",
+       "mark": "+"
+      },
+      {
+       "code": "                                && brand_for(&card_chars[..len]).is_some()",
+       "mark": "+"
+      },
+      {
+       "code": "                            {"
+      },
+      {
+       "code": "                                matches.push((positions[0], positions[len - 1] + 1));",
+       "mark": "+"
+      },
+      {
+       "code": "                            }"
+      },
+      {
+       "code": "                        }"
+      },
+      {
+       "elide": true,
+       "indent": 24
+      },
+      {
+       "code": "                }"
+      },
+      {
+       "code": "                let next_group = positions.windows(2).find(|w| w[1] > w[0] + 1).map(|w| w[1]);",
+       "note": "두 번째 묶음의 시작 위치",
+       "mark": "+"
+      },
+      {
+       "code": "                if let Some(next) = next_group {",
+       "mark": "+"
+      },
+      {
+       "code": "                    i = next;",
+       "note": "구분자가 있으면 다음 묶음부터 다시 찾기",
+       "mark": "+"
+      },
+      {
+       "code": "                } else {"
+      },
+      {
+       "code": "                    let max_end = matches"
+      },
+      {
+       "code": "                        .iter()"
+      },
+      {
+       "code": "                        .rev()"
+      },
+      {
+       "code": "                        .take_while(|&&(s, _)| s == i)"
+      },
+      {
+       "code": "                        .map(|&(_, end)| end)"
+      },
+      {
+       "code": "                        .max();"
+      },
+      {
+       "code": "                    i = max_end.unwrap_or(i + 1);",
+       "note": "한 덩어리: 가장 긴 후보 뒤, 없으면 한 자리 뒤",
+       "mark": "+"
+      },
+      {
+       "code": "                }"
+      },
+      {
+       "code": "            } else {"
+      },
+      {
+       "code": "                i += 1;"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        matches"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "via": {
+  "PiiSpanDetector::detect": "카드 스캐너는 PII 엔진에만 있음, prompt guard 엔진은 만들지 않음"
+ },
+ "commits": [
+  [
+   "716a9355e1",
+   "fix(guardrails): find a card that follows or precedes more digit groups"
+  ]
+ ]
+}

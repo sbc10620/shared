@@ -1,0 +1,1418 @@
+{
+ "title": "문맥어 단어 단위 일치와 KR 계좌 규칙",
+ "repo": "/Users/byungchulso/Works/ARGO-card-number-uuid-fp",
+ "before": "716a9355e1",
+ "after": "1c266b7d0e",
+ "range": "ARGO · 716a9355e1..1c266b7d0e · argo 바이너리(argo-cli) main() 부터 · feature guardrails",
+ "not_drawn": {},
+ "via": {
+  "PiiSpanDetector::detect": "kr_bank_account 와 그 문맥어는 PII 엔진에만 있음. prompt guard 엔진에는 없음"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 때 엔진 빌드와 kr_bank_account 검증기 찾기",
+   "caption": "YAML 규칙 변경(score 0.3, `_` 경계, 새 문맥어)은 코드 정의가 아니어서 그리지 않음",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "tokio 런타임 위에서 CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "설정을 읽고 부팅 절차 시작",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "guardrail 설치(부팅 때 한 번)",
+       "to": "install"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 턴 실행: 입력 검사 → 그림 3"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:190",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let _engine = crate::guardrails::pii::shared::engine_guard();",
+       "note": "PII 엔진 슬롯을 잡아 둠",
+       "to": "engine_guard"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "engine_guard",
+     "kind": "fn",
+     "status": "same",
+     "name": "shared::engine_guard()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:101",
+     "lines": [
+      {
+       "code": "    let _ = shared_slot();",
+       "note": "PII 슬롯 등록",
+       "to": "shared_slot"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "shared_slot",
+     "kind": "fn",
+     "status": "same",
+     "name": "shared::shared_slot()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:75",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            compile_from_yaml(",
+       "note": "엔진이 필요할 때 YAML 컴파일",
+       "to": "compile_from_yaml",
+       "edge": "defer",
+       "label": "acquire() 때 실행"
+      },
+      {
+       "code": "                super::UNIFIED_CONFIG_YAML,"
+      },
+      {
+       "code": "                None,"
+      },
+      {
+       "code": "                DEFAULT_CHUNK_SIZE,"
+      },
+      {
+       "code": "                &super::extensions(),"
+      },
+      {
+       "code": "            )"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "compile_from_yaml",
+     "kind": "fn",
+     "status": "same",
+     "name": "shared::compile_from_yaml()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:25",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let engine = PatternEngine::from_config_with_chunk_size(&config, layer, chunk_size, ext)?;",
+       "note": "규칙 파일로 엔진 빌드",
+       "to": "fcwcs"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "fcwcs",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternEngine::from_config_with_chunk_size()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:402",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        validate_scores(config)?;",
+       "note": "score 범위가 틀리면 빌드 실패"
+      },
+      {
+       "code": "        validate_validation_methods(config)?;",
+       "note": "validation_methods 이름 확인",
+       "to": "vvm"
+      },
+      {
+       "code": "        validate_context_words(config)?;",
+       "mark": "+",
+       "note": "문맥어의 * 표기 확인 → 그림 2"
+      },
+      {
+       "code": "        let (pattern_strs, pattern_meta, handwritten_detectors) ="
+      },
+      {
+       "code": "            collect_patterns_and_detectors(config, layer, ext)?;",
+       "note": "패턴과 PatternMeta 모으기 → 그림 2"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let chunks = build_dfa_chunks(&chunk_groups, chunk_size)?;",
+       "note": "DFA 빌드 실패면 빌드 실패"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "vvm",
+     "kind": "fn",
+     "status": "same",
+     "name": "validate_validation_methods()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:794",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        resolve_validation_methods(name, cfg)?;",
+       "note": "레코그나이저마다 이름 확인",
+       "to": "resolve"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "resolve",
+     "kind": "fn",
+     "status": "same",
+     "name": "resolve_validation_methods()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:804",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            validator::lookup(method).ok_or_else(|| {",
+       "note": "이름으로 검증기 찾기",
+       "to": "lookup"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "lookup",
+     "kind": "fn",
+     "status": "same",
+     "name": "validator::lookup()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:108",
+     "lines": [
+      {
+       "code": "    VALIDATORS.iter().copied().find(|v| v.name() == name)",
+       "note": "목록에서 이름이 같은 검증기",
+       "to": [
+        "VALIDATORS",
+        "kr_name"
+       ],
+       "edge": [
+        "use",
+        "call"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "VALIDATORS",
+     "kind": "static",
+     "status": "changed",
+     "name": "VALIDATORS",
+     "file": "tinicore/src/guardrails/engine/validator.rs:104",
+     "lines": [
+      {
+       "code": "const VALIDATORS: &[&dyn Validator] = &[&Luhn, &Card, &KrBankAccount, &Rrn, &PhoneNumber];",
+       "mark": "+",
+       "note": "KrBankAccount 추가",
+       "to": "KrBankAccount",
+       "edge": "use"
+      }
+     ]
+    },
+    {
+     "id": "KrBankAccount",
+     "kind": "struct",
+     "status": "new",
+     "name": "KrBankAccount",
+     "file": "tinicore/src/guardrails/engine/validator.rs:63",
+     "lines": [
+      {
+       "code": "struct KrBankAccount;",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "kr_name",
+     "kind": "fn",
+     "status": "new",
+     "name": "KrBankAccount::name()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:66",
+     "lines": [
+      {
+       "code": "        \"kr_bank_account\"",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · 빌드 때 문맥어의 * 표기 읽기",
+   "caption": "* 는 첫 글자나 끝 글자일 때만 그쪽을 엶. 지워진 ContextWord::new·needs_word_boundary 는 그리지 않음",
+   "nodes": [
+    {
+     "id": "fcwcs",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternEngine::from_config_with_chunk_size()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:402",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        validate_context_words(config)?;",
+       "mark": "+",
+       "note": "문맥어의 * 표기 확인",
+       "to": "vcw"
+      },
+      {
+       "code": "        let (pattern_strs, pattern_meta, handwritten_detectors) ="
+      },
+      {
+       "code": "            collect_patterns_and_detectors(config, layer, ext)?;",
+       "note": "패턴과 PatternMeta 모으기",
+       "to": "collect"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "vcw",
+     "kind": "fn",
+     "status": "new",
+     "name": "validate_context_words()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:826",
+     "lines": [
+      {
+       "code": "    for (name, cfg) in &config.recognizers {",
+       "mark": "+"
+      },
+      {
+       "code": "        for word in cfg",
+       "mark": "+"
+      },
+      {
+       "code": "            .context_words",
+       "mark": "+"
+      },
+      {
+       "code": "            .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .filter(|word| is_usable_context_word(word))",
+       "mark": "+"
+      },
+      {
+       "code": "        {",
+       "mark": "+"
+      },
+      {
+       "code": "            context_word(name, word)?;",
+       "mark": "+",
+       "note": "못 읽는 * 면 빌드 실패",
+       "to": "context_word"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    Ok(())",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "context_word",
+     "kind": "fn",
+     "status": "new",
+     "name": "context_word()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:841",
+     "lines": [
+      {
+       "code": "    ContextWord::parse(word).ok_or_else(|| {",
+       "mark": "+",
+       "note": "* 표기를 읽어 ContextWord 로",
+       "to": "parse"
+      },
+      {
+       "code": "        EngineError::Config(format!(",
+       "mark": "+"
+      },
+      {
+       "code": "            \"recognizer `{recognizer}`: context word `{word}` is not usable: a `*` may only be its first or last character, to open that side, and the word must keep more than `*`s and blanks\"",
+       "mark": "+"
+      },
+      {
+       "code": "        ))",
+       "mark": "+"
+      },
+      {
+       "code": "    })",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "parse",
+     "kind": "fn",
+     "status": "new",
+     "name": "ContextWord::parse()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:71",
+     "lines": [
+      {
+       "code": "        let (open_before, rest) = match word.strip_prefix('*') {",
+       "mark": "+"
+      },
+      {
+       "code": "            Some(rest) => (true, rest),",
+       "mark": "+"
+      },
+      {
+       "code": "            None => (false, word),",
+       "mark": "+"
+      },
+      {
+       "code": "        };",
+       "mark": "+"
+      },
+      {
+       "code": "        let (open_after, core) = match rest.strip_suffix('*') {",
+       "mark": "+"
+      },
+      {
+       "code": "            Some(core) => (true, core),",
+       "mark": "+"
+      },
+      {
+       "code": "            None => (false, rest),",
+       "mark": "+"
+      },
+      {
+       "code": "        };",
+       "mark": "+"
+      },
+      {
+       "code": "        if core.contains('*') || core.trim().is_empty() {",
+       "mark": "+"
+      },
+      {
+       "code": "            return None;",
+       "mark": "+",
+       "note": "* 가 가운데 있거나 * 뿐이면 못 읽음"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        let lower = core.to_lowercase();",
+       "mark": "+"
+      },
+      {
+       "code": "        Some(Self {",
+       "mark": "+",
+       "note": "ContextWord 만들기",
+       "to": "ContextWord",
+       "edge": "use"
+      },
+      {
+       "code": "            boundary_before: (!open_before)",
+       "mark": "+"
+      },
+      {
+       "code": "                .then(|| lower.chars().next().and_then(char_class))",
+       "mark": "+",
+       "note": "앞쪽이 닫혔으면 첫 글자의 종류",
+       "to": "char_class"
+      },
+      {
+       "code": "                .flatten(),",
+       "mark": "+"
+      },
+      {
+       "code": "            boundary_after: (!open_after)",
+       "mark": "+"
+      },
+      {
+       "code": "                .then(|| lower.chars().next_back().and_then(char_class))",
+       "mark": "+",
+       "note": "뒤쪽이 닫혔으면 끝 글자의 종류",
+       "to": "char_class"
+      },
+      {
+       "code": "                .flatten(),",
+       "mark": "+"
+      },
+      {
+       "code": "            lower,",
+       "mark": "+"
+      },
+      {
+       "code": "        })",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "char_class",
+     "kind": "fn",
+     "status": "new",
+     "name": "char_class()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:113",
+     "lines": [
+      {
+       "code": "    if c.is_ascii_alphanumeric() {",
+       "mark": "+"
+      },
+      {
+       "code": "        return Some(CharClass::AsciiAlnum);",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    match c as u32 {",
+       "mark": "+"
+      },
+      {
+       "code": "        0xAC00..=0xD7AF   // Hangul syllables"
+      },
+      {
+       "code": "        | 0x1100..=0x11FF // Hangul jamo"
+      },
+      {
+       "code": "        | 0x3130..=0x318F // Hangul compatibility jamo"
+      },
+      {
+       "code": "        | 0xA960..=0xA97F // Hangul jamo extended-A"
+      },
+      {
+       "code": "        | 0xD7B0..=0xD7FF // Hangul jamo extended-B"
+      },
+      {
+       "code": "        => Some(CharClass::Hangul),",
+       "mark": "+"
+      },
+      {
+       "code": "        0x0E00..=0x0E7F => Some(CharClass::Thai),",
+       "mark": "+"
+      },
+      {
+       "code": "        0x4E00..=0x9FFF   // CJK unified ideographs",
+       "mark": "+"
+      },
+      {
+       "code": "        | 0x3400..=0x4DBF // CJK unified ideographs extension A"
+      },
+      {
+       "code": "        | 0xF900..=0xFAFF // CJK compatibility ideographs"
+      },
+      {
+       "code": "        | 0x3040..=0x30FF // Hiragana, katakana"
+      },
+      {
+       "code": "        | 0xFF66..=0xFF9D // Halfwidth katakana"
+      },
+      {
+       "code": "        => Some(CharClass::Cjk),",
+       "mark": "+"
+      },
+      {
+       "code": "        _ => None,",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "ContextWord",
+     "kind": "struct",
+     "status": "changed",
+     "name": "ContextWord",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:50",
+     "lines": [
+      {
+       "code": "pub struct ContextWord {"
+      },
+      {
+       "code": "    pub lower: String,"
+      },
+      {
+       "code": "    pub boundary_before: Option<CharClass>,",
+       "mark": "+",
+       "note": "앞쪽이 닫혔을 때 첫 글자의 문자 종류",
+       "to": "CharClass",
+       "edge": "use"
+      },
+      {
+       "code": "    pub boundary_after: Option<CharClass>,",
+       "mark": "+",
+       "note": "뒤쪽도 같은 방식(끝 글자)"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "CharClass",
+     "kind": "enum",
+     "status": "new",
+     "name": "CharClass",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:101",
+     "lines": [
+      {
+       "code": "pub enum CharClass {",
+       "mark": "+"
+      },
+      {
+       "code": "    AsciiAlnum,",
+       "mark": "+"
+      },
+      {
+       "code": "    Hangul,",
+       "mark": "+"
+      },
+      {
+       "code": "    Thai,",
+       "mark": "+"
+      },
+      {
+       "code": "    Cjk,",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "collect",
+     "kind": "fn",
+     "status": "same",
+     "name": "collect_patterns_and_detectors()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:891",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let meta = pattern_meta_from_cfg(recognizer_cfg)?;",
+       "note": "레코그나이저 하나의 PatternMeta",
+       "to": "pmfc"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "pmfc",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pattern_meta_from_cfg()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:861",
+     "lines": [
+      {
+       "code": "    Ok(PatternMeta {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        context_words: recognizer_cfg"
+      },
+      {
+       "code": "            .context_words"
+      },
+      {
+       "code": "            .iter()"
+      },
+      {
+       "code": "            .filter(|word| is_usable_context_word(word))"
+      },
+      {
+       "code": "            .map(|word| context_word(&recognizer_cfg.entity_type, word))",
+       "mark": "+",
+       "note": "문맥어마다 ContextWord 준비",
+       "to": "context_word"
+      },
+      {
+       "code": "            .collect::<Result<_, _>>()?,",
+       "mark": "+",
+       "note": "못 읽는 문맥어면 빌드 실패"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        validation_methods: resolve_validation_methods(",
+       "note": "검증기 이름 확인 → 그림 1"
+      },
+      {
+       "code": "            &recognizer_cfg.entity_type,"
+      },
+      {
+       "code": "            recognizer_cfg,"
+      },
+      {
+       "code": "        )?,"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    })"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 3 · 턴마다 스캔에서 kr_bank_account 검증",
+   "caption": "kr_bank_account 를 실제로 돌리는 PII 입력 검사 경로(PiiSpanDetector::detect 경유)",
+   "nodes": [
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 턴 실행",
+       "to": "rst"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "rst",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        tinicore::agent::guardrails::run_input_guardrails_with_text(user_input, None).await",
+       "note": "저장 전에 입력 guardrail 검사",
+       "to": "with_text"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "with_text",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::run_input_guardrails_with_text()",
+     "file": "tinicore/src/agent/guardrails.rs:358",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    tinicore_traits::run_input_guardrails(&guardrail_set.input, &gi)",
+       "note": "설치된 입력 guardrail 실행",
+       "to": "rig"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "rig",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicore_traits::run_input_guardrails()",
+     "file": "tinicore-traits/src/guardrail.rs:1031",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let res = g.check(input).await;",
+       "note": "guardrail 하나씩 검사",
+       "to": "check"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "check",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::check()",
+     "file": "tinicore/src/sensitive/guardrail.rs:274",
+     "lines": [
+      {
+       "code": "        self.evaluate(input.text).await",
+       "note": "공통 판정 함수",
+       "to": "sg_evaluate"
+      }
+     ]
+    },
+    {
+     "id": "sg_evaluate",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::evaluate()",
+     "file": "tinicore/src/sensitive/guardrail.rs:138",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let outcome = self.chain.detect_any_of(text, &self.block).await;",
+       "note": "막을 종류가 있는지 탐지기 체인에 물음",
+       "to": "detect_any_of"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "detect_any_of",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::detect_any_of()",
+     "file": "tinicore/src/sensitive/chain.rs:264",
+     "lines": [
+      {
+       "code": "        self.scan_until_hit(text, Some(wanted)).await",
+       "note": "찾으면 멈추는 순회",
+       "to": "scan_until_hit"
+      }
+     ]
+    },
+    {
+     "id": "scan_until_hit",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::scan_until_hit()",
+     "file": "tinicore/src/sensitive/chain.rs:270",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            match m.detect(text).await {",
+       "note": "탐지기마다 detect",
+       "to": "pii_detect"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "pii_detect",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::detect()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:550",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        match tokio::task::spawn_blocking(move || filter.analyze(&text)).await {",
+       "note": "PII 필터 스캔(다른 스레드)",
+       "to": "analyze"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "analyze",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:156",
+     "lines": [
+      {
+       "code": "        self.analyze_with(text, PatternEngine::scan)",
+       "note": "scan 을 넘겨 공통 본문 실행",
+       "to": "aw"
+      }
+     ]
+    },
+    {
+     "id": "aw",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_with()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:175",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);",
+       "note": "넘겨받은 scan 함수로 엔진 스캔",
+       "to": "scan"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "scan",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:446",
+     "lines": [
+      {
+       "code": "        self.scan_inner(text, true)",
+       "note": "스캔 본문",
+       "to": "scan_inner"
+      }
+     ]
+    },
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:462",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let collapsed = self.validate_and_collapse(resolved, text);",
+       "note": "경계 검사·검증기",
+       "to": "vac"
+      },
+      {
+       "code": "        let mut matches = self.score_and_build(collapsed, text);",
+       "note": "점수 매기기(문맥어) → 그림 4"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "vac",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::validate_and_collapse()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:505",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "                .all(|v| v.validate(text, start..end))",
+       "note": "레코그나이저의 검증기 모두 통과해야",
+       "to": "kr_validate"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "kr_validate",
+     "kind": "fn",
+     "status": "new",
+     "name": "KrBankAccount::validate()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:70",
+     "lines": [
+      {
+       "code": "        text.get(span.clone()).is_some() && !inside_uuid(text, span)",
+       "mark": "+",
+       "note": "UUID 안의 4-4-4 숫자면 거부"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 4 · 스캔 점수에서 문맥어를 단어 단위로 찾기",
+   "caption": "닫힌 쪽 끝 글자와 바깥 글자가 같은 문자 종류면 긴 단어의 일부로 봄",
+   "nodes": [
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:462",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let mut matches = self.score_and_build(collapsed, text);",
+       "note": "점수 매기기",
+       "to": "sab"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "sab",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::score_and_build()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:572",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            let score = compute_score(meta, text, start, end);",
+       "note": "기본 score + 문맥어 보너스",
+       "to": "compute_score"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "compute_score",
+     "kind": "fn",
+     "status": "same",
+     "name": "compute_score()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:1178",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        if context_word_found(&window_lower, word) {",
+       "note": "창 안에 문맥어가 있는가",
+       "to": "cwf"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "cwf",
+     "kind": "fn",
+     "status": "changed",
+     "name": "context_word_found()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:1210",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    if word.boundary_before.is_none() && word.boundary_after.is_none() {",
+       "mark": "+",
+       "note": "양쪽이 열렸으면",
+       "to": "ContextWord",
+       "edge": "use"
+      },
+      {
+       "code": "        return window_lower.contains(&word.lower);",
+       "note": "단순 포함 검사"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let glued = |edge: Option<CharClass>, neighbour: Option<char>| {",
+       "mark": "+",
+       "note": "같은 문자 종류끼리 붙었는지",
+       "to": "CharClass",
+       "edge": "use"
+      },
+      {
+       "code": "        edge.is_some() && neighbour.and_then(char_class) == edge",
+       "mark": "+",
+       "note": "이웃 글자의 문자 종류와 비교",
+       "to": "char_class"
+      },
+      {
+       "code": "    };",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut from = 0;"
+      },
+      {
+       "code": "    while let Some(rel) = window_lower[from..].find(&word.lower) {"
+      },
+      {
+       "code": "        let at = from + rel;"
+      },
+      {
+       "code": "        let after = at + word.lower.len();"
+      },
+      {
+       "code": "        if !glued(word.boundary_before, window_lower[..at].chars().next_back())",
+       "mark": "+",
+       "note": "닫힌 쪽이 긴 단어에 붙지 않았으면"
+      },
+      {
+       "code": "            && !glued(word.boundary_after, window_lower[after..].chars().next())",
+       "mark": "+"
+      },
+      {
+       "code": "        {",
+       "mark": "+"
+      },
+      {
+       "code": "            return true;",
+       "note": "찾음"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        from = at + word.lower.chars().next().map_or(1, char::len_utf8);"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    false"
+      },
+      {
+       "elide": true,
+       "indent": 0
+      }
+     ]
+    },
+    {
+     "id": "char_class",
+     "kind": "fn",
+     "status": "new",
+     "name": "char_class()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:113",
+     "lines": [
+      {
+       "code": "    if c.is_ascii_alphanumeric() {",
+       "mark": "+"
+      },
+      {
+       "code": "        return Some(CharClass::AsciiAlnum);",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    match c as u32 {",
+       "mark": "+"
+      },
+      {
+       "code": "        0xAC00..=0xD7AF   // Hangul syllables"
+      },
+      {
+       "code": "        | 0x1100..=0x11FF // Hangul jamo"
+      },
+      {
+       "code": "        | 0x3130..=0x318F // Hangul compatibility jamo"
+      },
+      {
+       "code": "        | 0xA960..=0xA97F // Hangul jamo extended-A"
+      },
+      {
+       "code": "        | 0xD7B0..=0xD7FF // Hangul jamo extended-B"
+      },
+      {
+       "code": "        => Some(CharClass::Hangul),",
+       "mark": "+"
+      },
+      {
+       "code": "        0x0E00..=0x0E7F => Some(CharClass::Thai),",
+       "mark": "+"
+      },
+      {
+       "code": "        0x4E00..=0x9FFF   // CJK unified ideographs",
+       "mark": "+"
+      },
+      {
+       "code": "        | 0x3400..=0x4DBF // CJK unified ideographs extension A"
+      },
+      {
+       "code": "        | 0xF900..=0xFAFF // CJK compatibility ideographs"
+      },
+      {
+       "code": "        | 0x3040..=0x30FF // Hiragana, katakana"
+      },
+      {
+       "code": "        | 0xFF66..=0xFF9D // Halfwidth katakana"
+      },
+      {
+       "code": "        => Some(CharClass::Cjk),",
+       "mark": "+"
+      },
+      {
+       "code": "        _ => None,",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "ContextWord",
+     "kind": "struct",
+     "status": "changed",
+     "name": "ContextWord",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:50",
+     "lines": [
+      {
+       "code": "pub struct ContextWord {"
+      },
+      {
+       "code": "    pub lower: String,"
+      },
+      {
+       "code": "    pub boundary_before: Option<CharClass>,",
+       "mark": "+",
+       "note": "앞쪽이 닫혔을 때 첫 글자의 문자 종류",
+       "to": "CharClass",
+       "edge": "use"
+      },
+      {
+       "code": "    pub boundary_after: Option<CharClass>,",
+       "mark": "+",
+       "note": "뒤쪽도 같은 방식(끝 글자)"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "CharClass",
+     "kind": "enum",
+     "status": "new",
+     "name": "CharClass",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:101",
+     "lines": [
+      {
+       "code": "pub enum CharClass {",
+       "mark": "+"
+      },
+      {
+       "code": "    AsciiAlnum,",
+       "mark": "+"
+      },
+      {
+       "code": "    Hangul,",
+       "mark": "+"
+      },
+      {
+       "code": "    Thai,",
+       "mark": "+"
+      },
+      {
+       "code": "    Cjk,",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "3fedb5fae3",
+   "feat(guardrails): context words match whole words unless a '*' opens a side"
+  ],
+  [
+   "1c266b7d0e",
+   "fix(guardrails): a Korean account number needs a context word"
+  ]
+ ]
+}
