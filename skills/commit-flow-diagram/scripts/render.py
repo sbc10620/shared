@@ -110,6 +110,8 @@ def signature(lines, start, path=""):
         _, pre, i = decl.function(lines, start)
     else:
         return None, "", ""
+    # Comments inside the parameter list are not parameters.
+    text = text[:i + 1] + strip_comments(text[i + 1:], python)
     depth, buf, parts, close = 0, "", [], None
     for j in range(i + 1, len(text)):
         ch = text[j]
@@ -132,6 +134,30 @@ def signature(lines, start, path=""):
     if decl.is_clike(path) and not after.startswith("->"):
         after = ""  # `) const`, `) throws E`, `) noexcept` are not a return type
     return parts, after, pre
+
+
+def strip_comments(text, python=False):
+    """`text` without `//` and `/* */` comments (`#` for Python), string
+    literals left as they are."""
+    out, j, n = [], 0, len(text)
+    while j < n:
+        ch = text[j]
+        if ch in "\"'":
+            k = j + 1
+            while k < n and text[k] != ch and text[k] != "\n":
+                k += 2 if text[k] == "\\" else 1
+            out.append(text[j:k + 1])
+            j = k + 1
+        elif text.startswith("//", j) or (python and ch == "#"):
+            k = text.find("\n", j)
+            j = n if k < 0 else k
+        elif text.startswith("/*", j):
+            k = text.find("*/", j + 2)
+            j = n if k < 0 else k + 2
+        else:
+            out.append(ch)
+            j += 1
+    return "".join(out)
 
 
 def return_type(tail, python=False):

@@ -150,6 +150,12 @@ def page(group, figures):
         f'<li><code>{escape(sha)}</code><span>{escape(subj)}</span></li>' for sha, subj in group["commits"]
     )
     toc = "".join(f'<a href="#fig{i+1}">{escape(f["title"])}</a>' for i, f, _ in figures)
+    vi = group.get("via") or {}
+    via = ("" if not vi else
+           '<section class="not-drawn" id="via"><h2>경유 함수</h2>'
+           '<p>이름으로만 찾은 가장 짧은 경로 대신, 이 함수를 지나는 경로를 그렸습니다.</p><ul>'
+           + "".join(f'<li><code>{escape(k)}</code><span>{escape(str(v))}</span></li>' for k, v in sorted(vi.items()))
+           + '</ul></section>')
     nd = group.get("not_drawn") or {}
     not_drawn = ("" if not nd else
                  '<section class="not-drawn" id="not-drawn"><h2>그림에 없는 변경</h2>'
@@ -274,6 +280,7 @@ body.has-max {{ overflow: hidden; }}
     <nav class="toc">{toc}</nav>
   </div>
   {figures_html}
+  {via}
   {not_drawn}
 </main>
 

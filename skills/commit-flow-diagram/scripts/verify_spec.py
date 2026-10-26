@@ -6,9 +6,11 @@ usage: verify_spec.py <group.json>
 Checks, per box line (elided lines skipped):
   1. verbatim  — the stripped code line exists in the box's file at `after`
                  (`git show <after>:<path>`), so nothing in a box is paraphrase;
-  2. "+" marks — a marked line is an added line of `git diff <before> <after>`
-                 for that file, and an unmarked line is not (lines shorter
-                 than 4 characters, such as braces, are not judged);
+  2. "+" marks — judged where the line stands: found inside the box's
+                 definition (in box order), a marked line is a line number
+                 `git diff <before> <after>` added and an unmarked line is
+                 not; a moved line is not added (see added_lines). Lines
+                 shorter than 4 characters, such as braces, are not judged;
   3. edges     — every `to` names a box of the same figure;
   4. sameness   — the rules that make two agents produce the same group:
                  no hand layout (`col`, `align_to`), hand-picked `slug` or `dim`;
@@ -76,8 +78,10 @@ def changed_definitions(repo, before, after):
             continue  # deleted file
         test_from = None
         for i, l in enumerate(lines):
+            # An inline test module (`mod tests {`), not a file module
+            # declaration (`mod e2e;`), which only names another file.
             if re.match(r"\s*#\[cfg\(test\)\]", l) and i + 1 < len(lines) and \
-                    re.match(r"\s*(pub\s+)?mod\s", lines[i + 1]):
+                    re.match(r"\s*(pub(\([^)]*\))?\s+)?mod\s+\w+\s*\{", lines[i + 1]):
                 test_from = i
                 break
         touched = set()
@@ -106,6 +110,101 @@ def changed_definitions(repo, before, after):
                 if lj < ind:
                     ind = lj
     return out
+
+
+MOVE_MIN = 16  # a removed line this long elsewhere in the file makes an added one a move
+
+
+def added_lines(repo, before, after, path):
+    """Line numbers (1-based, at `after`) of the lines the range added or
+    changed in content. A `+` line that only moved or was re-indented does
+    not count: its text (without surrounding whitespace) is also a `-` line
+    of the same hunk, or, for a line of MOVE_MIN characters or more, a `-`
+    line anywhere in the file. A shorter line (`.iter()`, `return false;`)
+    is too common to tell a move from a new line elsewhere in the file."""
+    out, new_ln, plus, minus = set(), 0, [], set()
+    diff = git(repo, "diff", "-U0", before, after, "--", path).splitlines()
+    removed = {l[1:].strip() for l in diff if l.startswith("-") and not l.startswith("---")}
+
+    def flush():
+        out.update(n for n, t in plus
+                   if t not in minus and not (len(t) >= MOVE_MIN and t in removed))
+
+    for l in diff:
+        h = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", l)
+        if h:
+            flush()
+            new_ln, plus, minus = int(h.group(1)), [], set()
+        elif l.startswith("+") and not l.startswith("+++"):
+            plus.append((new_ln, l[1:].strip()))
+            new_ln += 1
+        elif l.startswith("-") and not l.startswith("---"):
+            minus.add(l[1:].strip())
+    flush()
+    return out
+
+
+def block_end(lines, start):
+    """Index of the last line of the definition that starts at lines[start]:
+    where its braces close, or, with no brace (Python), the last line before
+    one indented no deeper than the declaration."""
+    depth, opened = 0, False
+    for j in range(start, len(lines)):
+        code = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'|//.*$', "", lines[j])
+        for ch in code:
+            if ch == "{":
+                depth, opened = depth + 1, True
+            elif ch == "}":
+                depth -= 1
+        if opened and depth <= 0:
+            return j
+        if not opened and j > start and lines[j].rstrip().endswith(";") and depth == 0 \
+                and not lines[start].rstrip().endswith(("(", ",")):
+            break  # a declaration with no body
+    ind = len(lines[start]) - len(lines[start].lstrip())
+    for j in range(start + 1, len(lines)):
+        if lines[j].strip() and len(lines[j]) - len(lines[j].lstrip()) <= ind:
+            return j - 1
+    return len(lines) - 1
+
+
+def enclosing_header(lines, i):
+    """The stripped line of the block that holds the declaration at
+    lines[i] (`impl Validator for Card {`, `class X:`), or None at the top
+    level."""
+    ind = len(lines[i]) - len(lines[i].lstrip())
+    for j in range(i - 1, -1, -1):
+        l = lines[j]
+        if not l.strip() or l.lstrip().startswith(("//", "#", "*", "/*")):
+            continue
+        if len(l) - len(l.lstrip()) < ind:
+            return l.strip()
+    return None
+
+
+def existed_before(after_lines, i, name, old_lines, path):
+    """Whether a definition named `name` existed at `before` in the same
+    enclosing block (the same `impl … {` / class header) as the one at
+    after_lines[i]; at the top level, among top-level definitions."""
+    header = enclosing_header(after_lines, i)
+    spans = []
+    if header is None:
+        spans = [(0, len(old_lines) - 1, 0)]
+    else:
+        for k, l in enumerate(old_lines):
+            if l.strip() == header:
+                spans.append((k + 1, block_end(old_lines, k), len(l) - len(l.lstrip()) + 1))
+    for a, b, min_ind in spans:
+        for k in range(a, b + 1):
+            l = old_lines[k]
+            if header is None and l[:1].isspace():
+                continue
+            if header is not None and len(l) - len(l.lstrip()) < min_ind:
+                continue
+            d = definition(old_lines, k, path)
+            if d and d[0] == name:
+                return True
+    return False
 
 
 def _targets(ln):
@@ -196,10 +295,16 @@ def main():
                 except subprocess.CalledProcessError:
                     problems.append(f"fig{fi+1} {n['id']}: {path} does not exist at {after}")
                     sources[path] = set()
-                d = git(repo, "diff", "-U0", before, after, "--", path).splitlines()
-                added = {l[1:].strip() for l in d if l.startswith("+") and not l.startswith("+++")}
-                removed = {l[1:].strip() for l in d if l.startswith("-") and not l.startswith("---")}
-                diffs[path] = added - removed
+                diffs[path] = added_lines(repo, before, after, path)
+            # Walk the box's lines in source order inside its definition, so a
+            # line is judged where it is, not by its text anywhere in the file.
+            try:
+                flines = git(repo, "show", f"{after}:{path}").splitlines()
+                k0 = int(n["file"].partition(":")[2]) - 1
+                span_end = block_end(flines, k0)
+            except (subprocess.CalledProcessError, ValueError, IndexError):
+                flines, k0, span_end = [], 0, -1
+            cursor = k0
             for ln in n.get("lines", []):
                 for t in ([ln["to"]] if isinstance(ln.get("to"), str) else ln.get("to") or []):
                     if t not in ids:
@@ -209,8 +314,17 @@ def main():
                 code = ln["code"].strip()
                 if sources[path] and code not in sources[path]:
                     problems.append(f"fig{fi+1} {n['id']}: not verbatim in {path}: {code!r}")
-                if len(code) >= 4 and bool(ln.get("mark")) != (code in diffs[path]):
-                    want = "needs" if code in diffs[path] else "must not have"
+                at = next((k for k in range(cursor, span_end + 1) if flines[k].strip() == code), None)
+                if at is None:
+                    at = next((k for k in range(k0, span_end + 1) if flines[k].strip() == code), None)
+                if at is None:
+                    if flines and sources[path] and code in sources[path]:
+                        problems.append(f"fig{fi+1} {n['id']}: not inside this box's definition "
+                                        f"({n['file']}): {code!r}")
+                    continue
+                cursor = at + 1
+                if len(code) >= 4 and bool(ln.get("mark")) != ((at + 1) in diffs[path]):
+                    want = "needs" if (at + 1) in diffs[path] else "must not have"
                     problems.append(f"fig{fi+1} {n['id']}: {want} a + mark: {code!r}")
     changed = changed_definitions(repo, before, after)
     # Box identity, status and arrows, all against the repository.
@@ -235,23 +349,11 @@ def main():
                 problems.append(f"fig{fi+1} {n['id']}: name {n['name']!r} does not match the declaration `{dname}`")
             if dname in changed:
                 try:
-                    existed = decl_line.strip() in {l.strip() for l in git(repo, "show", f"{before}:{path}").splitlines()}
+                    old_lines = git(repo, "show", f"{before}:{path}").splitlines()
                 except subprocess.CalledProcessError:
-                    existed = False
+                    old_lines = []  # the file is new
+                existed = existed_before(after_lines, int(line) - 1, dname, old_lines, path)
                 want = "changed" if existed else "new"
-                # A changed signature line is "changed" when the name existed before.
-                if not existed:
-                    try:
-                        old = git(repo, "show", f"{before}:{path}")
-                        if re.search(rf"\b(fn|def|func|fun|function|struct|enum|trait|class|interface|const|static)\s+(mut\s+)?{re.escape(dname)}\b", old):
-                            want = "changed"
-                        elif decl.is_clike(path):
-                            old_lines = old.splitlines()
-                            if any(f and f[0] == dname for f in (decl.function(old_lines, k) for k in
-                                   range(len(old_lines)) if dname in old_lines[k])):
-                                want = "changed"
-                    except subprocess.CalledProcessError:
-                        pass
             else:
                 want = "same"
             if n.get("status") != want:
@@ -289,6 +391,13 @@ def main():
     for name, why in not_drawn.items():
         if not str(why).strip():
             problems.append(f"not_drawn `{name}`: give the reason")
+    # A `via` function is one every chain to the change must pass (Step 1.3).
+    names = [n["name"] for fig in group["figures"] for n in fig["nodes"]]
+    for name, why in (group.get("via") or {}).items():
+        if not any(re.search(rf"(^|::|\.){re.escape(name)}(\(\))?$", x) or x == name for x in names):
+            problems.append(f"via `{name}` is not a box — draw the chain through it")
+        if not str(why).strip():
+            problems.append(f"via `{name}`: give the reason")
     # An entry exception only when the code really has no main.
     if group.get("entry_exception"):
         hits = subprocess.run(["git", "-C", repo, "grep", "-nE",
