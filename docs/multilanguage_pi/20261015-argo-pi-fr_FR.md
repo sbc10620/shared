@@ -198,7 +198,7 @@ common 규칙 4개(`invisible_payload`, `imperative_pipe_to_shell`, `imperative_
 | common + en + fr 전체 regex 규칙 | 20 | 1199 KB |
 | (참고) common + en + fr 전체 regex 규칙, 프랑스어 주석 규칙 없음 | 19 | 1013 KB |
 
-프랑스어 규칙은 de_DE(사용자 입력 572 KB, 전체 1099 KB)보다 조금 크다. 두 형용사 어순, tu·vous 형, 3인칭과 구별하기 위한 대명사·소유 한정사 대안을 모두 두었기 때문이다. 규칙 단독으로는 `fr_ignore_prior` 193 KB, `fr_comment_directive` 192 KB, `fr_reveal_system_prompt` 126 KB, `fr_reveal_secrets` 117 KB 가 크다. 악센트 없는 입력을 받는 처리는 전체에서 약 19 KB 이다.
+프랑스어 규칙은 de_DE(사용자 입력 640 KB, 전체 1181 KB)보다 조금 크다. 두 형용사 어순, tu·vous 형, 3인칭과 구별하기 위한 대명사·소유 한정사 대안을 모두 두었기 때문이다. 규칙 단독으로는 `fr_ignore_prior` 193 KB, `fr_comment_directive` 192 KB, `fr_reveal_system_prompt` 126 KB, `fr_reveal_secrets` 117 KB 가 크다. 악센트 없는 입력을 받는 처리는 전체에서 약 19 KB 이다.
 
 ## 5. 결정 사항
 
