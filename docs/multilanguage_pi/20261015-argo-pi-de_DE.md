@@ -202,7 +202,7 @@ common 규칙 4개(`invisible_payload`, `imperative_pipe_to_shell`, `imperative_
 | common + en + de 전체 regex 규칙 | 20 | 1099 KB |
 | (참고) common + en + de 전체 regex 규칙, 독일어 주석 규칙 없음 | 19 | 907 KB |
 
-독일어 규칙은 ko_KR(사용자 입력 325 KB, 전체 800 KB)보다 상당히 크다. 친칭·존칭, 동사가 끝에 오는 어순, 단수·복수, 삽입어, 합성어 표기를 모두 대안으로 두었기 때문이다. 규칙 단독으로는 `de_comment_directive` 198 KB, `de_reveal_system_prompt` 132 KB, `de_ignore_prior` 123 KB, `de_reveal_secrets` 100 KB 가 크다. 대문자 움라우트를 위한 `(?iu:…)` 는 전체에서 약 11 KB 뿐이다.
+독일어 규칙은 ko_KR(사용자 입력 342 KB, 전체 820 KB)보다 상당히 크다. 친칭·존칭, 동사가 끝에 오는 어순, 단수·복수, 삽입어, 합성어 표기를 모두 대안으로 두었기 때문이다. 규칙 단독으로는 `de_comment_directive` 198 KB, `de_reveal_system_prompt` 132 KB, `de_ignore_prior` 123 KB, `de_reveal_secrets` 100 KB 가 크다. 대문자 움라우트를 위한 `(?iu:…)` 는 전체에서 약 11 KB 뿐이다.
 
 ## 5. 결정 사항
 
