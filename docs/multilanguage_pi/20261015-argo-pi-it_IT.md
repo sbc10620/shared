@@ -216,7 +216,7 @@ common 규칙 4개(`invisible_payload`, `imperative_pipe_to_shell`, `imperative_
 | common + en + it 전체 regex 규칙 | 20 | 1636 KB |
 | (참고) common + en + it 전체 regex 규칙, 이탈리아어 주석 규칙 없음 | 19 | 1421 KB |
 
-이탈리아어 규칙은 pt_BR(사용자 입력 1189 KB, 전체 1733 KB) 다음으로 크다(es_ES 는 사용자 입력 934 KB, 전체 1472 KB). 규칙 단독으로는 `it_ignore_prior` 342 KB, `it_comment_directive` 221 KB, `it_reveal_system_prompt` 205 KB, `it_reveal_secrets` 195 KB 이다. `it_ignore_prior` 가 특히 큰 이유는 세 가지이다. 부정 명령을 거르면서 부정사 명령을 받기 위한 문맥 조건, 많은 한정사·전치사 결합형(`delle`, `dell'`, `alle` 등), 수식 구(`che ti hanno dato`, `ricevute finora`)를 모두 대안으로 두었기 때문이다. 악센트 허용 처리는 전체에서 약 12 KB 이다.
+이탈리아어 규칙은 pt_BR(사용자 입력 1189 KB, 전체 1733 KB) 다음으로 크다(es_ES 는 사용자 입력 936 KB, 전체 1473 KB). 규칙 단독으로는 `it_ignore_prior` 342 KB, `it_comment_directive` 221 KB, `it_reveal_system_prompt` 205 KB, `it_reveal_secrets` 195 KB 이다. `it_ignore_prior` 가 특히 큰 이유는 세 가지이다. 부정 명령을 거르면서 부정사 명령을 받기 위한 문맥 조건, 많은 한정사·전치사 결합형(`delle`, `dell'`, `alle` 등), 수식 구(`che ti hanno dato`, `ricevute finora`)를 모두 대안으로 두었기 때문이다. 악센트 허용 처리는 전체에서 약 12 KB 이다.
 
 ## 5. 결정 사항
 
