@@ -1,0 +1,1091 @@
+{
+ "title": "UUID 안의 PII 매치를 엔진이 버리기",
+ "repo": "/Users/byungchulso/Works/ARGO-multilingual-support",
+ "before": "425843d519",
+ "after": "194cf3b3a7",
+ "range": "ARGO · 425843d519..194cf3b3a7 · argo (argo-cli) main() · feature guardrails",
+ "via": {
+  "PiiSpanDetector::detect": "UUID 검사는 drop_inside_uuid 가 켜진 PII 엔진에서만 실행됨"
+ },
+ "not_drawn": {
+  "default": "guardrails 기능을 끈 빌드의 프롬프트 가드에서만 호출 (그림은 켠 빌드)",
+  "fmt": "Debug 출력에 필드 추가. main() 흐름에서 호출 안 됨",
+  "known_names": "모르는 validator 이름일 때 에러 문구에 이름 목록을 넣는 도우미"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 때 PII 엔진에 UUID 검사를 켜는 흐름",
+   "caption": "PII 규칙 세트의 extensions() 가 drop_inside_uuid: true 를 넘기고, 엔진은 그 값을 저장한다. validator 표는 (이름, 함수) 목록이 되었고 card · kr_bank_account 이름은 없어졌다.",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "tokio 런타임 위에서 CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "설정을 읽고 부팅 절차 시작",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "가드레일 설치 (부팅 때 1회)",
+       "to": "install"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 턴 실행, 입력 PII 검사 → 그림 3"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:190",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let _engine = crate::guardrails::pii::shared::engine_guard();",
+       "note": "PII 엔진 슬롯을 등록하고 고정",
+       "to": "engine_guard"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let injection ="
+      },
+      {
+       "code": "        super::prompt_injection::install::build(config.prompt_injection, &mut warnings)?;",
+       "note": "프롬프트 인젝션 엔진 준비 → 그림 2"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "engine_guard",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::engine_guard()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:101",
+     "lines": [
+      {
+       "code": "    let _ = shared_slot();",
+       "note": "공유 슬롯을 먼저 만든다",
+       "to": "shared_slot"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "shared_slot",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::shared_slot()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:75",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            compile_from_yaml(",
+       "note": "내장 PII YAML 로 엔진 빌드",
+       "to": "compile_from_yaml",
+       "edge": "defer",
+       "label": "엔진이 필요할 때 실행"
+      },
+      {
+       "code": "                super::UNIFIED_CONFIG_YAML,"
+      },
+      {
+       "code": "                None,"
+      },
+      {
+       "code": "                DEFAULT_CHUNK_SIZE,"
+      },
+      {
+       "code": "                &super::extensions(),",
+       "note": "PII 규칙 세트의 확장 설정",
+       "to": "pii_ext"
+      },
+      {
+       "code": "            )"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "compile_from_yaml",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::compile_from_yaml()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:25",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let engine = PatternEngine::from_config_with_chunk_size(&config, layer, chunk_size, ext)?;",
+       "note": "받은 확장 설정(ext)으로 엔진 빌드",
+       "to": "fcwcs"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "pii_ext",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pii::extensions()",
+     "file": "tinicore/src/guardrails/pii/mod.rs:63",
+     "lines": [
+      {
+       "code": "    EngineExtensions {",
+       "to": "EE",
+       "edge": "use"
+      },
+      {
+       "code": "        keyword_lookup: keyword_file_content,"
+      },
+      {
+       "code": "        handwritten: Some(handwritten::build_handwritten_detectors),"
+      },
+      {
+       "code": "        drop_inside_uuid: true,",
+       "mark": "+",
+       "note": "PII 는 UUID 안의 매치를 버림"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "EE",
+     "kind": "struct",
+     "status": "changed",
+     "name": "EngineExtensions",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:212",
+     "lines": [
+      {
+       "code": "pub struct EngineExtensions {"
+      },
+      {
+       "code": "    pub keyword_lookup: fn(&str) -> Option<&'static str>,"
+      },
+      {
+       "code": "    pub handwritten: Option<HandwrittenBuilder>,"
+      },
+      {
+       "code": "    pub drop_inside_uuid: bool,",
+       "mark": "+",
+       "note": "이 값이 true 면 UUID 안 매치를 버림"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "fcwcs",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternEngine::from_config_with_chunk_size()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:418",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        validate_scores(config)?;"
+      },
+      {
+       "code": "        validate_validation_methods(config)?;",
+       "note": "규칙마다 validator 이름 확인",
+       "to": "vvm"
+      },
+      {
+       "code": "        validate_context_words(config)?;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let (pattern_strs, pattern_meta, handwritten_detectors) ="
+      },
+      {
+       "code": "            collect_patterns_and_detectors(config, layer, ext)?;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let chunks = build_dfa_chunks(&chunk_groups, chunk_size)?;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Ok(PatternEngine {",
+       "to": "PE",
+       "edge": "use"
+      },
+      {
+       "code": "            engines,"
+      },
+      {
+       "code": "            pattern_meta,"
+      },
+      {
+       "code": "            drop_inside_uuid: ext.drop_inside_uuid,",
+       "mark": "+",
+       "note": "확장 설정의 값을 엔진에 저장"
+      },
+      {
+       "code": "        })"
+      }
+     ]
+    },
+    {
+     "id": "PE",
+     "kind": "struct",
+     "status": "changed",
+     "name": "PatternEngine",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:260",
+     "lines": [
+      {
+       "code": "pub struct PatternEngine {"
+      },
+      {
+       "code": "    engines: Vec<Box<dyn MatchEngine>>,"
+      },
+      {
+       "code": "    pattern_meta: Vec<Arc<PatternMeta>>,"
+      },
+      {
+       "code": "    drop_inside_uuid: bool,",
+       "mark": "+",
+       "note": "스캔할 때 읽는 값"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "vvm",
+     "kind": "fn",
+     "status": "same",
+     "name": "validate_validation_methods()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:818",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        resolve_validation_methods(name, cfg)?;",
+       "note": "규칙 하나의 이름 목록 찾기",
+       "to": "rvm"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "rvm",
+     "kind": "fn",
+     "status": "same",
+     "name": "resolve_validation_methods()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:828",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            validator::lookup(method).ok_or_else(|| {",
+       "note": "이름이 같은 validator 찾기",
+       "to": "lookup"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "lookup",
+     "kind": "fn",
+     "status": "changed",
+     "name": "validator::lookup()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:41",
+     "lines": [
+      {
+       "code": "    VALIDATORS",
+       "mark": "+",
+       "to": "VALIDATORS",
+       "edge": "use"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .find(|(n, _)| *n == name)",
+       "mark": "+",
+       "note": "rule 파일의 이름과 같은 항목"
+      },
+      {
+       "code": "        .map(|(_, f)| f as &'static dyn Validator)",
+       "mark": "+",
+       "note": "그 함수를 validator 로 돌려줌",
+       "to": "Validator",
+       "edge": "use"
+      }
+     ]
+    },
+    {
+     "id": "VALIDATORS",
+     "kind": "static",
+     "status": "changed",
+     "name": "validator::VALIDATORS",
+     "file": "tinicore/src/guardrails/engine/validator.rs:36",
+     "lines": [
+      {
+       "code": "const VALIDATORS: &[(&str, fn(&str) -> bool)] =",
+       "mark": "+",
+       "note": "(이름, 함수) 표"
+      },
+      {
+       "code": "    &[(\"luhn\", luhn), (\"rrn\", rrn), (\"phonenumber\", phonenumber)];",
+       "mark": "+",
+       "note": "card · kr_bank_account 는 빠짐"
+      }
+     ]
+    },
+    {
+     "id": "Validator",
+     "kind": "trait",
+     "status": "changed",
+     "name": "validator::Validator",
+     "file": "tinicore/src/guardrails/engine/validator.rs:19",
+     "lines": [
+      {
+       "code": "pub(crate) trait Validator: Debug + Sync {"
+      },
+      {
+       "code": "    fn validate(&self, matched: &str) -> bool;",
+       "mark": "+",
+       "note": "매치된 글자만 받음 (앞뒤 문맥 없음)"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · 프롬프트 인젝션 엔진은 UUID 검사를 끄는 흐름",
+   "caption": "같은 엔진 코드를 쓰는 프롬프트 인젝션 규칙 세트는 drop_inside_uuid: false 를 넘긴다. 도구 출력 검사가 켜져 있을 때만 이 엔진을 준비한다.",
+   "nodes": [
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:190",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let injection ="
+      },
+      {
+       "code": "        super::prompt_injection::install::build(config.prompt_injection, &mut warnings)?;",
+       "note": "프롬프트 인젝션 규칙 세트 준비",
+       "to": "pi_build"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "pi_build",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::install::build()",
+     "file": "tinicore/src/guardrails/prompt_injection/install.rs:73",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let engine = ToolOutputEngine::new(&config.tool_output.rules).map_err(config_error)?;",
+       "note": "도구 출력 검사가 켜졌을 때 엔진 준비",
+       "to": "new"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "new",
+     "kind": "fn",
+     "status": "same",
+     "name": "ToolOutputEngine::new()",
+     "file": "tinicore/src/guardrails/prompt_injection/tool_output.rs:91",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Self::from_parts(embedded, added, Arc::clone(shared::slot()))",
+       "note": "공유 슬롯을 받아 둔다",
+       "to": "pi_slot"
+      }
+     ]
+    },
+    {
+     "id": "pi_slot",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::shared::slot()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:102",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    SLOT.get_or_init(|| TurnSlot::new(SLOT_NAME, || build_engine(&snapshot())))",
+       "note": "엔진 빌드 함수를 슬롯에 등록",
+       "to": "build_engine",
+       "edge": "defer",
+       "label": "엔진이 필요할 때 실행"
+      }
+     ]
+    },
+    {
+     "id": "build_engine",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::shared::build_engine()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:93",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    PatternEngine::from_config(&config, None, &extensions())",
+       "note": "프롬프트 인젝션 확장 설정으로 빌드",
+       "to": "pi_inj_ext"
+      }
+     ]
+    },
+    {
+     "id": "pi_inj_ext",
+     "kind": "fn",
+     "status": "changed",
+     "name": "prompt_injection::extensions()",
+     "file": "tinicore/src/guardrails/prompt_injection/mod.rs:405",
+     "lines": [
+      {
+       "code": "    EngineExtensions {",
+       "to": "EE",
+       "edge": "use"
+      },
+      {
+       "code": "        keyword_lookup: |_| None,"
+      },
+      {
+       "code": "        handwritten: Some(handwritten::build_handwritten_detectors),"
+      },
+      {
+       "code": "        drop_inside_uuid: false,",
+       "mark": "+",
+       "note": "문구 판정 규칙이라 UUID 검사 안 함"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "EE",
+     "kind": "struct",
+     "status": "changed",
+     "name": "EngineExtensions",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:212",
+     "lines": [
+      {
+       "code": "pub struct EngineExtensions {"
+      },
+      {
+       "code": "    pub keyword_lookup: fn(&str) -> Option<&'static str>,"
+      },
+      {
+       "code": "    pub handwritten: Option<HandwrittenBuilder>,"
+      },
+      {
+       "code": "    pub drop_inside_uuid: bool,",
+       "mark": "+",
+       "note": "false 면 UUID 검사를 하지 않음"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 3 · 한 턴의 PII 입력 검사에서 UUID 안 매치를 버리는 흐름",
+   "caption": "매치는 경계 검사와 validator 를 통과한 뒤, 엔진이 UUID 하나 안에 통째로 들어 있는지 본다. 그렇다면 어떤 PII 규칙의 매치든 버린다.",
+   "nodes": [
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 턴 실행 (그림 1 의 run 에서 이어짐)",
+       "to": "rst"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "rst",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        tinicore::agent::guardrails::run_input_guardrails_with_text(user_input, None).await",
+       "note": "저장 전에 사용자 입력을 가드레일로 검사",
+       "to": "with_text"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "with_text",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::run_input_guardrails_with_text()",
+     "file": "tinicore/src/agent/guardrails.rs:358",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    tinicore_traits::run_input_guardrails(&guardrail_set.input, &gi)",
+       "note": "등록된 입력 가드레일 목록 실행",
+       "to": "rig"
+      },
+      {
+       "code": "        .await"
+      },
+      {
+       "code": "        .map(|_| ())"
+      }
+     ]
+    },
+    {
+     "id": "rig",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicore_traits::run_input_guardrails()",
+     "file": "tinicore-traits/src/guardrail.rs:1031",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let res = g.check(input).await;",
+       "note": "가드레일마다 check (여기선 PII 입력 검사)",
+       "to": "check"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "check",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::check()",
+     "file": "tinicore/src/sensitive/guardrail.rs:274",
+     "lines": [
+      {
+       "code": "        self.evaluate(input.text).await",
+       "note": "입력 문자열 판정",
+       "to": "evaluate"
+      }
+     ]
+    },
+    {
+     "id": "evaluate",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::evaluate()",
+     "file": "tinicore/src/sensitive/guardrail.rs:138",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let outcome = self.chain.detect_any_of(text, &self.block).await;",
+       "note": "막을 종류가 있는지 검출기 체인에 물음",
+       "to": "dao"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "dao",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::detect_any_of()",
+     "file": "tinicore/src/sensitive/chain.rs:264",
+     "lines": [
+      {
+       "code": "        self.scan_until_hit(text, Some(wanted)).await",
+       "note": "막을 종류만 골라 검사",
+       "to": "suh"
+      }
+     ]
+    },
+    {
+     "id": "suh",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::scan_until_hit()",
+     "file": "tinicore/src/sensitive/chain.rs:270",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            match m.detect(text).await {",
+       "note": "검출기를 하나씩 실행 (PII 검출기)",
+       "to": "detect"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "detect",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::detect()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:550",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        match tokio::task::spawn_blocking(move || filter.analyze(&text)).await {",
+       "note": "별도 스레드에서 PII 패턴 검사",
+       "to": "analyze"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "analyze",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:156",
+     "lines": [
+      {
+       "code": "        self.analyze_with(text, PatternEngine::scan)",
+       "note": "PatternEngine::scan 으로 검사",
+       "to": "aw"
+      }
+     ]
+    },
+    {
+     "id": "aw",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_with()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:175",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);",
+       "note": "함수 포인터 scan 호출",
+       "to": "scan"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "scan",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:463",
+     "lines": [
+      {
+       "code": "        self.scan_inner(text, true)",
+       "note": "중첩 매치를 버리는 모드로 검사",
+       "to": "scan_inner"
+      }
+     ]
+    },
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:479",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let collapsed = self.validate_and_collapse(resolved, text);",
+       "note": "경계 검사 · 값 검증 · UUID 검사 단계",
+       "to": "vac"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "vac",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternEngine::validate_and_collapse()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:522",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        for &(pid, start, end) in &resolved {"
+      },
+      {
+       "code": "            let meta = &self.pattern_meta[pid];",
+       "to": "PE",
+       "edge": "use"
+      },
+      {
+       "code": "            if meta.boundary_check"
+      },
+      {
+       "code": "                && !passes_boundary_check("
+      },
+      {
+       "code": "                    text,"
+      },
+      {
+       "code": "                    start,"
+      },
+      {
+       "code": "                    end,"
+      },
+      {
+       "code": "                    &meta.boundary_check_reject_before,"
+      },
+      {
+       "code": "                    &meta.boundary_check_reject_after,"
+      },
+      {
+       "code": "                )"
+      },
+      {
+       "code": "            {"
+      },
+      {
+       "code": "                continue;",
+       "note": "경계 검사에 걸리면 매치를 버림"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            if !meta.validation_methods.is_empty()",
+       "mark": "+"
+      },
+      {
+       "code": "                && !text",
+       "mark": "+"
+      },
+      {
+       "code": "                    .get(start..end)",
+       "mark": "+"
+      },
+      {
+       "code": "                    .is_some_and(|m| meta.validation_methods.iter().all(|v| v.validate(m)))",
+       "mark": "+",
+       "note": "validator 에는 매치된 글자만 넘김",
+       "to": "v_impl"
+      },
+      {
+       "code": "            {"
+      },
+      {
+       "code": "                continue;",
+       "note": "validator 하나라도 실패하면 버림"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "            if self.drop_inside_uuid && validator::inside_uuid(text, start..end) {",
+       "mark": "+",
+       "note": "PII 엔진이면 UUID 안의 매치를 버림",
+       "to": "inside_uuid"
+      },
+      {
+       "code": "                continue;",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            validated.push((pid, start, end));"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "inside_uuid",
+     "kind": "fn",
+     "status": "changed",
+     "name": "validator::inside_uuid()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:101",
+     "lines": [
+      {
+       "code": "    let bytes = text.as_bytes();"
+      },
+      {
+       "code": "    if span.start > span.end || span.end > bytes.len() {",
+       "note": "범위 밖 span 은 UUID 안이 아님"
+      },
+      {
+       "code": "        return false;"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    let first = span.end.saturating_sub(UUID_LEN);"
+      },
+      {
+       "code": "    (first..=span.start).any(|s| bytes.get(s..s + UUID_LEN).is_some_and(is_uuid))"
+      }
+     ],
+     "desc": "span 을 통째로 덮는 36바이트 창 중 하나가 UUID(8-4-4-4-12) 면 true"
+    },
+    {
+     "id": "v_impl",
+     "kind": "fn",
+     "status": "new",
+     "name": "Validator::validate()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:25",
+     "lines": [
+      {
+       "code": "        self(matched)",
+       "mark": "+",
+       "note": "표의 함수(luhn · rrn · phonenumber) 실행",
+       "to": "phonenumber",
+       "callee": "self"
+      }
+     ],
+     "desc": "impl Validator for fn(&str) -> bool"
+    },
+    {
+     "id": "phonenumber",
+     "kind": "fn",
+     "status": "new",
+     "name": "validator::phonenumber()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:31",
+     "lines": [
+      {
+       "code": "    true",
+       "mark": "+",
+       "note": "형식은 패턴이 이미 확인, 항상 통과"
+      }
+     ]
+    },
+    {
+     "id": "PE",
+     "kind": "struct",
+     "status": "changed",
+     "name": "PatternEngine",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:260",
+     "lines": [
+      {
+       "code": "pub struct PatternEngine {"
+      },
+      {
+       "code": "    engines: Vec<Box<dyn MatchEngine>>,"
+      },
+      {
+       "code": "    pattern_meta: Vec<Arc<PatternMeta>>,"
+      },
+      {
+       "code": "    drop_inside_uuid: bool,",
+       "mark": "+",
+       "note": "그림 1 에서 빌드 때 저장한 값"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "194cf3b3a7",
+   "fix(guardrails): no PII recognizer reports a match inside a UUID"
+  ]
+ ]
+}

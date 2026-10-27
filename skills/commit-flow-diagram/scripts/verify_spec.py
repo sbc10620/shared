@@ -40,7 +40,8 @@ DEF_RE = re.compile(
     r"|\bfun\s+(?:<[^>]*>\s*)?(?:[\w.]+\.)?([A-Za-z_]\w*)"         # Kotlin
     r"|\bfunction\s+([A-Za-z_]\w*)"                              # JS/TS
     r"|\b(?:struct|enum|trait|union|class|interface|record)\s+([A-Za-z_]\w*)"
-    r"|\b(?:const|static)\s+(?:mut\s+)?([A-Z_][A-Z0-9_]*)\s*:")
+    r"|\b(?:const|static)\s+(?:mut\s+)?([A-Z_][A-Z0-9_]*)\s*:"
+    r"|\btype\s+([A-Za-z_]\w*)\s*(?:<[^>]*>)?\s*=")           # type alias
 MAIN_RE = re.compile(r"^\s*(pub\s+)?(async\s+)?fn\s+main\s*\(|\bint\s+main\s*\(|^def\s+main\s*\(|"
                      r"static\s+void\s+main\s*\(|^func\s+main\s*\(|^fun\s+main\s*\(")
 
@@ -62,11 +63,129 @@ EXIT_RE = re.compile(r"\breturn\b|\bErr\(|\?;?\s*$|\bexit\(|\bpanic!|\bthrow\b|\
                      r"\bbreak\b|\bcontinue\b|=>\s*Ok\(|=>\s*Err")
 
 
+MOD_DECL_RE = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?mod\s+\w+\s*;")
+
+
+def removed_text(repo, before, after):
+    """Every `-` line of the whole range (stripped), across all files, so a
+    line moved to another file counts as moved, not added."""
+    return {l[1:].strip() for l in git(repo, "diff", "-U0", before, after).splitlines()
+            if l.startswith("-") and not l.startswith("---")}
+
+
+_REMOVED = {}
+_MOVED_SPANS = {}
+
+
+def _body(lines, start):
+    """The definition starting at lines[start], as stripped code lines
+    (blank and comment lines dropped), and its last line index."""
+    end = block_end(lines, start)
+    body = tuple(l.strip() for l in lines[start:end + 1]
+                 if l.strip() and not l.lstrip().startswith(("//", "/*", "*", "#")))
+    return body, end
+
+
+VIS_RE = re.compile(r"^(pub(\([^)]*\))?|public|private|protected|internal|fileprivate)\s+")
+
+
+def _no_vis(body):
+    """`body` with the visibility of its declaration line dropped: a
+    definition moved into a module often has to become `pub(super)`."""
+    return (VIS_RE.sub("", body[0]),) + body[1:] if body else body
+
+
+def _bodies(lines, path):
+    """[(name, start, end, body)] of every definition in a file."""
+    out = []
+    for i in range(len(lines)):
+        d = definition(lines, i, path)
+        if d:
+            body, end = _body(lines, i)
+            out.append((d[0], i, end, body))
+    return out
+
+
+def moved_spans(repo, before, after):
+    """{path: [(name, start, end)]} (0-based, at `after`) of the
+    definitions whose code (comments and blank lines aside) equals a
+    definition of the same name at `before`, in this file or another (from
+    another file, the declaration's visibility may differ): a definition the
+    range moved without changing it. Its lines are not added, whatever their
+    length."""
+    key = (repo, before, after)
+    if key in _MOVED_SPANS:
+        return _MOVED_SPANS[key]
+    old = {}
+    for st in git(repo, "diff", "--name-status", "--no-renames", before, after).splitlines():
+        old_path = st.split("\t")[-1]
+        if not old_path.endswith(SOURCE_EXT):
+            continue
+        try:
+            lines = git(repo, "show", f"{before}:{old_path}").splitlines()
+        except subprocess.CalledProcessError:
+            continue  # added file
+        for name, _, _, body in _bodies(lines, old_path):
+            old.setdefault(name, set()).add((old_path, body, _no_vis(body)))
+    out = {}
+    for path in git(repo, "diff", "--name-only", before, after).splitlines():
+        if not path.endswith(SOURCE_EXT):
+            continue
+        try:
+            lines = git(repo, "show", f"{after}:{path}").splitlines()
+        except subprocess.CalledProcessError:
+            continue  # deleted file
+        # Same code: moved. Same code but for the visibility of the
+        # declaration: moved, if it came from another file (a visibility
+        # change in place is a change).
+        out[path] = [(name, a, b) for name, a, b, body in _bodies(lines, path)
+                     if any(body == ob or (op != path and _no_vis(body) == nv)
+                            for op, ob, nv in old.get(name, ()))]
+    _MOVED_SPANS[key] = out
+    return out
+
+
 def changed_definitions(repo, before, after):
-    """{name: "path:line"} of every non-test definition the range touches:
-    for each added or changed code line (comments, attributes and blank
-    lines do not count), the nearest enclosing definition above it (a
-    definition line with no more indentation, or the line itself)."""
+    return _definitions(repo, before, after)
+
+
+def moved_definitions(repo, before, after):
+    """{(name, path, line): True} of the definitions the range only moved:
+    they hold moved lines (see added_lines) and no line changed in content,
+    so they are not in the changed set and are not drawn; the page lists
+    them."""
+    out = {}
+    for path, spans in moved_spans(repo, before, after).items():
+        if TEST_PATH.search(path):
+            continue  # tests are never drawn, moved or not
+        raw = all_added_lines(repo, before, after, path)
+        for name, a, b in spans:
+            if any(a < n <= b + 1 for n in raw):
+                out[(name, path, a + 1)] = True
+    return out
+
+
+def all_added_lines(repo, before, after, path):
+    """Line numbers (at `after`) of every `+` line, moved or not."""
+    out, new_ln = set(), 0
+    for l in git(repo, "diff", "-U0", before, after, "--", path).splitlines():
+        h = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", l)
+        if h:
+            new_ln = int(h.group(1))
+        elif l.startswith("+") and not l.startswith("+++"):
+            out.add(new_ln)
+            new_ln += 1
+    return out
+
+
+def _definitions(repo, before, after):
+    """{(name, path, line): True} of every non-test definition the range
+    touches, keyed by its declaration so two definitions of one name stay
+    apart: for each line the range added or changed in content (a moved
+    line, a comment, an attribute, a blank line or a `mod x;` declaration
+    does not count — see added_lines), the nearest enclosing definition
+    above it (a definition line with no more indentation, or the line
+    itself)."""
     out = {}
     names = git(repo, "diff", "--name-only", before, after).splitlines()
     for path in names:
@@ -84,17 +203,17 @@ def changed_definitions(repo, before, after):
                     re.match(r"\s*(pub(\([^)]*\))?\s+)?mod\s+\w+\s*\{", lines[i + 1]):
                 test_from = i
                 break
-        touched = set()
-        for h in re.finditer(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@",
-                             git(repo, "diff", "-U0", before, after, "--", path), re.M):
-            start, count = int(h.group(2)), int(h.group(3) or 1)
-            touched.update(range(start, start + max(count, 1)))
+        touched = added_lines(repo, before, after, path)
         for ln in sorted(touched):
             i = min(ln, len(lines)) - 1
             if i < 0 or (test_from is not None and i >= test_from):
                 continue
             if not lines[i].strip() or lines[i].lstrip().startswith(("//", "/*", "*", "#[", "# ", "@")):
                 continue  # comment, attribute or blank: not a code change
+            if MOD_DECL_RE.match(lines[i]):
+                continue  # `mod x;` only names another file
+            if re.fullmatch(r"[\s{}()\[\];,]*", lines[i]):
+                continue  # only closing brackets: it belongs to no one definition
             ind = len(lines[i]) - len(lines[i].lstrip())
             for j in range(i, -1, -1):
                 l = lines[j]
@@ -105,7 +224,7 @@ def changed_definitions(repo, before, after):
                 if d and d[1] and lj > 0 and j != i:
                     d = None  # a const/static inside a body is not a definition of its own
                 if d and (j == i or lj <= ind):
-                    out.setdefault(d[0], f"{path}:{j+1}")
+                    out[(d[0], path, j + 1)] = True
                     break
                 if lj < ind:
                     ind = lj
@@ -120,11 +239,15 @@ def added_lines(repo, before, after, path):
     changed in content. A `+` line that only moved or was re-indented does
     not count: its text (without surrounding whitespace) is also a `-` line
     of the same hunk, or, for a line of MOVE_MIN characters or more, a `-`
-    line anywhere in the file. A shorter line (`.iter()`, `return false;`)
-    is too common to tell a move from a new line elsewhere in the file."""
+    line anywhere in the range, this file or another (a definition moved to
+    another file is not new). A shorter line (`.iter()`, `return false;`)
+    is too common to tell a move from a new line elsewhere."""
     out, new_ln, plus, minus = set(), 0, [], set()
     diff = git(repo, "diff", "-U0", before, after, "--", path).splitlines()
-    removed = {l[1:].strip() for l in diff if l.startswith("-") and not l.startswith("---")}
+    key = (repo, before, after)
+    if key not in _REMOVED:
+        _REMOVED[key] = removed_text(repo, before, after)
+    removed = _REMOVED[key]
 
     def flush():
         out.update(n for n, t in plus
@@ -141,14 +264,16 @@ def added_lines(repo, before, after, path):
         elif l.startswith("-") and not l.startswith("---"):
             minus.add(l[1:].strip())
     flush()
-    return out
+    spans = moved_spans(repo, before, after).get(path, [])
+    return {n for n in out if not any(a < n <= b + 1 for _, a, b in spans)}
 
 
 def block_end(lines, start):
     """Index of the last line of the definition that starts at lines[start]:
     where its braces close, or, with no brace (Python), the last line before
     one indented no deeper than the declaration."""
-    depth, opened = 0, False
+    depth, opened = 0, False      # braces
+    sq, sq_opened = 0, False      # brackets: a `const X: &[T] = &[ … ];` table
     for j in range(start, len(lines)):
         code = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'|//.*$', "", lines[j])
         for ch in code:
@@ -156,9 +281,17 @@ def block_end(lines, start):
                 depth, opened = depth + 1, True
             elif ch == "}":
                 depth -= 1
-        if opened and depth <= 0:
+            elif ch == "[":
+                sq += 1
+            elif ch == "]":
+                sq -= 1
+        if sq > 0 and depth <= 0:
+            sq_opened = True  # a bracket left open outside any brace
+        if sq_opened and sq <= 0 and depth <= 0 and code.rstrip().endswith(";"):
             return j
-        if not opened and j > start and lines[j].rstrip().endswith(";") and depth == 0 \
+        if opened and depth <= 0 and sq <= 0:
+            return j
+        if not opened and lines[j].rstrip().endswith(";") and depth == 0 and sq <= 0 \
                 and not lines[start].rstrip().endswith(("(", ",")):
             break  # a declaration with no body
     ind = len(lines[start]) - len(lines[start].lstrip())
@@ -347,7 +480,7 @@ def main():
                 continue
             if not re.search(rf"\b{re.escape(dname)}\b", n["name"]):
                 problems.append(f"fig{fi+1} {n['id']}: name {n['name']!r} does not match the declaration `{dname}`")
-            if dname in changed:
+            if (dname, path, int(line)) in changed:
                 try:
                     old_lines = git(repo, "show", f"{before}:{path}").splitlines()
                 except subprocess.CalledProcessError:
@@ -372,22 +505,34 @@ def main():
                                         f"`{callee}`: {ln.get('code', '')!r}")
     if len(group["figures"]) > 1 and len(unique) <= 18:
         problems.append(f"{len(unique)} distinct boxes fit in one figure — do not split (Step 2)")
-    for name in group.get("not_drawn", {}):
-        if name not in changed:
-            problems.append(f"not_drawn `{name}` is not a definition this range changed")
+    # A `not_drawn` key names a changed definition: `name`, or, when two
+    # changed definitions share the name, `name@path` (a path suffix is
+    # enough: `default@install.rs`).
+    def nd_matches(key, name, path):
+        base, _, where = key.partition("@")
+        return base == name and (not where or path.endswith(where))
 
-    # Completeness: every changed definition is a box or explained.
-    # Drawn = a box's name, or a declaration shown as a line inside a box
-    # (e.g. a const listed in its enum's box).
-    boxed = " ".join(n["name"] for fig in group["figures"] for n in fig["nodes"])
-    boxed += " " + " ".join(d[0]
-                            for fig in group["figures"] for n in fig["nodes"]
-                            for ln in n.get("lines", []) if not ln.get("elide")
-                            for d in [definition([ln.get("code", "")], 0, n["file"].partition(":")[0])] if d)
     not_drawn = group.get("not_drawn", {})
-    for name, where in changed.items():
-        if not re.search(rf"\b{re.escape(name)}\b", boxed) and name not in not_drawn:
-            problems.append(f"changed `{name}` ({where}) is neither a box nor listed in `not_drawn` with a reason")
+    for key in not_drawn:
+        hits = [(n, p) for (n, p, _) in changed if nd_matches(key, n, p)]
+        if not hits:
+            problems.append(f"not_drawn `{key}` is not a definition this range changed")
+
+    # Completeness: every changed definition is a box (its declaration line),
+    # a declaration shown as a line inside a box of the same file (e.g. a
+    # const listed in its enum's box), or explained in `not_drawn`.
+    box_at = {(n["file"].partition(":")[0], int(n["file"].partition(":")[2] or 0))
+              for fig in group["figures"] for n in fig["nodes"]}
+    inside = {(n["file"].partition(":")[0], d[0])
+              for fig in group["figures"] for n in fig["nodes"]
+              for ln in n.get("lines", []) if not ln.get("elide")
+              for d in [definition([ln.get("code", "")], 0, n["file"].partition(":")[0])] if d}
+    for (name, path, line) in changed:
+        if (path, line) in box_at or (path, name) in inside:
+            continue
+        if any(nd_matches(k, name, path) for k in not_drawn):
+            continue
+        problems.append(f"changed `{name}` ({path}:{line}) is neither a box nor listed in `not_drawn` with a reason")
     for name, why in not_drawn.items():
         if not str(why).strip():
             problems.append(f"not_drawn `{name}`: give the reason")

@@ -28,6 +28,7 @@ from xml.sax.saxutils import escape
 sys.dont_write_bytecode = True  # keep the skill directory free of __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render  # noqa: E402
+import verify_spec  # noqa: E402
 
 CHROMES = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -162,6 +163,13 @@ def page(group, figures):
                  '<p>이 범위에서 바뀌었지만 main() 에서 시작하는 흐름에 박스로 넣지 않은 정의입니다.</p><ul>'
                  + "".join(f'<li><code>{escape(k)}</code><span>{escape(str(v))}</span></li>' for k, v in sorted(nd.items()))
                  + '</ul></section>')
+    mv = sorted(verify_spec.moved_definitions(group["repo"], group["before"], group["after"]))
+    moved = ("" if not mv else
+             '<section class="not-drawn" id="moved"><h2>내용 그대로 옮긴 정의</h2>'
+             '<p>이 범위에서 다른 파일이나 위치로 옮기기만 한 정의입니다. 바뀐 정의가 아니므로 그리지 않았습니다.</p><ul>'
+             + "".join(f'<li><code>{escape(name)}</code><span>{escape(path)}:{line}</span></li>'
+                       for name, path, line in mv)
+             + '</ul></section>')
     figures_html = "".join(f'''
 <section class="fig" id="fig{i+1}">
   <header class="fig-head">
@@ -282,6 +290,7 @@ body.has-max {{ overflow: hidden; }}
   {figures_html}
   {via}
   {not_drawn}
+  {moved}
 </main>
 
 <script>

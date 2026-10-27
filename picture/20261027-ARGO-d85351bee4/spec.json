@@ -1,0 +1,3604 @@
+{
+ "title": "PII 규칙·검증·표를 나라별 모듈로 나눈 코드 흐름",
+ "repo": "/Users/byungchulso/Works/ARGO-multilingual-support",
+ "before": "d4cf74fef2",
+ "after": "d85351bee4",
+ "range": "ARGO · d4cf74fef2..d85351bee4 · argo 바이너리(argo-cli) main() 부터 · feature guardrails",
+ "via": {
+  "pii::shared::compile_for_countries": "label 검사와 나라별 validator 는 PII 엔진 빌드에서만 쓰임",
+  "PiiSpanDetector::detect": "validator·손으로 쓴 탐지기는 PII 엔진 스캔에서만 실행"
+ },
+ "not_drawn": {
+  "sub": "TYPES 표의 행을 만드는 const fn, 컴파일 때 계산되고 실행 중 호출 없음",
+  "full": "TYPES 표의 ^…$ 행을 만드는 const fn, 컴파일 때 계산되고 실행 중 호출 없음",
+  "space_slash_or_dash": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "space": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "two": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "five": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "upper_or_digit": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "six_to_nine": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "three": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "four": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "letter_e": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "letter_s": "어느 나라 모양 표(TYPES)에서도 쓰지 않음, 호출 없음",
+  "compile_from_yaml": "테스트·벤치용 YAML 필터(layer_filter_from_yaml 등)에서만 호출",
+  "build_filters_with_params": "벤치·테스트에서만 호출, main() 에서 닿지 않음",
+  "check_cases": "#[cfg(test)] 도우미, 테스트에서만 사용",
+  "default@recognizer.rs": "EngineExtensions 기본값, feature guardrails 빌드에선 테스트에서만 사용"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 때 PII 엔진을 만들며 모든 규칙의 label: 을 검사",
+   "caption": "install 이 공유 슬롯을 만들고, 엔진이 빌드될 때 common + 선택 국가 규칙마다 label: 이 있고 아는 값인지 검사",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "tokio 런타임 위에서 CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "설정을 읽고 부팅 절차 시작",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "가드레일 설치 (부팅 때 1회)",
+       "to": "install"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 번 실행 모드로 턴 하나 처리 → 그림 7"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:228",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let _engine = crate::guardrails::pii::shared::engine_guard();",
+       "note": "PII 엔진 슬롯을 만들고 부팅 동안 고정",
+       "to": "engine_guard"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;",
+       "note": "층마다 PII 탐지기 만들기 → 그림 5"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        super::prompt_injection::install::build(config.prompt_injection, &mut warnings)?;",
+       "note": "프롬프트 인젝션 규칙 빌드 → 그림 6"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "engine_guard",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::engine_guard()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:179",
+     "lines": [
+      {
+       "code": "    let _ = shared_slot();",
+       "note": "공유 슬롯을 먼저 만든다",
+       "to": "shared_slot"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "shared_slot",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::shared_slot()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            compile_for_countries(countries, DEFAULT_CHUNK_SIZE, &super::extensions())",
+       "note": "common + 선택 국가 규칙으로 엔진 빌드",
+       "to": [
+        "cfc",
+        "extensions"
+       ],
+       "edge": [
+        "defer",
+        "defer"
+       ],
+       "label": "엔진이 필요할 때 실행"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "cfc",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pii::shared::compile_for_countries()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:59",
+     "lines": [
+      {
+       "code": "    let config = EngineConfig::from_yamls(&rule_documents(countries))?;"
+      },
+      {
+       "code": "    let engine = PatternEngine::from_config_with_chunk_size(&config, None, chunk_size, ext)?;",
+       "note": "파싱한 규칙으로 엔진 빌드",
+       "to": "fcwcs"
+      },
+      {
+       "code": "    super::labels::check_labels(&config)?;",
+       "note": "모든 규칙에 label: 이 맞게 있는지 검사",
+       "to": "check_labels",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    Ok(engine)"
+      }
+     ]
+    },
+    {
+     "id": "extensions",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pii::extensions()",
+     "file": "tinicore/src/guardrails/pii/mod.rs:72",
+     "lines": [
+      {
+       "code": "    EngineExtensions {",
+       "to": "EngineExtensions",
+       "edge": "use"
+      },
+      {
+       "code": "        keyword_lookup: keyword_file_content,"
+      },
+      {
+       "code": "        handwritten: Some(handwritten::build_handwritten_detectors),"
+      },
+      {
+       "code": "        drop_inside_uuid: true,"
+      },
+      {
+       "code": "        validators: validators::lookup,",
+       "note": "validator 이름은 나라별 모듈 표에서 찾음",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "EngineExtensions",
+     "kind": "struct",
+     "status": "changed",
+     "name": "EngineExtensions",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:220",
+     "lines": [
+      {
+       "code": "pub struct EngineExtensions {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub handwritten: Option<HandwrittenBuilder>,"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub validators: fn(&str) -> Option<&'static dyn Validator>,",
+       "note": "규칙 세트가 넘기는 validator 찾기 함수",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "fcwcs",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternEngine::from_config_with_chunk_size()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:430",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        validate_scores(config)?;"
+      },
+      {
+       "code": "        check_validators(config, ext)?;",
+       "note": "validator 이름 검사 → 그림 2",
+       "mark": "+"
+      },
+      {
+       "code": "        validate_context_words(config)?;"
+      },
+      {
+       "code": "        let (pattern_strs, pattern_meta, handwritten_detectors) ="
+      },
+      {
+       "code": "            collect_patterns_and_detectors(config, layer, ext)?;",
+       "note": "규칙마다 PatternMeta 만들기 → 그림 2"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let chunks = build_dfa_chunks(&chunk_groups, chunk_size)?;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "check_labels",
+     "kind": "fn",
+     "status": "new",
+     "name": "labels::check_labels()",
+     "file": "tinicore/src/guardrails/pii/labels.rs:34",
+     "lines": [
+      {
+       "code": "    let mut keys: Vec<&String> = config.recognizers.keys().collect();",
+       "mark": "+"
+      },
+      {
+       "code": "    keys.sort();",
+       "mark": "+"
+      },
+      {
+       "code": "    for key in keys {",
+       "mark": "+"
+      },
+      {
+       "code": "        let recognizer = &config.recognizers[key];",
+       "mark": "+"
+      },
+      {
+       "code": "        match recognizer.label.as_deref() {",
+       "to": "RecognizerConfig",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "            None => {",
+       "note": "label: 이 없으면 빌드 실패",
+       "mark": "+"
+      },
+      {
+       "code": "                return Err(EngineError::Config(format!(",
+       "mark": "+"
+      },
+      {
+       "code": "                    \"PII recognizer `{key}` has no `label:`\"",
+       "mark": "+"
+      },
+      {
+       "code": "                )));",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            Some(label) if kind_of_label(label).is_none() => {",
+       "note": "어떤 종류도 아닌 label 이면 빌드 실패",
+       "to": "kind_of_label",
+       "mark": "+"
+      },
+      {
+       "code": "                return Err(EngineError::Config(format!(",
+       "mark": "+"
+      },
+      {
+       "code": "                    \"PII recognizer `{key}` has an unknown label `{label}` — expected `{CREDENTIAL}` or one of: {}\",",
+       "to": "CREDENTIAL",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "                    PiiLabel::ALL",
+       "mark": "+"
+      },
+      {
+       "code": "                        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "                        .map(|known| known.as_str())",
+       "mark": "+"
+      },
+      {
+       "code": "                        .collect::<Vec<_>>()"
+      },
+      {
+       "code": "                        .join(\", \")",
+       "mark": "+"
+      },
+      {
+       "code": "                )));",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            Some(_) => {}",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    Ok(())",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "kind_of_label",
+     "kind": "fn",
+     "status": "new",
+     "name": "labels::kind_of_label()",
+     "file": "tinicore/src/guardrails/pii/labels.rs:22",
+     "lines": [
+      {
+       "code": "    if label == CREDENTIAL {",
+       "note": "credential 은 비밀값 종류",
+       "to": "CREDENTIAL",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        return Some(SensitiveKind::Credential);",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    PiiLabel::ALL",
+       "note": "그 밖은 PiiLabel 이름과 같아야 함",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .find(|known| known.as_str() == label)",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|known| SensitiveKind::Pii(*known))",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "CREDENTIAL",
+     "kind": "static",
+     "status": "new",
+     "name": "labels::CREDENTIAL",
+     "file": "tinicore/src/guardrails/pii/labels.rs:19",
+     "lines": [
+      {
+       "code": "pub(crate) const CREDENTIAL: &str = \"credential\";",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "RecognizerConfig",
+     "kind": "struct",
+     "status": "changed",
+     "name": "RecognizerConfig",
+     "file": "tinicore/src/guardrails/engine/config.rs:105",
+     "lines": [
+      {
+       "code": "pub struct RecognizerConfig {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub label: Option<String>,",
+       "note": "규칙 파일의 label: 값 (글자 그대로)",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · 엔진 빌드: validator 이름을 나라별 표에서 찾고 PatternMeta 에 label 저장",
+   "caption": "엔진은 validator 를 모름. EngineExtensions::validators(PII 는 validators::lookup)로 이름을 풀고, 못 풀면 빌드 실패",
+   "nodes": [
+    {
+     "id": "fcwcs",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternEngine::from_config_with_chunk_size()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:430",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        check_validators(config, ext)?;",
+       "note": "모든 validator 이름이 풀리는지 먼저 검사",
+       "to": "check_validators",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let (pattern_strs, pattern_meta, handwritten_detectors) ="
+      },
+      {
+       "code": "            collect_patterns_and_detectors(config, layer, ext)?;",
+       "note": "규칙마다 PatternMeta 만들기",
+       "to": "collect"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "check_validators",
+     "kind": "fn",
+     "status": "new",
+     "name": "check_validators()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:828",
+     "lines": [
+      {
+       "code": "    let mut names: Vec<&String> = config.recognizers.keys().collect();",
+       "mark": "+"
+      },
+      {
+       "code": "    names.sort();",
+       "mark": "+"
+      },
+      {
+       "code": "    for name in names {",
+       "mark": "+"
+      },
+      {
+       "code": "        for method in &config.recognizers[name].validation_methods {",
+       "to": "RecognizerConfig",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "            if (ext.validators)(method).is_none() {",
+       "note": "PII 는 validators::lookup 으로 찾음",
+       "to": "lookup",
+       "callee": "validators",
+       "mark": "+"
+      },
+      {
+       "code": "                return Err(EngineError::Config(format!(",
+       "note": "모르는 이름이면 빌드 실패",
+       "mark": "+"
+      },
+      {
+       "code": "                    \"recognizer `{name}`: unknown validation method `{method}`\"",
+       "mark": "+"
+      },
+      {
+       "code": "                )));",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    Ok(())"
+      }
+     ]
+    },
+    {
+     "id": "lookup",
+     "kind": "fn",
+     "status": "new",
+     "name": "validators::lookup()",
+     "file": "tinicore/src/guardrails/pii/validators/mod.rs:22",
+     "lines": [
+      {
+       "code": "    TABLES",
+       "note": "나라별 모듈의 표를 차례로 봄",
+       "to": "TABLES",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .flat_map(|table| table.iter())",
+       "mark": "+"
+      },
+      {
+       "code": "        .find(|(known, _)| *known == name)",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|(_, validator)| validator as &'static dyn Validator)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "TABLES",
+     "kind": "static",
+     "status": "new",
+     "name": "validators::TABLES",
+     "file": "tinicore/src/guardrails/pii/validators/mod.rs:18",
+     "lines": [
+      {
+       "code": "const TABLES: &[&[(&str, ValidatorFn)]] = &[common::VALIDATORS, kr::VALIDATORS, us::VALIDATORS];",
+       "note": "새 나라 모듈은 여기에 표를 추가",
+       "to": [
+        "VALc",
+        "VALk",
+        "VALu",
+        "ValidatorFn"
+       ],
+       "edge": [
+        "use",
+        "use",
+        "use",
+        "use"
+       ],
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "ValidatorFn",
+     "kind": "static",
+     "status": "new",
+     "name": "ValidatorFn",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:207",
+     "lines": [
+      {
+       "code": "pub type ValidatorFn = fn(&str) -> bool;",
+       "note": "이름 붙인 fn(&str) -> bool 이 곧 검사",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "VALc",
+     "kind": "static",
+     "status": "new",
+     "name": "validators::common::VALIDATORS",
+     "file": "tinicore/src/guardrails/pii/validators/common.rs:8",
+     "lines": [
+      {
+       "code": "pub(super) const VALIDATORS: &[(&str, ValidatorFn)] = &[(\"luhn\", luhn)];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "VALk",
+     "kind": "static",
+     "status": "new",
+     "name": "validators::kr::VALIDATORS",
+     "file": "tinicore/src/guardrails/pii/validators/kr.rs:7",
+     "lines": [
+      {
+       "code": "pub(super) const VALIDATORS: &[(&str, ValidatorFn)] = &[(\"rrn\", rrn)];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "VALu",
+     "kind": "static",
+     "status": "new",
+     "name": "validators::us::VALIDATORS",
+     "file": "tinicore/src/guardrails/pii/validators/us.rs:9",
+     "lines": [
+      {
+       "code": "pub(super) const VALIDATORS: &[(&str, ValidatorFn)] = &[",
+       "mark": "+"
+      },
+      {
+       "code": "    (\"ssn\", ssn),",
+       "mark": "+"
+      },
+      {
+       "code": "    (\"aba_routing\", aba_routing),"
+      },
+      {
+       "code": "    (\"nanp\", nanp),",
+       "mark": "+"
+      },
+      {
+       "code": "    (\"dea\", dea),",
+       "mark": "+"
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "RecognizerConfig",
+     "kind": "struct",
+     "status": "changed",
+     "name": "RecognizerConfig",
+     "file": "tinicore/src/guardrails/engine/config.rs:105",
+     "lines": [
+      {
+       "code": "pub struct RecognizerConfig {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub label: Option<String>,",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub validation_methods: Vec<String>,"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "collect",
+     "kind": "fn",
+     "status": "changed",
+     "name": "collect_patterns_and_detectors()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:922",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let meta = Arc::new(pattern_meta_from_cfg(recognizer_cfg, ext)?);",
+       "note": "정규식 규칙마다 PatternMeta 하나",
+       "to": "pmfc",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    let (detectors, handled) = match ext.handwritten {"
+      },
+      {
+       "code": "        Some(build) => build(&deferred_handwritten, start_pid),",
+       "note": "PII 쪽 빌더가 손으로 쓴 탐지기 생성",
+       "to": "bhd",
+       "callee": "build"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        pattern_meta.push(Arc::new(pattern_meta_from_cfg(cfg, ext)?));",
+       "note": "손으로 쓴 규칙도 PatternMeta",
+       "to": "pmfc",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "pmfc",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pattern_meta_from_cfg()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:883",
+     "lines": [
+      {
+       "code": "    Ok(PatternMeta {",
+       "to": "PatternMeta",
+       "edge": "use"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        label: recognizer_cfg.label.clone(),",
+       "note": "규칙의 label: 을 그대로 복사",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            .collect::<Result<_, _>>()?,"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        validators: recognizer_cfg",
+       "mark": "+"
+      },
+      {
+       "code": "            .validation_methods",
+       "mark": "+"
+      },
+      {
+       "code": "            .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .filter_map(|method| (ext.validators)(method))",
+       "note": "이름을 찾은 validator 로 바꿔 저장",
+       "to": "lookup",
+       "callee": "validators",
+       "mark": "+"
+      },
+      {
+       "code": "            .collect(),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "PatternMeta",
+     "kind": "struct",
+     "status": "changed",
+     "name": "PatternMeta",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:148",
+     "lines": [
+      {
+       "code": "pub struct PatternMeta {"
+      },
+      {
+       "code": "    pub entity_type: String,"
+      },
+      {
+       "code": "    pub label: Option<String>,",
+       "note": "매치의 종류를 정하는 label",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub validators: Vec<&'static dyn Validator>,",
+       "note": "빌드 때 찾아 둔 validator",
+       "to": "Validator",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "Validator",
+     "kind": "trait",
+     "status": "changed",
+     "name": "Validator",
+     "file": "tinicore/src/guardrails/engine/validator.rs:21",
+     "lines": [
+      {
+       "code": "pub trait Validator: Debug + Sync {",
+       "mark": "+"
+      },
+      {
+       "code": "    fn validate(&self, matched: &str) -> bool;"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "bhd",
+     "kind": "fn",
+     "status": "same",
+     "name": "handwritten::build_handwritten_detectors()",
+     "file": "tinicore/src/guardrails/pii/handwritten/mod.rs:176",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let Some(fac_idx) = factories.iter().position(|f| f.handles(&cfg.entity_type)) else {",
+       "note": "타입마다 맡을 탐지기 찾기 → 그림 3"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            continue;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        detectors.extend(factories[*fac_idx].build(items));",
+       "note": "탐지기마다 한 번에 빌드 → 그림 4"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 3 · 손으로 쓴 탐지기가 맡는 타입을 나라별 TYPES 표에서 찾음",
+   "caption": "앵커 탐지기는 TABLES(common·kr TYPES), 모양 탐지기는 SCANS 와 SEGMENT_TABLES(us TYPES)를 훑음. 새 나라는 표만 추가",
+   "nodes": [
+    {
+     "id": "bhd",
+     "kind": "fn",
+     "status": "same",
+     "name": "handwritten::build_handwritten_detectors()",
+     "file": "tinicore/src/guardrails/pii/handwritten/mod.rs:176",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let Some(fac_idx) = factories.iter().position(|f| f.handles(&cfg.entity_type)) else {",
+       "note": "앵커 표·모양 표 중 맡을 쪽 찾기",
+       "to": [
+        "ah",
+        "fh"
+       ]
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            continue;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "ah",
+     "kind": "fn",
+     "status": "same",
+     "name": "AhoCorasickDetectorFactory::handles()",
+     "file": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/mod.rs:173",
+     "lines": [
+      {
+       "code": "        is_aho_corasick_type(pii_type)",
+       "note": "앵커 표에서 찾기",
+       "to": "isac"
+      }
+     ]
+    },
+    {
+     "id": "isac",
+     "kind": "fn",
+     "status": "same",
+     "name": "is_aho_corasick_type()",
+     "file": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/mod.rs:156",
+     "lines": [
+      {
+       "code": "    pattern_desc_for(pii_type).is_some()",
+       "note": "표에 있으면 앵커 탐지기가 맡음",
+       "to": "pdf"
+      }
+     ]
+    },
+    {
+     "id": "pdf",
+     "kind": "fn",
+     "status": "new",
+     "name": "pattern_desc_for()",
+     "file": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/mod.rs:299",
+     "lines": [
+      {
+       "code": "    TABLES",
+       "note": "나라별 TYPES 표를 차례로 봄",
+       "to": "TABLESa",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .flat_map(|table| table.iter())",
+       "mark": "+"
+      },
+      {
+       "code": "        .find(|(name, _)| *name == pii_type)",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|(_, desc)| desc)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "TABLESa",
+     "kind": "static",
+     "status": "new",
+     "name": "aho_corasick_detector::TABLES",
+     "file": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/mod.rs:297",
+     "lines": [
+      {
+       "code": "const TABLES: &[&[(&str, PatternDesc)]] = &[common::TYPES, kr::TYPES];",
+       "note": "새 나라 모듈은 여기에 TYPES 추가",
+       "to": [
+        "TYc",
+        "TYk",
+        "PatternDesc"
+       ],
+       "edge": [
+        "use",
+        "use",
+        "use"
+       ],
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "TYc",
+     "kind": "static",
+     "status": "new",
+     "name": "aho_corasick_detector::common::TYPES",
+     "file": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/common.rs:12",
+     "lines": [
+      {
+       "code": "pub(super) const TYPES: &[(&str, PatternDesc)] = &[",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "TYk",
+     "kind": "static",
+     "status": "new",
+     "name": "aho_corasick_detector::kr::TYPES",
+     "file": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/kr.rs:7",
+     "lines": [
+      {
+       "code": "pub(super) const TYPES: &[(&str, PatternDesc)] = &[",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "PatternDesc",
+     "kind": "struct",
+     "status": "new",
+     "name": "PatternDesc",
+     "file": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/mod.rs:269",
+     "lines": [
+      {
+       "code": "pub(super) struct PatternDesc {",
+       "mark": "+"
+      },
+      {
+       "code": "    pub(super) anchors: &'static [&'static str],",
+       "mark": "+"
+      },
+      {
+       "code": "    pub(super) verifier: Verifier,",
+       "mark": "+"
+      },
+      {
+       "code": "    pub(super) full_match: bool,",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "fh",
+     "kind": "fn",
+     "status": "same",
+     "name": "FixedShapeDetectorFactory::handles()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:279",
+     "lines": [
+      {
+       "code": "        shape_for(pii_type).is_some()",
+       "note": "모양 표에서 찾기",
+       "to": "shape_for"
+      }
+     ]
+    },
+    {
+     "id": "shape_for",
+     "kind": "fn",
+     "status": "new",
+     "name": "shape_for()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:69",
+     "lines": [
+      {
+       "code": "    if let Some((_, scan)) = common::SCANS.iter().find(|(name, _)| *name == pii_type) {",
+       "note": "자기 스캔 함수가 있는 타입",
+       "to": "SCANS",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        return Some(FixedShape::Scan(*scan));",
+       "to": "FixedShape",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    SEGMENT_TABLES",
+       "note": "나라별 모양 표에서 찾기",
+       "to": "SEGMENT_TABLES",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .flat_map(|table| table.iter())",
+       "mark": "+"
+      },
+      {
+       "code": "        .find(|seg_type| seg_type.entity_type == pii_type)",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(FixedShape::Segments)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "SCANS",
+     "kind": "static",
+     "status": "new",
+     "name": "fixed_shape_detector::common::SCANS",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/common.rs:8",
+     "lines": [
+      {
+       "code": "pub(super) const SCANS: &[(&str, Scan)] = &[",
+       "to": "Scan",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "    (\"facebook_oauth_2_0\", scan_alnum_125),",
+       "mark": "+"
+      },
+      {
+       "code": "    (\"gcp_oauth_2_0\", scan_hex_8_4_12),",
+       "mark": "+"
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "Scan",
+     "kind": "static",
+     "status": "new",
+     "name": "Scan",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:37",
+     "lines": [
+      {
+       "code": "type Scan = fn(&[u8], usize, &mut Vec<(usize, usize, usize)>);",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "SEGMENT_TABLES",
+     "kind": "static",
+     "status": "new",
+     "name": "SEGMENT_TABLES",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:67",
+     "lines": [
+      {
+       "code": "const SEGMENT_TABLES: &[&[SegType]] = &[us::TYPES];",
+       "note": "새 나라 모듈은 여기에 TYPES 추가",
+       "to": [
+        "TYus",
+        "SegType"
+       ],
+       "edge": [
+        "use",
+        "use"
+       ],
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "TYus",
+     "kind": "static",
+     "status": "new",
+     "name": "fixed_shape_detector::us::TYPES",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/us.rs:12",
+     "lines": [
+      {
+       "code": "pub(super) const TYPES: &[SegType] = &[",
+       "mark": "+"
+      },
+      {
+       "code": "    SegType {",
+       "mark": "+"
+      },
+      {
+       "code": "        entity_type: \"us_itin\",",
+       "mark": "+"
+      },
+      {
+       "code": "        shapes: &[&[",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(nine, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 2),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "        extra: Some(itin_group_ok),",
+       "note": "모양이 맞은 뒤 돌릴 추가 검사",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "SegType",
+     "kind": "struct",
+     "status": "new",
+     "name": "SegType",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:49",
+     "lines": [
+      {
+       "code": "pub(super) struct SegType {",
+       "mark": "+"
+      },
+      {
+       "code": "    pub(super) entity_type: &'static str,",
+       "mark": "+"
+      },
+      {
+       "code": "    pub(super) shapes: &'static [&'static [Seg]],",
+       "mark": "+"
+      },
+      {
+       "code": "    pub(super) groups: &'static [usize],",
+       "mark": "+"
+      },
+      {
+       "code": "    pub(super) extra: Option<fn(&[u8], usize) -> bool>,",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "FixedShape",
+     "kind": "enum",
+     "status": "new",
+     "name": "FixedShape",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:41",
+     "lines": [
+      {
+       "code": "enum FixedShape {"
+      },
+      {
+       "code": "    Scan(Scan),",
+       "mark": "+"
+      },
+      {
+       "code": "    Segments(&'static SegType),",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 4 · 고정 모양 탐지기 빌드: 나라별 모양을 첫 두 바이트 표로 묶음",
+   "caption": "한 탐지기가 모든 나라의 모양 타입을 맡고, 64개씩 표 하나로 묶어 한 번에 훑게 함",
+   "nodes": [
+    {
+     "id": "bhd",
+     "kind": "fn",
+     "status": "same",
+     "name": "handwritten::build_handwritten_detectors()",
+     "file": "tinicore/src/guardrails/pii/handwritten/mod.rs:176",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        detectors.extend(factories[*fac_idx].build(items));",
+       "note": "모양 타입을 모아 탐지기 하나로",
+       "to": "fb"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "fb",
+     "kind": "fn",
+     "status": "new",
+     "name": "FixedShapeDetectorFactory::build()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:283",
+     "lines": [
+      {
+       "code": "        let items: Vec<(usize, FixedShape)> = items"
+      },
+      {
+       "code": "            .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .filter_map(|(cfg, pid)| shape_for(&cfg.entity_type).map(|shape| (*pid, shape)))",
+       "note": "타입마다 모양 찾기",
+       "to": "shape_for"
+      },
+      {
+       "code": "            .collect();",
+       "mark": "+"
+      },
+      {
+       "code": "        if items.is_empty() {"
+      },
+      {
+       "code": "            return Vec::new();",
+       "note": "맡을 타입이 없으면 탐지기 없음"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        let mut scans = Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "        let mut segments = Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "        for (pid, shape) in items {",
+       "mark": "+"
+      },
+      {
+       "code": "            match shape {",
+       "mark": "+"
+      },
+      {
+       "code": "                FixedShape::Scan(scan) => scans.push((pid, scan)),",
+       "to": "FixedShape",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "                FixedShape::Segments(seg_type) => segments.push((pid, seg_type)),",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        let tables = shape_tables(&segments);",
+       "note": "모양 타입을 64개씩 바이트 표로",
+       "to": "shape_tables"
+      },
+      {
+       "code": "        vec![Box::new(FixedShapeDetector {",
+       "to": "FSD",
+       "edge": "use"
+      },
+      {
+       "code": "            scans,",
+       "mark": "+"
+      },
+      {
+       "code": "            segments,",
+       "mark": "+"
+      },
+      {
+       "code": "            tables,",
+       "mark": "+"
+      },
+      {
+       "code": "        }) as Box<dyn MatchEngine>]"
+      }
+     ]
+    },
+    {
+     "id": "shape_for",
+     "kind": "fn",
+     "status": "new",
+     "name": "shape_for()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:69",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    SEGMENT_TABLES",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "FixedShape",
+     "kind": "enum",
+     "status": "new",
+     "name": "FixedShape",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:41",
+     "lines": [
+      {
+       "code": "enum FixedShape {"
+      },
+      {
+       "code": "    Scan(Scan),",
+       "mark": "+"
+      },
+      {
+       "code": "    Segments(&'static SegType),",
+       "mark": "+"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "shape_tables",
+     "kind": "fn",
+     "status": "new",
+     "name": "shape_tables()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:233",
+     "lines": [
+      {
+       "code": "    let mut tables: Vec<ShapeTable> = Vec::new();"
+      },
+      {
+       "code": "    for (i, &(_, seg_type)) in segments.iter().enumerate() {",
+       "mark": "+"
+      },
+      {
+       "code": "        for (alt, segs) in seg_type.shapes.iter().enumerate() {",
+       "mark": "+"
+      },
+      {
+       "code": "            if tables.last().is_none_or(|table| table.shapes.len() == 64) {"
+      },
+      {
+       "code": "                tables.push(ShapeTable {",
+       "to": "ShapeTable",
+       "edge": "use"
+      },
+      {
+       "code": "                    shapes: Vec::new(),"
+      },
+      {
+       "code": "                    first: Box::new([0; 256]),"
+      },
+      {
+       "code": "                    second: Box::new([0; 256]),"
+      },
+      {
+       "code": "                });",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            let table = tables.last_mut().expect(\"pushed above\");"
+      },
+      {
+       "code": "            let bit = 1u64 << table.shapes.len();"
+      },
+      {
+       "code": "            table.shapes.push((i, alt));"
+      },
+      {
+       "code": "            let (first, second) = first_two_byte_sets(segs);"
+      },
+      {
+       "code": "            for b in 0..=255u8 {"
+      },
+      {
+       "code": "                let (word, mask) = (usize::from(b >> 6), 1u64 << (b & 63));"
+      },
+      {
+       "code": "                if first[word] & mask != 0 {"
+      },
+      {
+       "code": "                    table.first[usize::from(b)] |= bit;"
+      },
+      {
+       "code": "                }",
+       "mark": "+"
+      },
+      {
+       "code": "                if second[word] & mask != 0 {"
+      },
+      {
+       "code": "                    table.second[usize::from(b)] |= bit;"
+      },
+      {
+       "code": "                }",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    tables",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "ShapeTable",
+     "kind": "struct",
+     "status": "same",
+     "name": "ShapeTable",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:92",
+     "lines": [
+      {
+       "code": "struct ShapeTable {"
+      },
+      {
+       "code": "    shapes: Vec<(usize, usize)>,"
+      },
+      {
+       "code": "    first: Box<[u64; 256]>,"
+      },
+      {
+       "code": "    second: Box<[u64; 256]>,"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "FSD",
+     "kind": "struct",
+     "status": "new",
+     "name": "FixedShapeDetector",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:82",
+     "lines": [
+      {
+       "code": "pub(crate) struct FixedShapeDetector {"
+      },
+      {
+       "code": "    scans: Vec<(usize, Scan)>,",
+       "mark": "+"
+      },
+      {
+       "code": "    segments: Vec<(usize, &'static SegType)>,",
+       "mark": "+"
+      },
+      {
+       "code": "    tables: Vec<ShapeTable>,"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 5 · 부팅: PII 탐지기가 낼 종류를 label: 에서 읽음",
+   "caption": "pii_type → 종류 손글씨 표(pii_type_to_kind 등)를 없애고, 층·filter_labels 둘 다 규칙의 label: 로 종류를 정함",
+   "nodes": [
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:228",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;",
+       "note": "층마다 PII 탐지기 만들기",
+       "to": "build_pii"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "build_pii",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::install::build_pii()",
+     "file": "tinicore/src/guardrails/pii/install.rs:297",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let input_detector = build_layer_detector(\"input\", labels, warnings)",
+       "note": "input 층 탐지기 (output·default 도 같음)",
+       "to": "bld"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "bld",
+     "kind": "fn",
+     "status": "same",
+     "name": "build_layer_detector()",
+     "file": "tinicore/src/guardrails/pii/install.rs:256",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            return PiiSpanDetector::try_for_kinds(format!(\"guardrails:{layer}\"), &kinds);",
+       "note": "filter_labels 설정이 있으면 종류로 고름",
+       "to": "tfk"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    PiiSpanDetector::try_for_layer(layer)",
+       "note": "없으면 층에 적힌 규칙 그대로",
+       "to": "tfl"
+      }
+     ]
+    },
+    {
+     "id": "tfk",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PiiSpanDetector::try_for_kinds()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:408",
+     "lines": [
+      {
+       "code": "        let filter = crate::guardrails::pii::shared::shared_filter_for_kinds(kinds)?;",
+       "note": "label 이 그 종류인 규칙만 고르는 필터",
+       "to": "sffk",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "sffk",
+     "kind": "fn",
+     "status": "new",
+     "name": "pii::shared::shared_filter_for_kinds()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:291",
+     "lines": [
+      {
+       "code": "    let slot = shared_slot();"
+      },
+      {
+       "code": "    let engine = slot.acquire()?;",
+       "mark": "+"
+      },
+      {
+       "code": "    let mut pii_types: Vec<String> = engine",
+       "mark": "+"
+      },
+      {
+       "code": "        .pattern_meta()",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .filter(|meta| kinds.contains(&super::labels::kind_of_meta(Some(meta))))",
+       "note": "규칙마다 label 로 종류 판정",
+       "to": "kind_of_meta",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|meta| meta.entity_type.clone())",
+       "mark": "+"
+      },
+      {
+       "code": "        .collect();",
+       "mark": "+"
+      },
+      {
+       "code": "    pii_types.sort();",
+       "mark": "+"
+      },
+      {
+       "code": "    pii_types.dedup();",
+       "mark": "+"
+      },
+      {
+       "code": "    Ok(PatternFilter::new("
+      },
+      {
+       "code": "        Arc::clone(slot),"
+      },
+      {
+       "code": "        ActiveFilter::PiiTypes(pii_types),",
+       "mark": "+"
+      },
+      {
+       "code": "        AUDIT_TAG,"
+      },
+      {
+       "code": "    ))"
+      }
+     ]
+    },
+    {
+     "id": "kind_of_meta",
+     "kind": "fn",
+     "status": "new",
+     "name": "labels::kind_of_meta()",
+     "file": "tinicore/src/guardrails/pii/labels.rs:65",
+     "lines": [
+      {
+       "code": "    let kind = meta",
+       "mark": "+"
+      },
+      {
+       "code": "        .and_then(|meta| meta.label.as_deref())",
+       "to": "PatternMeta",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        .and_then(kind_of_label);",
+       "note": "label 글자를 종류로 바꿈",
+       "to": "kind_of_label",
+       "mark": "+"
+      },
+      {
+       "code": "    debug_assert!(",
+       "mark": "+"
+      },
+      {
+       "code": "        kind.is_some(),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"PII pattern {:?} has no valid label\",",
+       "mark": "+"
+      },
+      {
+       "code": "        meta.map(|meta| &meta.entity_type)",
+       "mark": "+"
+      },
+      {
+       "code": "    );",
+       "mark": "+"
+      },
+      {
+       "code": "    kind.unwrap_or(SensitiveKind::Credential)",
+       "note": "없으면 가장 조심스러운 Credential",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "kind_of_label",
+     "kind": "fn",
+     "status": "new",
+     "name": "labels::kind_of_label()",
+     "file": "tinicore/src/guardrails/pii/labels.rs:22",
+     "lines": [
+      {
+       "code": "    if label == CREDENTIAL {",
+       "note": "credential 은 비밀값 종류",
+       "to": "CREDENTIAL",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        return Some(SensitiveKind::Credential);",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    PiiLabel::ALL",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .find(|known| known.as_str() == label)",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|known| SensitiveKind::Pii(*known))",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "CREDENTIAL",
+     "kind": "static",
+     "status": "new",
+     "name": "labels::CREDENTIAL",
+     "file": "tinicore/src/guardrails/pii/labels.rs:19",
+     "lines": [
+      {
+       "code": "pub(crate) const CREDENTIAL: &str = \"credential\";",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "PatternMeta",
+     "kind": "struct",
+     "status": "changed",
+     "name": "PatternMeta",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:148",
+     "lines": [
+      {
+       "code": "pub struct PatternMeta {"
+      },
+      {
+       "code": "    pub entity_type: String,"
+      },
+      {
+       "code": "    pub label: Option<String>,",
+       "note": "규칙의 label: 을 그대로 가짐",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "tfl",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::try_for_layer()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:348",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Self::try_from_filter(format!(\"guardrails:{layer}\"), shared_layer_filter(layer)?)",
+       "note": "층 필터로 탐지기 만들기",
+       "to": "tff"
+      }
+     ]
+    },
+    {
+     "id": "tff",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::try_from_filter()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:384",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let kinds = kinds_for_layer(&metas);",
+       "note": "층 규칙들이 내는 종류 목록",
+       "to": "kfl"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "kfl",
+     "kind": "fn",
+     "status": "changed",
+     "name": "kinds_for_layer()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:20",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let kind = kind_of_meta(Some(meta));",
+       "note": "표 대신 label 에서 종류 읽기",
+       "to": "kind_of_meta",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 6 · 부팅: 프롬프트 인젝션 규칙도 같은 label: 칸을 읽음",
+   "caption": "label 을 RecognizerConfig 가 읽고, 규칙 파일의 두 번째 읽기는 action·replacement 만 읽음",
+   "nodes": [
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:228",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        super::prompt_injection::install::build(config.prompt_injection, &mut warnings)?;",
+       "note": "프롬프트 인젝션 규칙 빌드",
+       "to": "pib"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "pib",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::install::build()",
+     "file": "tinicore/src/guardrails/prompt_injection/install.rs:73",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            check_added_rules(&rules().map_err(config_error)?, &config.tool_output.rules)",
+       "note": "층이 꺼져 있어도 추가 규칙 검사",
+       "to": "rules"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "    let engine = ToolOutputEngine::new(&config.tool_output.rules).map_err(config_error)?;",
+       "note": "tool_output 층 엔진 준비",
+       "to": "toe_new"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "rules",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::rules()",
+     "file": "tinicore/src/guardrails/prompt_injection/mod.rs:357",
+     "lines": [
+      {
+       "code": "    parse_rules(RULES_YAML).map_err(|e| {",
+       "note": "내장 rules.yaml 읽기",
+       "to": "parse_rules"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "parse_rules",
+     "kind": "fn",
+     "status": "changed",
+     "name": "prompt_injection::parse_rules()",
+     "file": "tinicore/src/guardrails/prompt_injection/mod.rs:308",
+     "lines": [
+      {
+       "code": "    let recognizers = parse_recognizers(yaml)?;"
+      },
+      {
+       "code": "    let metas: RuleMetaFile = serde_yaml::from_str(yaml)?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        if key != id {"
+      },
+      {
+       "code": "            return Err(EngineError::Config(format!("
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "        let action = rule_action(id, metas.recognizers.get(key.as_str()))?;",
+       "note": "두 번째 읽기는 action 만",
+       "to": "rule_action",
+       "mark": "+"
+      },
+      {
+       "code": "        let label = config",
+       "note": "label 은 엔진 설정 칸에서 읽음",
+       "to": "RecognizerConfig",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "            .label",
+       "mark": "+"
+      },
+      {
+       "code": "            .as_deref()",
+       "mark": "+"
+      },
+      {
+       "code": "            .map(str::parse::<PromptInjectionLabel>)",
+       "mark": "+"
+      },
+      {
+       "code": "            .transpose()",
+       "mark": "+"
+      },
+      {
+       "code": "            .map_err(|e| {",
+       "mark": "+"
+      },
+      {
+       "code": "                EngineError::Config(format!("
+      },
+      {
+       "code": "                    \"prompt-injection rule `{id}` has an invalid label: {e}\"",
+       "mark": "+"
+      },
+      {
+       "code": "                ))",
+       "mark": "+"
+      },
+      {
+       "code": "            })?;",
+       "mark": "+"
+      },
+      {
+       "code": "        if config.layers.is_empty() {"
+      },
+      {
+       "code": "            return Err(EngineError::Config(format!("
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "        if label.is_none() && config.layers.iter().any(|l| l == TOOL_OUTPUT_LAYER) {"
+      },
+      {
+       "code": "            return Err(EngineError::Config(format!("
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "rule_action",
+     "kind": "fn",
+     "status": "new",
+     "name": "prompt_injection::rule_action()",
+     "file": "tinicore/src/guardrails/prompt_injection/mod.rs:277",
+     "lines": [
+      {
+       "code": "    let config_err ="
+      },
+      {
+       "code": "        |what: String| EngineError::Config(format!(\"prompt-injection rule `{id}` {what}\"));"
+      },
+      {
+       "code": "    let map = entry.and_then(serde_yaml::Value::as_mapping);"
+      },
+      {
+       "code": "    let get = |key: &str| map.and_then(|m| m.get(key)).cloned();"
+      },
+      {
+       "code": "    let Some(tag) = get(\"action\") else {"
+      },
+      {
+       "code": "        return Err(config_err(\"has no action\".into()));"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let mut action = serde_yaml::Mapping::new();"
+      },
+      {
+       "code": "    action.insert(\"action\".into(), tag);"
+      },
+      {
+       "code": "    if let Some(replacement) = get(\"replacement\") {"
+      },
+      {
+       "code": "        action.insert(\"replacement\".into(), replacement);"
+      },
+      {
+       "code": "    }"
+      },
+      {
+       "code": "    serde_yaml::from_value(serde_yaml::Value::Mapping(action))",
+       "mark": "+"
+      },
+      {
+       "code": "        .map_err(|e| config_err(format!(\"has an invalid action: {e}\")))",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "RecognizerConfig",
+     "kind": "struct",
+     "status": "changed",
+     "name": "RecognizerConfig",
+     "file": "tinicore/src/guardrails/engine/config.rs:105",
+     "lines": [
+      {
+       "code": "pub struct RecognizerConfig {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub label: Option<String>,",
+       "note": "PII 와 프롬프트 인젝션이 같은 칸을 씀",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "toe_new",
+     "kind": "fn",
+     "status": "same",
+     "name": "ToolOutputEngine::new()",
+     "file": "tinicore/src/guardrails/prompt_injection/tool_output.rs:91",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Self::from_parts(embedded, added, Arc::clone(shared::slot()))",
+       "note": "규칙 표 만들기와 공유 슬롯",
+       "to": [
+        "from_parts",
+        "pi_slot"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "from_parts",
+     "kind": "fn",
+     "status": "same",
+     "name": "ToolOutputEngine::from_parts()",
+     "file": "tinicore/src/guardrails/prompt_injection/tool_output.rs:117",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "                (rule.action.clone(), rule.label, rule.recognizer().layers),",
+       "note": "추가 규칙을 엔진 설정으로 바꿔 층 읽기",
+       "to": "recognizer"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "recognizer",
+     "kind": "fn",
+     "status": "changed",
+     "name": "ToolOutputRule::recognizer()",
+     "file": "tinicore/src/guardrails/prompt_injection/mod.rs:240",
+     "lines": [
+      {
+       "code": "        RecognizerConfig {",
+       "to": "RecognizerConfig",
+       "edge": "use"
+      },
+      {
+       "code": "            recognizer_type: \"PatternRecognizer\".into(),"
+      },
+      {
+       "code": "            entity_type: self.id.clone(),"
+      },
+      {
+       "code": "            patterns: vec![self.pattern.clone()],"
+      },
+      {
+       "code": "            layers: vec![TOOL_OUTPUT_LAYER.to_string()],"
+      },
+      {
+       "code": "            label: Some(self.label.as_str().to_string()),",
+       "note": "추가 규칙의 label 도 같은 칸에",
+       "mark": "+"
+      },
+      {
+       "code": "            ..RecognizerConfig::default()",
+       "note": "나머지 칸은 기본값",
+       "to": "rc_default"
+      },
+      {
+       "code": "        }"
+      }
+     ]
+    },
+    {
+     "id": "rc_default",
+     "kind": "fn",
+     "status": "changed",
+     "name": "RecognizerConfig::default()",
+     "file": "tinicore/src/guardrails/engine/config.rs:175",
+     "lines": [
+      {
+       "code": "        Self {"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            label: None,",
+       "note": "label 기본값은 없음",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "pi_slot",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::shared::slot()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:102",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    SLOT.get_or_init(|| TurnSlot::new(SLOT_NAME, || build_engine(&snapshot())))",
+       "note": "턴 슬롯에 빌드 방법 등록",
+       "to": "pi_build",
+       "edge": "defer",
+       "label": "엔진이 필요할 때 실행"
+      }
+     ]
+    },
+    {
+     "id": "pi_build",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_injection::shared::build_engine()",
+     "file": "tinicore/src/guardrails/prompt_injection/shared.rs:93",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    PatternEngine::from_config(&config, None, &extensions())",
+       "note": "프롬프트 인젝션용 확장으로 빌드",
+       "to": "pi_ext"
+      }
+     ]
+    },
+    {
+     "id": "pi_ext",
+     "kind": "fn",
+     "status": "changed",
+     "name": "prompt_injection::extensions()",
+     "file": "tinicore/src/guardrails/prompt_injection/mod.rs:409",
+     "lines": [
+      {
+       "code": "    EngineExtensions {",
+       "to": "EngineExtensions",
+       "edge": "use"
+      },
+      {
+       "code": "        keyword_lookup: |_| None,"
+      },
+      {
+       "code": "        handwritten: Some(handwritten::build_handwritten_detectors),"
+      },
+      {
+       "code": "        drop_inside_uuid: false,"
+      },
+      {
+       "code": "        validators: |_| None,",
+       "note": "validator 없음: 이름을 쓰면 빌드 실패",
+       "mark": "+"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "EngineExtensions",
+     "kind": "struct",
+     "status": "changed",
+     "name": "EngineExtensions",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:220",
+     "lines": [
+      {
+       "code": "pub struct EngineExtensions {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub validators: fn(&str) -> Option<&'static dyn Validator>,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 7 · 턴: PII 입력 검사가 매치마다 label: 로 종류를 읽음",
+   "caption": "엔진은 빌드마다 pid 가 바뀌므로, 매치를 만든 그 빌드의 PatternMeta 에서 label 을 읽어(analyze_with_meta) 종류를 정함",
+   "nodes": [
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 번 실행 모드로 턴 하나 처리",
+       "to": "rst"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "rst",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        tinicore::agent::guardrails::run_input_guardrails_with_text(user_input, None).await",
+       "note": "저장 전에 사용자 입력을 입력 가드레일로 검사",
+       "to": "with_text"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let user_input: &str = match crate::guardrails::prompt_guard::gate(ctx, user_input).await {",
+       "note": "프롬프트 가드 검사 → 그림 9"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "with_text",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::run_input_guardrails_with_text()",
+     "file": "tinicore/src/agent/guardrails.rs:358",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    tinicore_traits::run_input_guardrails(&guardrail_set.input, &gi)",
+       "note": "등록된 입력 가드레일 목록 실행",
+       "to": "rig"
+      },
+      {
+       "code": "        .await"
+      },
+      {
+       "code": "        .map(|_| ())"
+      }
+     ]
+    },
+    {
+     "id": "rig",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicore_traits::run_input_guardrails()",
+     "file": "tinicore-traits/src/guardrail.rs:1031",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let res = g.check(input).await;",
+       "note": "가드레일마다 check (여기선 pii.input)",
+       "to": "check"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "check",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::check()",
+     "file": "tinicore/src/sensitive/guardrail.rs:274",
+     "lines": [
+      {
+       "code": "        self.evaluate(input.text).await",
+       "note": "입력 문자열 판정",
+       "to": "evaluate"
+      }
+     ]
+    },
+    {
+     "id": "evaluate",
+     "kind": "fn",
+     "status": "same",
+     "name": "SensitiveGuardrail::evaluate()",
+     "file": "tinicore/src/sensitive/guardrail.rs:138",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let outcome = self.chain.detect_any_of(text, &self.block).await;",
+       "note": "막을 종류가 있는지 검출기 체인에 물음",
+       "to": "dao"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "dao",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::detect_any_of()",
+     "file": "tinicore/src/sensitive/chain.rs:264",
+     "lines": [
+      {
+       "code": "        self.scan_until_hit(text, Some(wanted)).await",
+       "note": "막을 종류만 골라 검사",
+       "to": "suh"
+      }
+     ]
+    },
+    {
+     "id": "suh",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::scan_until_hit()",
+     "file": "tinicore/src/sensitive/chain.rs:270",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            match m.detect(text).await {",
+       "note": "검출기를 하나씩 실행 (PII 검출기)",
+       "to": "detect"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "detect",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PiiSpanDetector::detect()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:447",
+     "lines": [
+      {
+       "code": "        let filter = self.filter.clone();"
+      },
+      {
+       "code": "        let text = text.to_string();"
+      },
+      {
+       "code": "        match tokio::task::spawn_blocking(move || filter.analyze_with_meta(&text, kind_of_meta))",
+       "note": "매치마다 종류를 label 에서 같이 읽음",
+       "to": "awm",
+       "mark": "+"
+      },
+      {
+       "code": "            .await",
+       "mark": "+"
+      },
+      {
+       "code": "        {",
+       "mark": "+"
+      },
+      {
+       "code": "            Ok(Ok(matches)) => Ok(resolve_overlaps(matches)),",
+       "note": "겹친 매치를 합쳐 구간으로",
+       "to": "resolve_overlaps"
+      },
+      {
+       "code": "            Ok(Err(build_err)) => {"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "                Err(DetectError::Engine(format!("
+      },
+      {
+       "code": "                    \"PII engine build failed: {build_err}\""
+      },
+      {
+       "code": "                )))"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            Err(join_err) => {"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      },
+      {
+       "code": "                Err(DetectError::Engine(format!("
+      },
+      {
+       "code": "                    \"scan task did not complete: {join_err}\""
+      },
+      {
+       "code": "                )))"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "awm",
+     "kind": "fn",
+     "status": "new",
+     "name": "PatternFilter::analyze_with_meta()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:181",
+     "lines": [
+      {
+       "code": "        let (engine, matches) = self.scan_narrowed(text, PatternEngine::scan)?;",
+       "note": "이번 턴 엔진으로 검사, 그 엔진도 받음",
+       "to": "scan_narrowed",
+       "mark": "+"
+      },
+      {
+       "code": "        let metas = engine.pattern_meta();",
+       "mark": "+"
+      },
+      {
+       "code": "        Ok(matches",
+       "mark": "+"
+      },
+      {
+       "code": "            .into_iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .map(|m| {",
+       "mark": "+"
+      },
+      {
+       "code": "                let value = read(metas.get(m.pid).map(|meta| &**meta));",
+       "note": "같은 빌드의 PatternMeta 에서 읽음",
+       "to": [
+        "kind_of_meta",
+        "PatternMeta"
+       ],
+       "edge": [
+        "call",
+        "use"
+       ],
+       "callee": "read",
+       "mark": "+"
+      },
+      {
+       "code": "                (m, value)",
+       "mark": "+"
+      },
+      {
+       "code": "            })",
+       "mark": "+"
+      },
+      {
+       "code": "            .collect())",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "scan_narrowed",
+     "kind": "fn",
+     "status": "new",
+     "name": "PatternFilter::scan_narrowed()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:209",
+     "lines": [
+      {
+       "code": "        let engine = self.engine.acquire()?;"
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);",
+       "note": "넘겨받은 scan 함수 실행",
+       "to": "pe_scan",
+       "callee": "scan"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Ok((engine, all_matches))",
+       "note": "매치와 함께 그 엔진을 돌려줌",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "kind_of_meta",
+     "kind": "fn",
+     "status": "new",
+     "name": "labels::kind_of_meta()",
+     "file": "tinicore/src/guardrails/pii/labels.rs:65",
+     "lines": [
+      {
+       "code": "    let kind = meta",
+       "mark": "+"
+      },
+      {
+       "code": "        .and_then(|meta| meta.label.as_deref())",
+       "to": "PatternMeta",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        .and_then(kind_of_label);",
+       "note": "label 글자를 종류로 바꿈",
+       "to": "kind_of_label",
+       "mark": "+"
+      },
+      {
+       "code": "    debug_assert!(",
+       "mark": "+"
+      },
+      {
+       "code": "        kind.is_some(),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"PII pattern {:?} has no valid label\",",
+       "mark": "+"
+      },
+      {
+       "code": "        meta.map(|meta| &meta.entity_type)",
+       "mark": "+"
+      },
+      {
+       "code": "    );",
+       "mark": "+"
+      },
+      {
+       "code": "    kind.unwrap_or(SensitiveKind::Credential)",
+       "note": "없으면 가장 조심스러운 Credential",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "kind_of_label",
+     "kind": "fn",
+     "status": "new",
+     "name": "labels::kind_of_label()",
+     "file": "tinicore/src/guardrails/pii/labels.rs:22",
+     "lines": [
+      {
+       "code": "    if label == CREDENTIAL {",
+       "note": "credential 은 비밀값 종류",
+       "to": "CREDENTIAL",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "code": "        return Some(SensitiveKind::Credential);",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    PiiLabel::ALL",
+       "mark": "+"
+      },
+      {
+       "code": "        .iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .find(|known| known.as_str() == label)",
+       "mark": "+"
+      },
+      {
+       "code": "        .map(|known| SensitiveKind::Pii(*known))",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "CREDENTIAL",
+     "kind": "static",
+     "status": "new",
+     "name": "labels::CREDENTIAL",
+     "file": "tinicore/src/guardrails/pii/labels.rs:19",
+     "lines": [
+      {
+       "code": "pub(crate) const CREDENTIAL: &str = \"credential\";",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "PatternMeta",
+     "kind": "struct",
+     "status": "changed",
+     "name": "PatternMeta",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:148",
+     "lines": [
+      {
+       "code": "pub struct PatternMeta {"
+      },
+      {
+       "code": "    pub entity_type: String,"
+      },
+      {
+       "code": "    pub label: Option<String>,",
+       "note": "규칙의 label: 을 그대로 가짐",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "resolve_overlaps",
+     "kind": "fn",
+     "status": "changed",
+     "name": "resolve_overlaps()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:110",
+     "lines": [
+      {
+       "code": "    if matches.is_empty() {"
+      },
+      {
+       "code": "        return Vec::new();"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let mut matches: Vec<(PatternMatch, SensitiveKind)> = matches",
+       "mark": "+"
+      },
+      {
+       "code": "        .into_iter()",
+       "mark": "+"
+      },
+      {
+       "code": "        .filter(|(m, _)| m.start < m.end)",
+       "mark": "+"
+      },
+      {
+       "code": "        .collect();",
+       "mark": "+"
+      },
+      {
+       "code": "    matches.sort_by(|(a, _), (b, _)| {",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        .map(|(m, kind)| SensitiveSpan {",
+       "mark": "+"
+      },
+      {
+       "code": "            kind,",
+       "note": "종류는 매치와 함께 받은 값",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "pe_scan",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:475",
+     "lines": [
+      {
+       "code": "        self.scan_inner(text, true)",
+       "note": "중첩 매치를 버리는 모드로 검사",
+       "to": "scan_inner"
+      }
+     ]
+    },
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:491",
+     "lines": [
+      {
+       "code": "        let resolved = self.collect_raw_matches(text);",
+       "note": "엔진마다 원시 매치 모으기 → 그림 8"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let collapsed = self.validate_and_collapse(resolved, text);",
+       "note": "경계 검사와 validator 단계 → 그림 8"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 8 · 턴: 나라별 표의 validator 와 모양 탐지기 실행",
+   "caption": "validator·SCANS·술어 함수는 내용 그대로 나라별 모듈로 옮겨졌으므로 박스 없이 호출 줄만 둠 (아래 '옮긴 정의' 목록)",
+   "nodes": [
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:491",
+     "lines": [
+      {
+       "code": "        let resolved = self.collect_raw_matches(text);",
+       "note": "엔진마다 원시 매치 모으기",
+       "to": "crm"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let collapsed = self.validate_and_collapse(resolved, text);",
+       "note": "경계 검사와 validator 단계",
+       "to": "vac"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "crm",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::collect_raw_matches()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:513",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            resolved.extend(engine.scan_raw(text));",
+       "note": "탐지기마다 scan_raw (여기선 모양 탐지기)",
+       "to": "f_scan",
+       "callee": "scan_raw"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "f_scan",
+     "kind": "fn",
+     "status": "new",
+     "name": "FixedShapeDetector::scan_raw()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:103",
+     "lines": [
+      {
+       "code": "        let bytes = text.as_bytes();"
+      },
+      {
+       "code": "        let mut out = Vec::new();"
+      },
+      {
+       "code": "        for &(pid, scan) in &self.scans {",
+       "mark": "+"
+      },
+      {
+       "code": "            scan(bytes, pid, &mut out);",
+       "note": "SCANS 표에 적힌 스캔 함수 실행",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        if !self.segments.is_empty() {"
+      },
+      {
+       "code": "            scan_segments(bytes, &self.segments, &self.tables, &mut out);",
+       "note": "모양 표 타입을 한 번에 훑기",
+       "to": "scan_segments"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        out",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "scan_segments",
+     "kind": "fn",
+     "status": "new",
+     "name": "scan_segments()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs:151",
+     "lines": [
+      {
+       "code": "    let mut found: Vec<Vec<(usize, usize, usize)>> = vec![Vec::new(); items.len()];"
+      },
+      {
+       "code": "    let mut ends = Vec::new();"
+      },
+      {
+       "code": "    for table in tables {"
+      },
+      {
+       "code": "        for (start, &b) in bytes.iter().enumerate() {"
+      },
+      {
+       "code": "            let mut candidates = table.first[usize::from(b)];"
+      },
+      {
+       "code": "            if candidates == 0 {"
+      },
+      {
+       "code": "                continue;",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            let Some(&next) = bytes.get(start + 1) else {"
+      },
+      {
+       "code": "                break;",
+       "mark": "+"
+      },
+      {
+       "code": "            };",
+       "mark": "+"
+      },
+      {
+       "code": "            candidates &= table.second[usize::from(next)];"
+      },
+      {
+       "code": "            while candidates != 0 {"
+      },
+      {
+       "code": "                let bit = candidates.trailing_zeros() as usize;"
+      },
+      {
+       "code": "                candidates &= candidates - 1;"
+      },
+      {
+       "code": "                let (i, alt) = table.shapes[bit];"
+      },
+      {
+       "code": "                let seg_type = items[i].1;",
+       "mark": "+"
+      },
+      {
+       "code": "                ends.clear();",
+       "mark": "+"
+      },
+      {
+       "code": "                segment_ends(bytes, start, seg_type.shapes[alt], &mut ends);",
+       "note": "표의 술어로 끝 위치 찾기",
+       "mark": "+"
+      },
+      {
+       "code": "                if ends.is_empty() || seg_type.extra.is_some_and(|ok| !ok(bytes, start)) {",
+       "note": "표의 추가 검사 (예: ITIN 그룹 번호)",
+       "mark": "+"
+      },
+      {
+       "code": "                    continue;",
+       "mark": "+"
+      },
+      {
+       "code": "                }",
+       "mark": "+"
+      },
+      {
+       "code": "                let group = seg_type.groups.get(alt).copied().unwrap_or(0);",
+       "mark": "+"
+      },
+      {
+       "code": "                found[i].extend(ends.iter().map(|&end| (group, start, end)));"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    for (&(pid, _), found) in items.iter().zip(found) {"
+      },
+      {
+       "code": "        push_leftmost_per_end(pid, found, out);"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "vac",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternEngine::validate_and_collapse()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:534",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            let meta = &self.pattern_meta[pid];",
+       "to": "PatternMeta",
+       "edge": "use"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "            if !meta.validators.is_empty()",
+       "mark": "+"
+      },
+      {
+       "code": "                && !text"
+      },
+      {
+       "code": "                    .get(start..end)"
+      },
+      {
+       "code": "                    .is_some_and(|m| meta.validators.iter().all(|v| v.validate(m)))",
+       "note": "표에 등록한 validator 를 모두 통과해야 남김",
+       "mark": "+"
+      },
+      {
+       "code": "            {"
+      },
+      {
+       "code": "                continue;"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "PatternMeta",
+     "kind": "struct",
+     "status": "changed",
+     "name": "PatternMeta",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:148",
+     "lines": [
+      {
+       "code": "pub struct PatternMeta {"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    pub validators: Vec<&'static dyn Validator>,",
+       "note": "빌드 때 이름으로 찾아 둔 함수",
+       "to": "Validator",
+       "edge": "use",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "Validator",
+     "kind": "trait",
+     "status": "changed",
+     "name": "Validator",
+     "file": "tinicore/src/guardrails/engine/validator.rs:21",
+     "lines": [
+      {
+       "code": "pub trait Validator: Debug + Sync {",
+       "mark": "+"
+      },
+      {
+       "code": "    fn validate(&self, matched: &str) -> bool;"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 9 · 턴: 프롬프트 가드 검사도 나뉜 analyze_with 를 거침",
+   "caption": "analyze_with 는 매치만 꺼내는 한 줄이 되고, 엔진 확보·검사·좁히기는 scan_narrowed 가 맡음 (PII 쪽은 그림 7)",
+   "nodes": [
+    {
+     "id": "rst",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let user_input: &str = match crate::guardrails::prompt_guard::gate(ctx, user_input).await {",
+       "note": "사용자 입력을 프롬프트 가드에 통과",
+       "to": "gate"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "gate",
+     "kind": "fn",
+     "status": "same",
+     "name": "guardrails::prompt_guard::gate()",
+     "file": "tinicli/src/guardrails/prompt_guard.rs:225",
+     "lines": [
+      {
+       "code": "    match prompt_guard::admit(ctx, user_input).await {",
+       "note": "입력 검사 요청",
+       "to": "admit"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "admit",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::admit()",
+     "file": "tinicore/src/agent/prompt_guard.rs:451",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    Ok(match evaluate_off_thread(guard, text.to_owned()).await? {",
+       "note": "블로킹 스레드에서 규칙 검사",
+       "to": "eot"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "eot",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::evaluate_off_thread()",
+     "file": "tinicore/src/agent/prompt_guard.rs:772",
+     "lines": [
+      {
+       "code": "    tokio::task::spawn_blocking(move || evaluate(&guard, &text))",
+       "note": "spawn_blocking 안에서 evaluate 실행",
+       "to": "pg_eval"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "pg_eval",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::evaluate()",
+     "file": "tinicore/src/agent/prompt_guard.rs:688",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let mut spans = match spans_by_rule(guard, filter, text) {",
+       "note": "규칙별 매치 위치 구하기",
+       "to": "sbr"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "sbr",
+     "kind": "fn",
+     "status": "same",
+     "name": "prompt_guard::spans_by_rule()",
+     "file": "tinicore/src/agent/prompt_guard.rs:632",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    for m in filter.analyze_keep_nested(text)? {",
+       "note": "공유 엔진으로 텍스트 검사",
+       "to": "akn"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "akn",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_keep_nested()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:170",
+     "lines": [
+      {
+       "code": "        self.analyze_with(text, PatternEngine::scan_keep_nested)",
+       "note": "중첩 매치를 남기는 scan 으로 실행",
+       "to": "aw"
+      }
+     ]
+    },
+    {
+     "id": "aw",
+     "kind": "fn",
+     "status": "changed",
+     "name": "PatternFilter::analyze_with()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:198",
+     "lines": [
+      {
+       "code": "        Ok(self.scan_narrowed(text, scan)?.1)",
+       "note": "본문은 scan_narrowed 로 옮기고 매치만 받음",
+       "to": "scan_narrowed",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "scan_narrowed",
+     "kind": "fn",
+     "status": "new",
+     "name": "PatternFilter::scan_narrowed()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:209",
+     "lines": [
+      {
+       "code": "        let engine = self.engine.acquire()?;"
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Ok((engine, all_matches))",
+       "note": "엔진도 함께 돌려줌 (여기선 안 씀)",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "7ecf8ec9f9",
+   "refactor(guardrails): keep each country's PII rules, checks and tests in its own module"
+  ],
+  [
+   "d85351bee4",
+   "bench(guardrails): let the PII benchmarks choose their countries"
+  ]
+ ]
+}

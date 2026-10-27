@@ -1,0 +1,3404 @@
+{
+ "title": "en_US PII 문서 적용 — FixedShapeDetector 바이트 스캔과 미국 validator 코드 흐름",
+ "repo": "/Users/byungchulso/Works/ARGO-multilingual-support",
+ "before": "d2086f7777",
+ "after": "d4cf74fef2",
+ "range": "ARGO · d2086f7777..d4cf74fef2 · argo 바이너리 main() 부터 · feature guardrails",
+ "not_drawn": {
+  "VALIDATORS": "검사 이름표(ssn·aba_routing·nanp·dea 추가). 엔진 빌드 때 lookup() 이 읽고, 그림 7 은 고른 함수를 부르는 쪽만 그림"
+ },
+ "via": {
+  "PiiSpanDetector::detect": "FixedShapeDetector 는 PII 엔진에만 있음. 이름만 따라가면 prompt guard(prompt injection 엔진)나 다른 scan() 으로 빠짐"
+ },
+ "figures": [
+  {
+   "title": "그림 1 · 부팅 때 PII 엔진 빌드 함수가 FixedShapeDetector factory 에 닿는 흐름",
+   "caption": "argo 부팅 → guardrail 설치 → slot 에 빌드 함수 등록 → (첫 스캔 때) recognizer 모으기 → 손 detector factory",
+   "nodes": [
+    {
+     "id": "main",
+     "kind": "fn",
+     "status": "same",
+     "name": "main()",
+     "file": "argo-cli/src/main.rs:10",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            runtime.block_on(tinicli::run_cli());",
+       "note": "tokio 런타임 위에서 CLI 본체 실행",
+       "to": "run_cli"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run_cli",
+     "kind": "fn",
+     "status": "same",
+     "name": "tinicli::run_cli()",
+     "file": "tinicli/src/lib.rs:202",
+     "lines": [
+      {
+       "code": "    cli_entry::run().await;",
+       "note": "설정을 읽고 부팅 절차 시작",
+       "to": "run"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "guardrail 설치 (feature guardrails 에서만)",
+       "to": "install"
+      },
+      {
+       "code": "            pii: PiiConfig {"
+      },
+      {
+       "code": "                mode: pii_mode,"
+      },
+      {
+       "code": "                tool_args: cfg.pii.demask_tool_args.clone(),"
+      },
+      {
+       "code": "                filter_labels: cfg.pii.filter_labels.clone(),"
+      },
+      {
+       "code": "                countries: Some(pii_countries),"
+      },
+      {
+       "code": "            },"
+      },
+      {
+       "code": "            prompt_injection,"
+      },
+      {
+       "code": "            pin_engines: false,"
+      },
+      {
+       "code": "        }) {"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 번 묻고 답하는 턴 실행 → 그림 5"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:228",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let _engine = crate::guardrails::pii::shared::engine_guard();",
+       "note": "공유 엔진 slot 등록",
+       "to": "engine_guard"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;",
+       "note": "PII 레이어별 detector 만들기 → 그림 4"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "engine_guard",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::engine_guard()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:177",
+     "lines": [
+      {
+       "code": "    let _ = shared_slot();",
+       "note": "slot 을 먼저 만들어 둠",
+       "to": "shared_slot"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "shared_slot",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::shared::shared_slot()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:155",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            compile_for_countries(countries, DEFAULT_CHUNK_SIZE, &super::extensions())",
+       "note": "slot 이 비었을 때 부를 빌드 함수",
+       "to": "compile",
+       "edge": "defer",
+       "label": "턴의 첫 스캔 때 실행"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "compile",
+     "kind": "fn",
+     "status": "same",
+     "name": "compile_for_countries()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:58",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let engine = PatternEngine::from_config_with_chunk_size(&config, None, chunk_size, ext)?;",
+       "note": "common + 선택 국가 YAML 로 엔진 빌드",
+       "to": "from_config"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "from_config",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::from_config_with_chunk_size()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:418",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let (pattern_strs, pattern_meta, handwritten_detectors) =",
+       "note": "regex 패턴과 손으로 쓴 detector 모으기"
+      },
+      {
+       "code": "            collect_patterns_and_detectors(config, layer, ext)?;",
+       "to": "collect"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "collect",
+     "kind": "fn",
+     "status": "same",
+     "name": "collect_patterns_and_detectors()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:919",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        Some(build) => build(&deferred_handwritten, start_pid),",
+       "note": "PII 규칙 세트의 손 detector 빌더",
+       "to": "bhd",
+       "callee": "build"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "bhd",
+     "kind": "fn",
+     "status": "same",
+     "name": "build_handwritten_detectors()",
+     "file": "tinicore/src/guardrails/pii/handwritten/mod.rs:176",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let Some(fac_idx) = factories.iter().position(|f| f.handles(&cfg.entity_type)) else {",
+       "note": "pii_type 을 맡을 factory 찾기",
+       "to": "handles"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "        detectors.extend(factories[*fac_idx].build(items));",
+       "note": "factory 마다 detector 하나 빌드",
+       "to": "fbuild"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "handles",
+     "kind": "fn",
+     "status": "same",
+     "name": "FixedShapeDetectorFactory::handles()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:585",
+     "lines": [
+      {
+       "code": "        shape_for(pii_type).is_some()",
+       "note": "모양 표에 있는 종류면 이 factory 담당",
+       "to": "shape_for"
+      }
+     ]
+    },
+    {
+     "id": "shape_for",
+     "kind": "fn",
+     "status": "changed",
+     "name": "shape_for()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:56",
+     "lines": [
+      {
+       "code": "    match pii_type {"
+      },
+      {
+       "code": "        \"facebook_oauth_2_0\" => Some(FixedShape::Alnum125),",
+       "to": "FixedShape",
+       "edge": "use"
+      },
+      {
+       "code": "        \"gcp_oauth_2_0\" => Some(FixedShape::Hex8_4_12),"
+      },
+      {
+       "code": "        \"us_itin\" => Some(FixedShape::Segments(UsShape::Itin)),",
+       "mark": "+",
+       "note": "미국 8종은 단계 목록 모양(Segments)",
+       "to": "UsShape",
+       "edge": "use"
+      },
+      {
+       "code": "        \"us_medicare_beneficiary_identifier\" => Some(FixedShape::Segments(UsShape::Mbi)),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"us_dea_number\" => Some(FixedShape::Segments(UsShape::Dea)),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"us_alien_registration_number\" => Some(FixedShape::Segments(UsShape::AlienNumberGrouped)),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"us_driver_license\" => Some(FixedShape::Segments(UsShape::DriverLicense)),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"us_social_security_number\" => Some(FixedShape::Segments(UsShape::Ssn)),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"us_phonenumber\" => Some(FixedShape::Segments(UsShape::Phone)),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"us_phonenumber_weak\" => Some(FixedShape::Segments(UsShape::PhoneWeak)),",
+       "mark": "+"
+      },
+      {
+       "code": "        _ => None,"
+      },
+      {
+       "code": "    }"
+      }
+     ]
+    },
+    {
+     "id": "FixedShape",
+     "kind": "enum",
+     "status": "changed",
+     "name": "FixedShape",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:34",
+     "lines": [
+      {
+       "code": "enum FixedShape {"
+      },
+      {
+       "code": "    Alnum125,"
+      },
+      {
+       "code": "    Hex8_4_12,"
+      },
+      {
+       "code": "    Segments(UsShape),",
+       "mark": "+",
+       "note": "미국 모양은 단계 목록으로 스캔"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "UsShape",
+     "kind": "enum",
+     "status": "new",
+     "name": "UsShape",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:45",
+     "lines": [
+      {
+       "code": "enum UsShape {",
+       "mark": "+"
+      },
+      {
+       "code": "    Itin,",
+       "mark": "+"
+      },
+      {
+       "code": "    Mbi,",
+       "mark": "+"
+      },
+      {
+       "code": "    Dea,",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    Phone,",
+       "mark": "+"
+      },
+      {
+       "code": "    PhoneWeak,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "fbuild",
+     "kind": "fn",
+     "status": "changed",
+     "name": "FixedShapeDetectorFactory::build()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:589",
+     "lines": [
+      {
+       "code": "        let items: Vec<(usize, FixedShape)> = items"
+      },
+      {
+       "code": "            .iter()"
+      },
+      {
+       "code": "            .filter_map(|(cfg, pid)| shape_for(&cfg.entity_type).map(|shape| (*pid, shape)))",
+       "note": "pii_type 마다 모양 찾기",
+       "to": "shape_for"
+      },
+      {
+       "code": "            .collect();"
+      },
+      {
+       "code": "        if items.is_empty() {"
+      },
+      {
+       "code": "            return Vec::new();"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        let (segments, scans): (Vec<_>, Vec<_>) = items",
+       "mark": "+"
+      },
+      {
+       "code": "            .into_iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .partition(|(_, shape)| matches!(shape, FixedShape::Segments(_)));",
+       "mark": "+",
+       "note": "Segments 와 전용 스캔 함수 종류를 나눔",
+       "to": "FixedShape",
+       "edge": "use"
+      },
+      {
+       "code": "        let segments: Vec<(usize, UsShape)> = segments",
+       "mark": "+",
+       "to": "UsShape",
+       "edge": "use"
+      },
+      {
+       "code": "            .into_iter()",
+       "mark": "+"
+      },
+      {
+       "code": "            .filter_map(|(pid, shape)| match shape {",
+       "mark": "+"
+      },
+      {
+       "code": "                FixedShape::Segments(shape) => Some((pid, shape)),",
+       "mark": "+"
+      },
+      {
+       "code": "                _ => None,",
+       "mark": "+"
+      },
+      {
+       "code": "            })",
+       "mark": "+"
+      },
+      {
+       "code": "            .collect();",
+       "mark": "+"
+      },
+      {
+       "code": "        let tables = shape_tables(&segments);",
+       "mark": "+",
+       "note": "Segments 모양으로 바이트 표 만들기 → 그림 2"
+      },
+      {
+       "code": "        vec![Box::new(FixedShapeDetector {",
+       "mark": "+",
+       "note": "detector 하나에 표까지 담음",
+       "to": "FixedShapeDetector",
+       "edge": "use"
+      },
+      {
+       "code": "            scans,",
+       "mark": "+"
+      },
+      {
+       "code": "            segments,",
+       "mark": "+"
+      },
+      {
+       "code": "            tables,",
+       "mark": "+"
+      },
+      {
+       "code": "        }) as Box<dyn MatchEngine>]",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "FixedShapeDetector",
+     "kind": "struct",
+     "status": "changed",
+     "name": "FixedShapeDetector",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:74",
+     "lines": [
+      {
+       "code": "pub(crate) struct FixedShapeDetector {"
+      },
+      {
+       "code": "    scans: Vec<(usize, FixedShape)>,",
+       "mark": "+",
+       "note": "Alnum125·Hex8_4_12 전용 스캔"
+      },
+      {
+       "code": "    segments: Vec<(usize, UsShape)>,",
+       "mark": "+",
+       "note": "Segments 종류 (pid, 모양)"
+      },
+      {
+       "code": "    tables: Vec<ShapeTable>,",
+       "mark": "+",
+       "note": "한 번에 걷는 바이트 표"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 2 · 미국 모양마다 첫 두 바이트 표(first/second)를 만드는 흐름",
+   "caption": "종류의 모양 목록(segment_shapes) → 모양마다 비트 하나 → offset 0·1 에 올 수 있는 바이트를 표에 기록",
+   "nodes": [
+    {
+     "id": "fbuild",
+     "kind": "fn",
+     "status": "changed",
+     "name": "FixedShapeDetectorFactory::build()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:589",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let tables = shape_tables(&segments);",
+       "mark": "+",
+       "note": "그림 1 에서 이어짐: 바이트 표 만들기",
+       "to": "shape_tables"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "shape_tables",
+     "kind": "fn",
+     "status": "new",
+     "name": "shape_tables()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:539",
+     "lines": [
+      {
+       "code": "    let mut tables: Vec<ShapeTable> = Vec::new();",
+       "mark": "+",
+       "note": "표 하나에 모양 최대 64개",
+       "to": "ShapeTable",
+       "edge": "use"
+      },
+      {
+       "code": "    for (i, &(_, shape)) in segments.iter().enumerate() {",
+       "mark": "+"
+      },
+      {
+       "code": "        for (alt, segs) in segment_shapes(shape).iter().enumerate() {",
+       "mark": "+",
+       "note": "종류의 모양(대안) 목록 읽기",
+       "to": "segment_shapes"
+      },
+      {
+       "code": "            if tables.last().is_none_or(|table| table.shapes.len() == 64) {",
+       "mark": "+"
+      },
+      {
+       "code": "                tables.push(ShapeTable {",
+       "mark": "+"
+      },
+      {
+       "code": "                    shapes: Vec::new(),",
+       "mark": "+"
+      },
+      {
+       "code": "                    first: Box::new([0; 256]),",
+       "mark": "+"
+      },
+      {
+       "code": "                    second: Box::new([0; 256]),",
+       "mark": "+"
+      },
+      {
+       "code": "                });",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            let table = tables.last_mut().expect(\"pushed above\");",
+       "mark": "+"
+      },
+      {
+       "code": "            let bit = 1u64 << table.shapes.len();",
+       "mark": "+",
+       "note": "모양마다 비트 하나"
+      },
+      {
+       "code": "            table.shapes.push((i, alt));",
+       "mark": "+"
+      },
+      {
+       "code": "            let (first, second) = first_two_byte_sets(segs);",
+       "mark": "+",
+       "note": "offset 0·1 에 올 수 있는 바이트 집합",
+       "to": "ftbs"
+      },
+      {
+       "code": "            for b in 0..=255u8 {",
+       "mark": "+"
+      },
+      {
+       "code": "                let (word, mask) = (usize::from(b >> 6), 1u64 << (b & 63));",
+       "mark": "+"
+      },
+      {
+       "code": "                if first[word] & mask != 0 {",
+       "mark": "+"
+      },
+      {
+       "code": "                    table.first[usize::from(b)] |= bit;",
+       "mark": "+",
+       "note": "first[b]: b 로 시작할 수 있는 모양"
+      },
+      {
+       "code": "                }",
+       "mark": "+"
+      },
+      {
+       "code": "                if second[word] & mask != 0 {",
+       "mark": "+"
+      },
+      {
+       "code": "                    table.second[usize::from(b)] |= bit;",
+       "mark": "+",
+       "note": "second[b]: 둘째 바이트가 b 일 수 있는 모양"
+      },
+      {
+       "code": "                }",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    tables",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "ShapeTable",
+     "kind": "struct",
+     "status": "new",
+     "name": "ShapeTable",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:84",
+     "lines": [
+      {
+       "code": "struct ShapeTable {",
+       "mark": "+"
+      },
+      {
+       "code": "    shapes: Vec<(usize, usize)>,",
+       "mark": "+",
+       "note": "비트 k → (종류 번호, 대안 번호)"
+      },
+      {
+       "code": "    first: Box<[u64; 256]>,",
+       "mark": "+",
+       "note": "바이트 → 첫 바이트로 받는 모양 비트"
+      },
+      {
+       "code": "    second: Box<[u64; 256]>,",
+       "mark": "+",
+       "note": "바이트 → 둘째 바이트로 받는 모양 비트"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "segment_shapes",
+     "kind": "fn",
+     "status": "new",
+     "name": "segment_shapes()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:234",
+     "lines": [
+      {
+       "code": "    match shape {",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::Itin => &[&[",
+       "mark": "+",
+       "note": "ITIN: 9XX-XX-XXXX",
+       "to": "UsShape",
+       "edge": "use"
+      },
+      {
+       "code": "            Run(nine, 1),",
+       "mark": "+",
+       "to": "Seg",
+       "edge": "use"
+      },
+      {
+       "code": "            Run(digit, 2),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(dash_or_space, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 2),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(dash_or_space, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 4),",
+       "mark": "+"
+      },
+      {
+       "code": "        ]],",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::Mbi => &[&[",
+       "mark": "+",
+       "note": "MBI: 1EG4-TE5-MK73 꼴"
+      },
+      {
+       "code": "            Run(one_to_nine, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(mbi_letter, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(mbi_alnum, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Opt(dash),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(mbi_letter, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(mbi_alnum, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Opt(dash),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(mbi_letter, 2),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 2),",
+       "mark": "+"
+      },
+      {
+       "code": "        ]],",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::Dea => &[&[Run(dea_first, 1), Run(upper_or_nine, 1), Run(digit, 7)]],",
+       "mark": "+",
+       "note": "DEA: 글자 2개 + 숫자 7개"
+      },
+      {
+       "code": "        UsShape::AlienNumberGrouped => &[&[",
+       "mark": "+",
+       "note": "A-Number: A 123 456 789"
+      },
+      {
+       "code": "            Run(letter_a, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Opt(dash_or_space),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(dash_or_space, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(dash_or_space, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "        ]],",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::DriverLicense => &[",
+       "mark": "+",
+       "note": "운전면허: 플로리다·일리노이·위스콘신"
+      },
+      {
+       "code": "            &[Run(upper, 1), Run(digit, 12)],",
+       "mark": "+"
+      },
+      {
+       "code": "            &[",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(upper, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 2),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            ],",
+       "mark": "+"
+      },
+      {
+       "code": "            &[Run(upper, 1), Run(digit, 11)],",
+       "mark": "+"
+      },
+      {
+       "code": "            &[",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(upper, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 4),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 4),",
+       "mark": "+"
+      },
+      {
+       "code": "            ],",
+       "mark": "+"
+      },
+      {
+       "code": "            &[Run(upper, 1), Run(digit, 13)],",
+       "mark": "+"
+      },
+      {
+       "code": "            &[",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(upper, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 4),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 4),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(dash, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "                Run(digit, 2),",
+       "mark": "+"
+      },
+      {
+       "code": "            ],",
+       "mark": "+"
+      },
+      {
+       "code": "        ],",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::Ssn => &[&[",
+       "mark": "+",
+       "note": "SSN: XXX-XX-XXXX"
+      },
+      {
+       "code": "            Run(digit, 3),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(dash_or_space, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 2),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(dash_or_space, 1),",
+       "mark": "+"
+      },
+      {
+       "code": "            Run(digit, 4),",
+       "mark": "+"
+      },
+      {
+       "code": "        ]],",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::Phone => &[",
+       "mark": "+",
+       "note": "전화번호 대안 6가지"
+      },
+      {
+       "code": "            US_PHONE_INTL_PAREN,",
+       "mark": "+",
+       "to": "P_INTL_PAREN",
+       "edge": "use"
+      },
+      {
+       "code": "            US_PHONE_INTL,",
+       "mark": "+",
+       "to": "P_INTL",
+       "edge": "use"
+      },
+      {
+       "code": "            US_PHONE_PAREN,",
+       "mark": "+",
+       "to": "P_PAREN",
+       "edge": "use"
+      },
+      {
+       "code": "            US_PHONE_FIRST_SEPARATOR,",
+       "mark": "+",
+       "to": "P_FIRST_SEP",
+       "edge": "use"
+      },
+      {
+       "code": "            US_PHONE_SECOND_SEPARATOR_ONLY,",
+       "mark": "+",
+       "to": "P_SECOND_SEP",
+       "edge": "use"
+      },
+      {
+       "code": "            US_PHONE_CLOSE_PAREN_ONLY,",
+       "mark": "+",
+       "to": "P_CLOSE_PAREN",
+       "edge": "use"
+      },
+      {
+       "code": "        ],",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::PhoneWeak => &[US_PHONE_BARE],",
+       "mark": "+",
+       "note": "구분자 없는 10자리 (약한 전화번호)",
+       "to": "P_BARE",
+       "edge": "use"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "UsShape",
+     "kind": "enum",
+     "status": "new",
+     "name": "UsShape",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:45",
+     "lines": [
+      {
+       "code": "enum UsShape {",
+       "mark": "+"
+      },
+      {
+       "code": "    Itin,",
+       "mark": "+"
+      },
+      {
+       "code": "    Mbi,",
+       "mark": "+"
+      },
+      {
+       "code": "    Dea,",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    Phone,",
+       "mark": "+"
+      },
+      {
+       "code": "    PhoneWeak,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "Seg",
+     "kind": "enum",
+     "status": "new",
+     "name": "Seg",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:166",
+     "lines": [
+      {
+       "code": "enum Seg {",
+       "mark": "+"
+      },
+      {
+       "code": "    Run(fn(u8) -> bool, usize),",
+       "mark": "+",
+       "note": "판정 함수에 맞는 바이트 정확히 n개"
+      },
+      {
+       "code": "    Opt(fn(u8) -> bool),",
+       "mark": "+",
+       "note": "맞는 바이트 0개 또는 1개"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "ftbs",
+     "kind": "fn",
+     "status": "new",
+     "name": "first_two_byte_sets()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:500",
+     "lines": [
+      {
+       "code": "    fn set_of(pred: fn(u8) -> bool) -> [u64; 4] {",
+       "mark": "+",
+       "note": "판정 함수를 256비트 집합으로"
+      },
+      {
+       "code": "        let mut set = [0u64; 4];",
+       "mark": "+"
+      },
+      {
+       "code": "        for b in 0..=255u8 {",
+       "mark": "+"
+      },
+      {
+       "code": "            if pred(b) {",
+       "mark": "+",
+       "note": "바이트마다 판정 함수 호출 → 그림 3"
+      },
+      {
+       "code": "                set[usize::from(b >> 6)] |= 1 << (b & 63);",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        set",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    fn union(a: [u64; 4], b: [u64; 4]) -> [u64; 4] {",
+       "mark": "+"
+      },
+      {
+       "code": "        [a[0] | b[0], a[1] | b[1], a[2] | b[2], a[3] | b[3]]",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    fn at0(segs: &[Seg]) -> [u64; 4] {",
+       "mark": "+",
+       "note": "offset 0: 첫 단계, Opt 면 다음 단계도",
+       "to": "Seg",
+       "edge": "use"
+      },
+      {
+       "code": "        match segs.split_first() {",
+       "mark": "+"
+      },
+      {
+       "code": "            None => [0; 4],",
+       "mark": "+"
+      },
+      {
+       "code": "            Some((Run(pred, _), _)) => set_of(*pred),",
+       "mark": "+"
+      },
+      {
+       "code": "            Some((Opt(pred), rest)) => union(set_of(*pred), at0(rest)),",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    fn at1(segs: &[Seg]) -> [u64; 4] {",
+       "mark": "+",
+       "note": "offset 1: 선택 단계를 건너뛴 길도 셈"
+      },
+      {
+       "code": "        match segs.split_first() {",
+       "mark": "+"
+      },
+      {
+       "code": "            None => [0; 4],",
+       "mark": "+"
+      },
+      {
+       "code": "            Some((Run(pred, n), rest)) => {",
+       "mark": "+"
+      },
+      {
+       "code": "                if *n > 1 {",
+       "mark": "+"
+      },
+      {
+       "code": "                    set_of(*pred)",
+       "mark": "+"
+      },
+      {
+       "code": "                } else {",
+       "mark": "+"
+      },
+      {
+       "code": "                    at0(rest)",
+       "mark": "+"
+      },
+      {
+       "code": "                }",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            Some((Opt(_), rest)) => union(at0(rest), at1(rest)),",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    (at0(segs), at1(segs))",
+       "mark": "+",
+       "note": "(first 집합, second 집합) 반환"
+      }
+     ]
+    },
+    {
+     "id": "P_INTL_PAREN",
+     "kind": "static",
+     "status": "new",
+     "name": "US_PHONE_INTL_PAREN",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:347",
+     "lines": [
+      {
+       "code": "const US_PHONE_INTL_PAREN: &[Seg] = &[",
+       "mark": "+",
+       "note": "+1 (212) 555-0123"
+      },
+      {
+       "code": "    Run(plus, 1),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "P_INTL",
+     "kind": "static",
+     "status": "new",
+     "name": "US_PHONE_INTL",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:362",
+     "lines": [
+      {
+       "code": "const US_PHONE_INTL: &[Seg] = &[",
+       "mark": "+",
+       "note": "+1 212 555 0123"
+      },
+      {
+       "code": "    Run(plus, 1),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "P_PAREN",
+     "kind": "static",
+     "status": "new",
+     "name": "US_PHONE_PAREN",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:375",
+     "lines": [
+      {
+       "code": "const US_PHONE_PAREN: &[Seg] = &[",
+       "mark": "+",
+       "note": "(212) 555-0123"
+      },
+      {
+       "code": "    Run(open_paren, 1),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "P_FIRST_SEP",
+     "kind": "static",
+     "status": "new",
+     "name": "US_PHONE_FIRST_SEPARATOR",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:387",
+     "lines": [
+      {
+       "code": "const US_PHONE_FIRST_SEPARATOR: &[Seg] = &[",
+       "mark": "+",
+       "note": "212-555-0123, 212-5550123"
+      },
+      {
+       "code": "    Run(two_to_nine, 1),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "P_SECOND_SEP",
+     "kind": "static",
+     "status": "new",
+     "name": "US_PHONE_SECOND_SEPARATOR_ONLY",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:397",
+     "lines": [
+      {
+       "code": "const US_PHONE_SECOND_SEPARATOR_ONLY: &[Seg] = &[",
+       "mark": "+",
+       "note": "212555-0123"
+      },
+      {
+       "code": "    Run(two_to_nine, 1),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "P_BARE",
+     "kind": "static",
+     "status": "new",
+     "name": "US_PHONE_BARE",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:406",
+     "lines": [
+      {
+       "code": "const US_PHONE_BARE: &[Seg] = &[",
+       "mark": "+",
+       "note": "2125550123 (약한 전화번호)"
+      },
+      {
+       "code": "    Run(two_to_nine, 1),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "P_CLOSE_PAREN",
+     "kind": "static",
+     "status": "new",
+     "name": "US_PHONE_CLOSE_PAREN_ONLY",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:414",
+     "lines": [
+      {
+       "code": "const US_PHONE_CLOSE_PAREN_ONLY: &[Seg] = &[",
+       "mark": "+",
+       "note": "212) 555-0123: ( 앞에 글자"
+      },
+      {
+       "code": "    Run(two_to_nine, 1),",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "];",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 3 · Seg 단계가 부르는 한 바이트 판정 함수",
+   "caption": "segment_shapes 표의 Run/Opt 에 들어 있는 판정 함수. 표를 만들 때(그림 2)와 걸을 때(그림 6) pred 로 불림",
+   "nodes": [
+    {
+     "id": "ftbs",
+     "kind": "fn",
+     "status": "new",
+     "name": "first_two_byte_sets()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:500",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            if pred(b) {",
+       "mark": "+",
+       "note": "그림 2 에서 이어짐: Seg 의 판정 함수",
+       "to": [
+        "p_digit",
+        "p_upper",
+        "p_dash",
+        "p_dash_or_space",
+        "p_nine",
+        "p_one_to_nine",
+        "p_mbi_letter",
+        "p_mbi_alnum",
+        "p_dea_first",
+        "p_upper_or_nine",
+        "p_letter_a",
+        "p_two_to_nine",
+        "p_space_dot_or_dash",
+        "p_plus",
+        "p_one",
+        "p_open_paren",
+        "p_close_paren"
+       ],
+       "callee": "pred"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "p_digit",
+     "kind": "fn",
+     "status": "new",
+     "name": "digit()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:175",
+     "lines": [
+      {
+       "code": "    b.is_ascii_digit()",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_upper",
+     "kind": "fn",
+     "status": "new",
+     "name": "upper()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:178",
+     "lines": [
+      {
+       "code": "    b.is_ascii_uppercase()",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_dash",
+     "kind": "fn",
+     "status": "new",
+     "name": "dash()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:181",
+     "lines": [
+      {
+       "code": "    b == b'-'",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_dash_or_space",
+     "kind": "fn",
+     "status": "new",
+     "name": "dash_or_space()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:184",
+     "lines": [
+      {
+       "code": "    b == b'-' || b == b' '",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_nine",
+     "kind": "fn",
+     "status": "new",
+     "name": "nine()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:187",
+     "lines": [
+      {
+       "code": "    b == b'9'",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_one_to_nine",
+     "kind": "fn",
+     "status": "new",
+     "name": "one_to_nine()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:190",
+     "lines": [
+      {
+       "code": "    (b'1'..=b'9').contains(&b)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_mbi_letter",
+     "kind": "fn",
+     "status": "new",
+     "name": "mbi_letter()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:194",
+     "lines": [
+      {
+       "code": "    b.is_ascii_uppercase() && !matches!(b, b'B' | b'I' | b'L' | b'O' | b'S' | b'Z')",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_mbi_alnum",
+     "kind": "fn",
+     "status": "new",
+     "name": "mbi_alnum()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:198",
+     "lines": [
+      {
+       "code": "    digit(b) || mbi_letter(b)",
+       "mark": "+",
+       "note": "숫자이거나 MBI 글자",
+       "to": [
+        "p_digit",
+        "p_mbi_letter"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "p_dea_first",
+     "kind": "fn",
+     "status": "new",
+     "name": "dea_first()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:202",
+     "lines": [
+      {
+       "code": "    b\"ABCDEFGHJKLMPRSTUX\".contains(&b)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_upper_or_nine",
+     "kind": "fn",
+     "status": "new",
+     "name": "upper_or_nine()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:206",
+     "lines": [
+      {
+       "code": "    upper(b) || b == b'9'",
+       "mark": "+",
+       "note": "대문자이거나 9",
+       "to": "p_upper"
+      }
+     ]
+    },
+    {
+     "id": "p_letter_a",
+     "kind": "fn",
+     "status": "new",
+     "name": "letter_a()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:209",
+     "lines": [
+      {
+       "code": "    b == b'a' || b == b'A'",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_two_to_nine",
+     "kind": "fn",
+     "status": "new",
+     "name": "two_to_nine()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:212",
+     "lines": [
+      {
+       "code": "    (b'2'..=b'9').contains(&b)",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_space_dot_or_dash",
+     "kind": "fn",
+     "status": "new",
+     "name": "space_dot_or_dash()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:216",
+     "lines": [
+      {
+       "code": "    matches!(b, b' ' | b'.' | b'-')",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_plus",
+     "kind": "fn",
+     "status": "new",
+     "name": "plus()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:219",
+     "lines": [
+      {
+       "code": "    b == b'+'",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_one",
+     "kind": "fn",
+     "status": "new",
+     "name": "one()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:222",
+     "lines": [
+      {
+       "code": "    b == b'1'",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_open_paren",
+     "kind": "fn",
+     "status": "new",
+     "name": "open_paren()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:225",
+     "lines": [
+      {
+       "code": "    b == b'('",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "p_close_paren",
+     "kind": "fn",
+     "status": "new",
+     "name": "close_paren()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:228",
+     "lines": [
+      {
+       "code": "    b == b')'",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 4 · 부팅 때 레이어 detector 를 만들며 미국 새 종류를 종류 표에 올리는 흐름",
+   "caption": "build_pii → 레이어마다 detector → pii_type ↔ 종류(NationalId·DriverLicense·Phone) 표",
+   "nodes": [
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "그림 1 에서 이어짐: guardrail 설치",
+       "to": "install"
+      },
+      {
+       "code": "            pii: PiiConfig {"
+      },
+      {
+       "code": "                mode: pii_mode,"
+      },
+      {
+       "code": "                tool_args: cfg.pii.demask_tool_args.clone(),"
+      },
+      {
+       "code": "                filter_labels: cfg.pii.filter_labels.clone(),"
+      },
+      {
+       "code": "                countries: Some(pii_countries),"
+      },
+      {
+       "code": "            },"
+      },
+      {
+       "code": "            prompt_injection,"
+      },
+      {
+       "code": "            pin_engines: false,"
+      },
+      {
+       "code": "        }) {"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "install",
+     "kind": "fn",
+     "status": "same",
+     "name": "install_guardrails_from_config()",
+     "file": "tinicore/src/guardrails/install.rs:228",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let (pii_guardrails, masking) = super::pii::install::build_pii(config.pii, &mut warnings)?;",
+       "note": "PII 레이어별 detector 만들기",
+       "to": "build_pii"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "build_pii",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii::install::build_pii()",
+     "file": "tinicore/src/guardrails/pii/install.rs:297",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let input_detector = build_layer_detector(\"input\", labels, warnings)",
+       "note": "input·output·default 레이어마다",
+       "to": "build_layer_detector"
+      },
+      {
+       "code": "        .map_err(|e| layer_build_failure(\"input\", &e))?;"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "build_layer_detector",
+     "kind": "fn",
+     "status": "same",
+     "name": "build_layer_detector()",
+     "file": "tinicore/src/guardrails/pii/install.rs:256",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            return PiiSpanDetector::try_for_kinds(format!(\"guardrails:{layer}\"), &kinds);",
+       "note": "filter_labels 로 고른 종류만 쓸 때",
+       "to": "try_for_kinds"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "    PiiSpanDetector::try_for_layer(layer)",
+       "note": "레이어의 기본 recognizer 를 쓸 때",
+       "to": "try_for_layer"
+      }
+     ]
+    },
+    {
+     "id": "try_for_kinds",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::try_for_kinds()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:526",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            pii_types.extend(kind_to_pii_types(kind));",
+       "note": "종류 → pii_type 이름 목록",
+       "to": "kind_to_pii_types"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "kind_to_pii_types",
+     "kind": "fn",
+     "status": "changed",
+     "name": "kind_to_pii_types()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:57",
+     "lines": [
+      {
+       "code": "    match kind {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        SensitiveKind::Pii(PiiLabel::NationalId) => {"
+      },
+      {
+       "code": "            vec!["
+      },
+      {
+       "code": "                \"kr_resident_registration_number\","
+      },
+      {
+       "code": "                \"us_social_security_number\","
+      },
+      {
+       "code": "                \"us_itin\",",
+       "mark": "+",
+       "note": "ITIN·MBI·DEA·A-Number 를 신분번호로"
+      },
+      {
+       "code": "                \"us_medicare_beneficiary_identifier\",",
+       "mark": "+"
+      },
+      {
+       "code": "                \"us_dea_number\",",
+       "mark": "+"
+      },
+      {
+       "code": "                \"us_alien_registration_number\",",
+       "mark": "+"
+      },
+      {
+       "code": "                \"us_alien_registration_number_weak\",",
+       "mark": "+"
+      },
+      {
+       "code": "            ]"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        SensitiveKind::Pii(PiiLabel::DriverLicense) => {"
+      },
+      {
+       "code": "            vec![",
+       "mark": "+"
+      },
+      {
+       "code": "                \"kr_driver_license\",",
+       "mark": "+"
+      },
+      {
+       "code": "                \"us_driver_license\",",
+       "mark": "+",
+       "note": "미국 운전면허 두 가지"
+      },
+      {
+       "code": "                \"us_driver_license_weak\",",
+       "mark": "+"
+      },
+      {
+       "code": "            ]",
+       "mark": "+"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        SensitiveKind::Pii(PiiLabel::Phone) => {"
+      },
+      {
+       "code": "            vec![\"kr_phonenumber\", \"us_phonenumber\", \"us_phonenumber_weak\"]",
+       "mark": "+",
+       "note": "번호만 있는 10자리 전화도 전화"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "try_for_layer",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::try_for_layer()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:467",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        Self::try_from_filter(format!(\"guardrails:{layer}\"), shared_layer_filter(layer)?)",
+       "note": "엔진의 pattern 정보로 detector 만들기",
+       "to": "try_from_filter"
+      }
+     ]
+    },
+    {
+     "id": "try_from_filter",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::try_from_filter()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:503",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let kinds = kinds_for_layer(&metas);",
+       "note": "레이어가 낼 수 있는 종류 목록",
+       "to": "kinds_for_layer"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "kinds_for_layer",
+     "kind": "fn",
+     "status": "same",
+     "name": "kinds_for_layer()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:145",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let kind = pii_type_to_kind(&meta.entity_type);",
+       "note": "recognizer 마다 종류 정하기",
+       "to": "pii_type_to_kind"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "pii_type_to_kind",
+     "kind": "fn",
+     "status": "changed",
+     "name": "pii_type_to_kind()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:25",
+     "lines": [
+      {
+       "code": "    match pii_type {"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        \"kr_resident_registration_number\"",
+       "mark": "+"
+      },
+      {
+       "code": "        | \"us_social_security_number\"",
+       "mark": "+"
+      },
+      {
+       "code": "        | \"us_itin\"",
+       "mark": "+",
+       "note": "새 미국 신분번호 5종은 NationalId"
+      },
+      {
+       "code": "        | \"us_medicare_beneficiary_identifier\"",
+       "mark": "+"
+      },
+      {
+       "code": "        | \"us_dea_number\"",
+       "mark": "+"
+      },
+      {
+       "code": "        | \"us_alien_registration_number\"",
+       "mark": "+"
+      },
+      {
+       "code": "        | \"us_alien_registration_number_weak\" => SensitiveKind::Pii(PiiLabel::NationalId),",
+       "mark": "+"
+      },
+      {
+       "code": "        \"kr_passport\" | \"us_passport\" => SensitiveKind::Pii(PiiLabel::Passport),"
+      },
+      {
+       "code": "        \"kr_driver_license\" | \"us_driver_license\" | \"us_driver_license_weak\" => {",
+       "mark": "+",
+       "note": "미국 운전면허는 DriverLicense"
+      },
+      {
+       "code": "            SensitiveKind::Pii(PiiLabel::DriverLicense)",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        \"kr_bank_account\" | \"us_bank_account\" => SensitiveKind::Pii(PiiLabel::BankAccount),"
+      },
+      {
+       "code": "        \"kr_phonenumber\" | \"us_phonenumber\" | \"us_phonenumber_weak\" => {",
+       "mark": "+",
+       "note": "번호만 있는 10자리도 Phone"
+      },
+      {
+       "code": "            SensitiveKind::Pii(PiiLabel::Phone)",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 5 · 턴마다 스캔이 FixedShapeDetector 에 닿는 흐름",
+   "caption": "단일 턴 → agent loop → 모델 답변 마스킹 → PiiSpanDetector → PatternEngine::scan → 엔진마다 scan_raw",
+   "nodes": [
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                repl::run_single_turn(&ctx, &cfg, &conv_id, &effective_prompt, &single_shot_hooks)",
+       "note": "한 번 묻고 답하는 턴 실행",
+       "to": "run_single_turn"
+      },
+      {
+       "code": "                    .await"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "run_single_turn",
+     "kind": "fn",
+     "status": "same",
+     "name": "repl::run_single_turn()",
+     "file": "tinicli/src/repl.rs:435",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    let result = tinicore::agent::loop_::agent_loop(config, ctx, hooks, &*tools_guard, None).await;",
+       "note": "agent loop 한 번 돌리기",
+       "to": "agent_loop"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "agent_loop",
+     "kind": "fn",
+     "status": "same",
+     "name": "agent_loop()",
+     "file": "tinicore/src/agent/loop_.rs:1456",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        return Box::pin(agent_loop_inner(config, ctx, hooks, tools, cancel)).await;",
+       "note": "CLI 는 origin 이 없어 바로 본체로",
+       "to": "agent_loop_inner"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      }
+     ]
+    },
+    {
+     "id": "agent_loop_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "agent_loop_inner()",
+     "file": "tinicore/src/agent/loop_.rs:1520",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        let _ = crate::agent::pii_masking::mask_llm_output_in_session(",
+       "note": "모델 답변의 PII 가리기 (output 레이어)",
+       "to": "mlo"
+      },
+      {
+       "code": "            chain,"
+      },
+      {
+       "code": "            &mut messages,"
+      },
+      {
+       "code": "            sensitive.on_error,"
+      },
+      {
+       "code": "            site.roles,"
+      },
+      {
+       "code": "            config.session_key(),"
+      },
+      {
+       "code": "            turn_start,"
+      },
+      {
+       "code": "        )"
+      },
+      {
+       "code": "        .await;"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "mlo",
+     "kind": "fn",
+     "status": "same",
+     "name": "pii_masking::mask_llm_output_in_session()",
+     "file": "tinicore/src/agent/pii_masking.rs:1691",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "                let outcome = chain.detect_all(&original).await;",
+       "note": "답변 문자열을 detector 전부로 검사",
+       "to": "detect_all"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "detect_all",
+     "kind": "fn",
+     "status": "same",
+     "name": "DetectorChain::detect_all()",
+     "file": "tinicore/src/sensitive/chain.rs:206",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            match m.detect(text).await {",
+       "note": "체인의 detector 마다 검사",
+       "to": "detect"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "detect",
+     "kind": "fn",
+     "status": "same",
+     "name": "PiiSpanDetector::detect()",
+     "file": "tinicore/src/guardrails/pii/detector.rs:571",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        match tokio::task::spawn_blocking(move || filter.analyze(&text)).await {",
+       "note": "PII 규칙 엔진으로 스캔 (별도 스레드)",
+       "to": "analyze"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "analyze",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:157",
+     "lines": [
+      {
+       "code": "        self.analyze_with(text, PatternEngine::scan)",
+       "note": "포함된 매치는 버리는 scan 으로",
+       "to": "analyze_with"
+      }
+     ]
+    },
+    {
+     "id": "analyze_with",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternFilter::analyze_with()",
+     "file": "tinicore/src/guardrails/engine/filter.rs:176",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let mut all_matches = scan(&engine, text);",
+       "note": "이 턴의 엔진으로 스캔",
+       "to": "pscan"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "pscan",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:463",
+     "lines": [
+      {
+       "code": "        self.scan_inner(text, true)",
+       "note": "포함 매치 제거 켜고 본체 실행",
+       "to": "scan_inner"
+      }
+     ]
+    },
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:479",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let resolved = self.collect_raw_matches(text);",
+       "note": "엔진마다 원시 매치 (pid, 시작, 끝)",
+       "to": "collect_raw"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let collapsed = self.validate_and_collapse(resolved, text);",
+       "note": "경계 검사·validator → 그림 7"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "collect_raw",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::collect_raw_matches()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:501",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            resolved.extend(engine.scan_raw(text));",
+       "note": "DFA 엔진과 손 detector 를 차례로",
+       "to": "scan_raw"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "scan_raw",
+     "kind": "fn",
+     "status": "changed",
+     "name": "FixedShapeDetector::scan_raw()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:95",
+     "lines": [
+      {
+       "code": "        let bytes = text.as_bytes();"
+      },
+      {
+       "code": "        let mut out = Vec::new();"
+      },
+      {
+       "code": "        for &(pid, shape) in &self.scans {",
+       "mark": "+",
+       "note": "전용 스캔 함수 종류만 이 반복에서",
+       "to": "FixedShapeDetector",
+       "edge": "use"
+      },
+      {
+       "code": "            match shape {"
+      },
+      {
+       "code": "                FixedShape::Alnum125 => scan_alnum_125(bytes, pid, &mut out),"
+      },
+      {
+       "code": "                FixedShape::Hex8_4_12 => scan_hex_8_4_12(bytes, pid, &mut out),"
+      },
+      {
+       "code": "                FixedShape::Segments(_) => {}",
+       "mark": "+",
+       "note": "Segments 는 여기서 건너뜀",
+       "to": "FixedShape",
+       "edge": "use"
+      },
+      {
+       "code": "            }"
+      },
+      {
+       "code": "        }"
+      },
+      {
+       "code": "        if !self.segments.is_empty() {",
+       "mark": "+"
+      },
+      {
+       "code": "            scan_segments(bytes, &self.segments, &self.tables, &mut out);",
+       "mark": "+",
+       "note": "미국 모양 전부를 한 번에 걷기 → 그림 6"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        out"
+      }
+     ]
+    },
+    {
+     "id": "FixedShapeDetector",
+     "kind": "struct",
+     "status": "changed",
+     "name": "FixedShapeDetector",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:74",
+     "lines": [
+      {
+       "code": "pub(crate) struct FixedShapeDetector {"
+      },
+      {
+       "code": "    scans: Vec<(usize, FixedShape)>,",
+       "mark": "+",
+       "note": "Alnum125·Hex8_4_12 전용 스캔"
+      },
+      {
+       "code": "    segments: Vec<(usize, UsShape)>,",
+       "mark": "+",
+       "note": "Segments 종류 (pid, 모양)"
+      },
+      {
+       "code": "    tables: Vec<ShapeTable>,",
+       "mark": "+",
+       "note": "한 번에 걷는 바이트 표"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "FixedShape",
+     "kind": "enum",
+     "status": "changed",
+     "name": "FixedShape",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:34",
+     "lines": [
+      {
+       "code": "enum FixedShape {"
+      },
+      {
+       "code": "    Alnum125,"
+      },
+      {
+       "code": "    Hex8_4_12,"
+      },
+      {
+       "code": "    Segments(UsShape),",
+       "mark": "+",
+       "note": "미국 모양은 단계 목록으로 스캔"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 6 · FixedShapeDetector 가 미국 모양을 한 번에 걷는 흐름",
+   "caption": "위치마다 first[첫 바이트] & second[둘째 바이트] 로 후보 모양을 좁히고, 남은 모양만 단계(Seg)대로 걸어 끝 위치를 구함",
+   "nodes": [
+    {
+     "id": "scan_raw",
+     "kind": "fn",
+     "status": "changed",
+     "name": "FixedShapeDetector::scan_raw()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:95",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        if !self.segments.is_empty() {",
+       "mark": "+"
+      },
+      {
+       "code": "            scan_segments(bytes, &self.segments, &self.tables, &mut out);",
+       "mark": "+",
+       "note": "그림 5 에서 이어짐: 표마다 한 번 걷기",
+       "to": "scan_segments"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "scan_segments",
+     "kind": "fn",
+     "status": "new",
+     "name": "scan_segments()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:455",
+     "lines": [
+      {
+       "code": "    let mut found: Vec<Vec<(usize, usize, usize)>> = vec![Vec::new(); items.len()];",
+       "mark": "+",
+       "note": "종류마다 (패턴 묶음, 시작, 끝) 모음"
+      },
+      {
+       "code": "    let mut ends = Vec::new();",
+       "mark": "+"
+      },
+      {
+       "code": "    for table in tables {",
+       "mark": "+"
+      },
+      {
+       "code": "        for (start, &b) in bytes.iter().enumerate() {",
+       "mark": "+"
+      },
+      {
+       "code": "            let mut candidates = table.first[usize::from(b)];",
+       "mark": "+",
+       "note": "첫 바이트로 시작할 수 있는 모양 비트",
+       "to": "ShapeTable",
+       "edge": "use"
+      },
+      {
+       "code": "            if candidates == 0 {",
+       "mark": "+",
+       "note": "하나도 없으면 다음 위치 (영문 단어 대부분)"
+      },
+      {
+       "code": "                continue;",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "            let Some(&next) = bytes.get(start + 1) else {",
+       "mark": "+"
+      },
+      {
+       "code": "                break;",
+       "mark": "+"
+      },
+      {
+       "code": "            };",
+       "mark": "+"
+      },
+      {
+       "code": "            candidates &= table.second[usize::from(next)];",
+       "mark": "+",
+       "note": "둘째 바이트까지 맞는 모양만 남김"
+      },
+      {
+       "code": "            while candidates != 0 {",
+       "mark": "+",
+       "note": "남은 비트(모양)마다 단계 걷기"
+      },
+      {
+       "code": "                let bit = candidates.trailing_zeros() as usize;",
+       "mark": "+"
+      },
+      {
+       "code": "                candidates &= candidates - 1;",
+       "mark": "+"
+      },
+      {
+       "code": "                let (i, alt) = table.shapes[bit];",
+       "mark": "+"
+      },
+      {
+       "code": "                let shape = items[i].1;",
+       "mark": "+"
+      },
+      {
+       "code": "                ends.clear();",
+       "mark": "+"
+      },
+      {
+       "code": "                segment_ends(bytes, start, segment_shapes(shape)[alt], &mut ends);",
+       "mark": "+",
+       "note": "모양(그림 2)의 단계를 걸어 끝 위치들",
+       "to": "segment_ends"
+      },
+      {
+       "code": "                if ends.is_empty()",
+       "mark": "+"
+      },
+      {
+       "code": "                    || (matches!(shape, UsShape::Itin) && !itin_group_ok(bytes, start))",
+       "mark": "+",
+       "note": "ITIN 은 그룹 번호 범위도 확인",
+       "to": [
+        "UsShape",
+        "itin_group_ok"
+       ],
+       "edge": [
+        "use",
+        "call"
+       ]
+      },
+      {
+       "code": "                {",
+       "mark": "+"
+      },
+      {
+       "code": "                    continue;",
+       "mark": "+"
+      },
+      {
+       "code": "                }",
+       "mark": "+"
+      },
+      {
+       "code": "                let group = shape_groups(shape).get(alt).copied().unwrap_or(0);",
+       "mark": "+",
+       "note": "전화번호는 원래 regex 패턴별 묶음",
+       "to": "shape_groups"
+      },
+      {
+       "code": "                found[i].extend(ends.iter().map(|&end| (group, start, end)));",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    for (&(pid, _), found) in items.iter().zip(found) {",
+       "mark": "+"
+      },
+      {
+       "code": "        push_leftmost_per_end(pid, found, out);",
+       "mark": "+",
+       "note": "끝 위치마다 가장 왼쪽 시작만",
+       "to": "push_leftmost"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "segment_ends",
+     "kind": "fn",
+     "status": "new",
+     "name": "segment_ends()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:432",
+     "lines": [
+      {
+       "code": "    let Some((first, rest)) = segs.split_first() else {",
+       "mark": "+"
+      },
+      {
+       "code": "        ends.push(pos);",
+       "mark": "+",
+       "note": "단계를 다 걸었으면 끝 위치 기록"
+      },
+      {
+       "code": "        return;",
+       "mark": "+"
+      },
+      {
+       "code": "    };",
+       "mark": "+"
+      },
+      {
+       "code": "    match *first {",
+       "mark": "+"
+      },
+      {
+       "code": "        Run(pred, n) => {",
+       "mark": "+",
+       "note": "Run: n 바이트가 모두 맞으면 다음 단계",
+       "to": "Seg",
+       "edge": "use"
+      },
+      {
+       "code": "            if all_in(bytes, pos, pos + n, pred) {",
+       "mark": "+"
+      },
+      {
+       "code": "                segment_ends(bytes, pos + n, rest, ends);",
+       "mark": "+"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "        Opt(pred) => {",
+       "mark": "+"
+      },
+      {
+       "code": "            segment_ends(bytes, pos, rest, ends);",
+       "mark": "+",
+       "note": "Opt: 건너뛴 길"
+      },
+      {
+       "code": "            if bytes.get(pos).copied().is_some_and(pred) {",
+       "mark": "+",
+       "note": "판정 함수는 그림 3 에서"
+      },
+      {
+       "code": "                segment_ends(bytes, pos + 1, rest, ends);",
+       "mark": "+",
+       "note": "Opt: 한 바이트 먹은 길"
+      },
+      {
+       "code": "            }",
+       "mark": "+"
+      },
+      {
+       "code": "        }",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "itin_group_ok",
+     "kind": "fn",
+     "status": "new",
+     "name": "itin_group_ok()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:426",
+     "lines": [
+      {
+       "code": "    let group = u32::from(bytes[start + 4] - b'0') * 10 + u32::from(bytes[start + 5] - b'0');",
+       "mark": "+"
+      },
+      {
+       "code": "    matches!(group, 50..=65 | 70..=88 | 90..=92 | 94..=99)",
+       "mark": "+",
+       "note": "50-65, 70-88, 90-92, 94-99 만 ITIN"
+      }
+     ]
+    },
+    {
+     "id": "shape_groups",
+     "kind": "fn",
+     "status": "new",
+     "name": "shape_groups()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:339",
+     "lines": [
+      {
+       "code": "    match shape {",
+       "mark": "+"
+      },
+      {
+       "code": "        UsShape::Phone => &[0, 0, 1, 1, 1, 2],",
+       "mark": "+",
+       "note": "대안 6개 → regex 패턴 0·1·2",
+       "to": "UsShape",
+       "edge": "use"
+      },
+      {
+       "code": "        _ => &[],",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      }
+     ]
+    },
+    {
+     "id": "push_leftmost",
+     "kind": "fn",
+     "status": "new",
+     "name": "push_leftmost_per_end()",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:570",
+     "lines": [
+      {
+       "code": "    found.sort_unstable_by_key(|&(group, start, end)| (group, end, start));",
+       "mark": "+"
+      },
+      {
+       "code": "    found.dedup_by_key(|&mut (group, _, end)| (group, end));",
+       "mark": "+",
+       "note": "(묶음, 끝) 마다 시작이 가장 작은 것만"
+      },
+      {
+       "code": "    out.extend(found.into_iter().map(|(_, start, end)| (pid, start, end)));",
+       "mark": "+",
+       "note": "engine 이 받는 (pid, 시작, 끝)"
+      }
+     ]
+    },
+    {
+     "id": "ShapeTable",
+     "kind": "struct",
+     "status": "new",
+     "name": "ShapeTable",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:84",
+     "lines": [
+      {
+       "code": "struct ShapeTable {",
+       "mark": "+"
+      },
+      {
+       "code": "    shapes: Vec<(usize, usize)>,",
+       "mark": "+",
+       "note": "비트 k → (종류 번호, 대안 번호)"
+      },
+      {
+       "code": "    first: Box<[u64; 256]>,",
+       "mark": "+",
+       "note": "바이트 → 첫 바이트로 받는 모양 비트"
+      },
+      {
+       "code": "    second: Box<[u64; 256]>,",
+       "mark": "+",
+       "note": "바이트 → 둘째 바이트로 받는 모양 비트"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "UsShape",
+     "kind": "enum",
+     "status": "new",
+     "name": "UsShape",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:45",
+     "lines": [
+      {
+       "code": "enum UsShape {",
+       "mark": "+"
+      },
+      {
+       "code": "    Itin,",
+       "mark": "+"
+      },
+      {
+       "code": "    Mbi,",
+       "mark": "+"
+      },
+      {
+       "code": "    Dea,",
+       "mark": "+"
+      },
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "    Phone,",
+       "mark": "+"
+      },
+      {
+       "code": "    PhoneWeak,",
+       "mark": "+"
+      },
+      {
+       "code": "}"
+      }
+     ]
+    },
+    {
+     "id": "Seg",
+     "kind": "enum",
+     "status": "new",
+     "name": "Seg",
+     "file": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:166",
+     "lines": [
+      {
+       "code": "enum Seg {",
+       "mark": "+"
+      },
+      {
+       "code": "    Run(fn(u8) -> bool, usize),",
+       "mark": "+",
+       "note": "판정 함수에 맞는 바이트 정확히 n개"
+      },
+      {
+       "code": "    Opt(fn(u8) -> bool),",
+       "mark": "+",
+       "note": "맞는 바이트 0개 또는 1개"
+      },
+      {
+       "code": "}",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "그림 7 · 매치마다 경계 검사와 미국 validator 를 거치는 흐름",
+   "caption": "원시 매치 → boundary_check(+ / ( 예외) → validation_methods 표의 새 항목 ssn · aba_routing · nanp · dea",
+   "nodes": [
+    {
+     "id": "scan_inner",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::scan_inner()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:479",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "        let collapsed = self.validate_and_collapse(resolved, text);",
+       "note": "그림 5 에서 이어짐: 경계 검사·validator",
+       "to": "vac"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "vac",
+     "kind": "fn",
+     "status": "same",
+     "name": "PatternEngine::validate_and_collapse()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:522",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "                && !passes_boundary_check(",
+       "note": "앞뒤에 붙은 글자·숫자면 버림",
+       "to": "boundary"
+      },
+      {
+       "code": "                    text,"
+      },
+      {
+       "code": "                    start,"
+      },
+      {
+       "code": "                    end,"
+      },
+      {
+       "code": "                    &meta.boundary_check_reject_before,"
+      },
+      {
+       "code": "                    &meta.boundary_check_reject_after,"
+      },
+      {
+       "code": "                )"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      },
+      {
+       "code": "                    .is_some_and(|m| meta.validation_methods.iter().all(|v| v.validate(m)))",
+       "note": "recognizer 의 validator 를 모두 통과해야",
+       "to": "validate"
+      },
+      {
+       "elide": true,
+       "indent": 12
+      }
+     ]
+    },
+    {
+     "id": "boundary",
+     "kind": "fn",
+     "status": "changed",
+     "name": "passes_boundary_check()",
+     "file": "tinicore/src/guardrails/engine/recognizer.rs:1334",
+     "lines": [
+      {
+       "code": "    let bytes = text.as_bytes();"
+      },
+      {
+       "code": "    let opens_phone = matches!(bytes.get(start), Some(b'+' | b'('));",
+       "mark": "+",
+       "note": "+ 나 ( 로 시작하면 전화번호 시작"
+      },
+      {
+       "code": "    let before_ok = start == 0 || {"
+      },
+      {
+       "code": "        let b = bytes[start - 1];"
+      },
+      {
+       "code": "        !(b.is_ascii_alphanumeric() && !opens_phone)",
+       "mark": "+",
+       "note": "그때는 앞에 붙은 글자를 허용 (Tel+1 …)"
+      },
+      {
+       "code": "            && !reject_before"
+      },
+      {
+       "code": "                .as_ref()"
+      },
+      {
+       "code": "                .is_some_and(|r| r.as_bytes().contains(&b))"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    let after_ok = end >= text.len() || {"
+      },
+      {
+       "code": "        let b = bytes[end];"
+      },
+      {
+       "code": "        !b.is_ascii_alphanumeric()"
+      },
+      {
+       "code": "            && !reject_after"
+      },
+      {
+       "code": "                .as_ref()"
+      },
+      {
+       "code": "                .is_some_and(|r| r.as_bytes().contains(&b))"
+      },
+      {
+       "code": "    };"
+      },
+      {
+       "code": "    before_ok && after_ok"
+      }
+     ]
+    },
+    {
+     "id": "validate",
+     "kind": "fn",
+     "status": "same",
+     "name": "Validator::validate()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:25",
+     "lines": [
+      {
+       "code": "        self(matched)",
+       "note": "YAML 이 이름으로 고른 검사 함수",
+       "to": [
+        "ssn",
+        "aba",
+        "nanp",
+        "dea"
+       ],
+       "callee": "self"
+      }
+     ],
+     "desc": "impl Validator for fn(&str) -> bool"
+    },
+    {
+     "id": "ssn",
+     "kind": "fn",
+     "status": "new",
+     "name": "ssn()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:181",
+     "lines": [
+      {
+       "code": "    let d = digits(text);",
+       "mark": "+",
+       "note": "숫자만 뽑기",
+       "to": "digits"
+      },
+      {
+       "code": "    if d.len() != 9 {",
+       "mark": "+",
+       "note": "9자리가 아니면 실패"
+      },
+      {
+       "code": "        return false;",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    let area = d[0] * 100 + d[1] * 10 + d[2];",
+       "mark": "+"
+      },
+      {
+       "code": "    let group = d[3] * 10 + d[4];",
+       "mark": "+"
+      },
+      {
+       "code": "    let serial = d[5] * 1000 + d[6] * 100 + d[7] * 10 + d[8];",
+       "mark": "+"
+      },
+      {
+       "code": "    let advertising = area == 987 && group == 65 && (4320..=4329).contains(&serial);",
+       "mark": "+"
+      },
+      {
+       "code": "    !(area == 0 || area == 666 || area >= 900 || group == 0 || serial == 0 || advertising)",
+       "mark": "+",
+       "note": "SSA 가 발급하지 않는 범위면 실패"
+      }
+     ]
+    },
+    {
+     "id": "aba",
+     "kind": "fn",
+     "status": "new",
+     "name": "aba_routing()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:196",
+     "lines": [
+      {
+       "code": "    let d = digits(text);",
+       "mark": "+",
+       "note": "숫자만 뽑기",
+       "to": "digits"
+      },
+      {
+       "code": "    if d.len() < 9 {",
+       "mark": "+",
+       "note": "routing 번호 9자리가 없으면 실패"
+      },
+      {
+       "code": "        return false;",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    let sum = 3 * (d[0] + d[3] + d[6]) + 7 * (d[1] + d[4] + d[7]) + (d[2] + d[5] + d[8]);",
+       "mark": "+",
+       "note": "ABA 가중치 3·7·1 합"
+      },
+      {
+       "code": "    sum.is_multiple_of(10)",
+       "mark": "+",
+       "note": "10의 배수여야 통과"
+      }
+     ]
+    },
+    {
+     "id": "nanp",
+     "kind": "fn",
+     "status": "new",
+     "name": "nanp()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:209",
+     "lines": [
+      {
+       "code": "    let mut d = digits(text);",
+       "mark": "+",
+       "note": "숫자만 뽑기",
+       "to": "digits"
+      },
+      {
+       "code": "    if text.trim_start().starts_with('+') && !d.is_empty() {",
+       "mark": "+",
+       "note": "+1 이면 국가 코드 1 을 뺌"
+      },
+      {
+       "code": "        d.remove(0); // the country code 1",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    if d.len() != 10 {",
+       "mark": "+",
+       "note": "10자리가 아니면 실패"
+      },
+      {
+       "code": "        return false;",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    d[0] >= 2 && d[3] >= 2 && !(d[4] == 1 && d[5] == 1)",
+       "mark": "+",
+       "note": "지역·국번 첫 자리 2-9, 국번 N11 아님"
+      }
+     ]
+    },
+    {
+     "id": "dea",
+     "kind": "fn",
+     "status": "new",
+     "name": "dea()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:223",
+     "lines": [
+      {
+       "code": "    let Some(tail) = text.get(2..) else {",
+       "mark": "+",
+       "note": "앞 두 글자가 없으면 실패"
+      },
+      {
+       "code": "        return false;",
+       "mark": "+"
+      },
+      {
+       "code": "    };",
+       "mark": "+"
+      },
+      {
+       "code": "    let d = digits(tail);",
+       "mark": "+",
+       "note": "뒤 7자리 숫자",
+       "to": "digits"
+      },
+      {
+       "code": "    if d.len() != 7 || text.chars().count() != 9 {",
+       "mark": "+",
+       "note": "숫자 7개·전체 9글자가 아니면 실패"
+      },
+      {
+       "code": "        return false;",
+       "mark": "+"
+      },
+      {
+       "code": "    }",
+       "mark": "+"
+      },
+      {
+       "code": "    ((d[0] + d[2] + d[4]) + 2 * (d[1] + d[3] + d[5])) % 10 == d[6]",
+       "mark": "+",
+       "note": "DEA 검사 숫자가 마지막 자리와 같아야"
+      }
+     ]
+    },
+    {
+     "id": "digits",
+     "kind": "fn",
+     "status": "new",
+     "name": "digits()",
+     "file": "tinicore/src/guardrails/engine/validator.rs:169",
+     "lines": [
+      {
+       "code": "    text.chars().filter_map(|c| c.to_digit(10)).collect()",
+       "mark": "+"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "commits": [
+  [
+   "d4cf74fef2",
+   "feat(guardrails): apply the en_US PII document — validate and tighten the US rules, detect ITIN, MBI, DEA, A-Number and driver licence numbers"
+  ]
+ ]
+}
