@@ -4,6 +4,8 @@
 
 ## 0. 문서 작성 기준
 
+> **엔진 설명 기준:** 이 0절의 엔진 설명(점수 체계, context_words 검색 방식, `validator.rs`, 검출 방식)은 이 문서를 쓴 2026-09 당시 기준이다. 지금 동작(점수 체계 구현됨, 문맥 단어는 단어 단위로 맞추고 `*` 로 연다, 나라별 검증기 모듈과 모르는 이름의 빌드 실패, UUID 안 매치 제거)은 `_template-argo-pii-locale.md` 0절과 `20260915-argo-pii-common.md` 8절, ARGO `tinicore/src/guardrails/AGENTS.md` 를 본다.
+
 각 항목은 다음 네 가지 기준으로 평가한다.
 
 1. 적용 법령 또는 감독기관 규제상 노출되면 안 되는 PII 인가?

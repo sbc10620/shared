@@ -7,7 +7,7 @@
   작성 절차는 skills/argo-pii-locale/SKILL.md 를 따른다. 완성된 예시는 docs/multilanguage/20260914-argo-pii-en_US.md 이다.
 -->
 
-이 문서는 `tinicore/src/guardrails/config/pii_filter_config.yaml` 에 {국가명}({LOCALE}) 고유 PII recognizer 가 포함되어야 하는 근거를 기록한다. 이미 YAML 에 있는 항목도 근거를 남기기 위해 포함하며, 국가에 종속되지 않는 항목(카드번호, API 키, 비밀번호, 이메일, IP 주소 등)은 다루지 않는다.
+이 문서는 `tinicore/src/guardrails/pii/config/{cc}.yaml` 에 {국가명}({LOCALE}) 고유 PII recognizer 가 포함되어야 하는 근거를 기록한다. 이미 YAML 에 있는 항목도 근거를 남기기 위해 포함하며, 국가에 종속되지 않는 항목(카드번호, API 키, 비밀번호, 이메일, IP 주소 등)은 다루지 않는다.
 
 ## 0. 문서 작성 기준
 
@@ -18,39 +18,46 @@
 3. 결정론적 방법(regex 또는 손으로 작성한 패턴 매칭)으로 검출할 수 있는가?
 4. 검증기(체크섬 등)가 있어서 매칭 정확도를 높일 수 있는가? 검증기가 없어도 보안상 중요하면 채택한다.
 
-### 검출 방식 세 가지 (결정론적 검출 가능성 항목에서 사용하는 용어)
+### 엔진 기준
 
-엔진(`recognizer.rs` 의 `PiiEngine`)은 세 가지 매칭 방식을 지원하며, 어느 방식으로 찾은 매치든 같은 후처리 파이프라인(boundary check → validator → dedup → 점수 계산·임계값)을 거친다. 따라서 검증기와 context_words 는 방식과 무관하게 동일하게 적용된다.
+0절의 엔진 설명은 ARGO 다국어 브랜치(`dev/byungchul.so/multilingual-support`, 2026-10-27) 기준이다. 코드가 바뀌면 이 절을 먼저 고친다. 자세한 규칙은 ARGO `tinicore/src/guardrails/AGENTS.md` 에 있다.
+
+- 나라별 recognizer 는 `pii/config/{cc}.yaml` 하나에 모이고, 공통 항목(카드, API 키 등)은 `common.yaml` 에 있다. 호스트가 고른 나라의 파일만 엔진에 들어간다.
+- 모든 recognizer 는 `label:`(`national_id`, `passport`, `phone` 등)을 가져야 한다. 없거나 모르는 값이면 엔진 빌드가 실패한다.
+
+### 검출 방식 (결정론적 검출 가능성 항목에서 사용하는 용어)
+
+엔진은 아래 네 가지 방식을 지원한다. 어느 방식으로 찾은 매치든 같은 후처리(boundary check → 검증기 → UUID 안 매치 제거 → recognizer 별 겹침 정리 → 점수·임계값 → 포함된 짧은 매치 제거)를 거친다. 따라서 검증기와 context_words 는 방식과 무관하게 똑같이 적용된다.
 
 | 방식 | 구현 위치 | 동작 | 적합한 경우 | 비용 |
 |---|---|---|---|---|
-| **regex** | `PatternRecognizer`, `PatternTemplateRecognizer` | 패턴을 30개 단위 청크(`DEFAULT_CHUNK_SIZE`)로 나눠 `regex_automata::hybrid::dfa`(lazy DFA)로 컴파일하고, 청크마다 텍스트를 한 번씩 스캔 | 패턴 수가 적고 구조가 단순할 때. 기본 선택지 | 패턴 수와 복잡도에 비례해 DFA 캐시 메모리와 스캔 횟수가 늘어난다. 카드번호는 105개 패턴이 문제가 되어 handwritten 으로 옮겼다 |
-| **byte-scan handwritten** | `handwritten/card_detector.rs` 방식 (`MatchEngine` 직접 구현) | 텍스트를 바이트 단위로 걸으며 숫자열·영숫자열을 뽑고, 접두 표·길이·자리 규칙을 코드로 검사 | 접두가 고정 문자열이 아니라 **표**(BIN 처럼 여러 접두 구간)이거나, 주별 형식처럼 패턴 수가 많거나, 체크섬을 매칭 단계에서 바로 적용하고 싶을 때 | 메모리 거의 없음. 타입마다 detector 코드를 작성해야 한다 |
-| **Aho-Corasick handwritten** | `handwritten/aho_corasick_detector.rs` (`pattern_desc_for` 에 anchor + verifier 등록) | 고정 문자열 anchor 를 하나의 automaton 으로 찾고, anchor 뒤의 바이트를 verifier 함수가 검사 | **고정 리터럴 접두**가 있고 그 뒤에 단순한 문자 집합 run 이 이어질 때 (`AKIA`, `ghp_`, `010` 등). 여러 타입을 한 automaton 에 묶어 텍스트를 한 번만 스캔한다 | 메모리 거의 없음. anchor 가 짧으면(1-2바이트) 텍스트 곳곳에서 verifier 가 호출되어 이득이 줄고, anchor 는 대소문자를 구분한다(`ascii_case_insensitive` 미사용) |
+| **regex** | `PatternRecognizer`, `PatternTemplateRecognizer` | 패턴을 lazy DFA 로 컴파일한다. 한 나라의 패턴은 DFA 청크 하나를 함께 쓴다 | 길이가 열린 형식(`{8,}`), 중첩 alternation, 키워드 파일 템플릿, 손으로 짠 detector 가 정확히 같은 결과를 내지 못할 때 | 패턴마다 DFA 메모리가 든다. common + 나라 하나의 regex 를 30개(청크 1개) 이하로 유지한다 |
+| **FixedShape 형식** | `handwritten/fixed_shape_detector/{cc}.rs` 의 `TYPES` (`Seg::Run`, `Seg::Opt`) | 문자 클래스 묶음의 고정 형식을 앞 두 바이트 표로 거른 뒤 형식만 대조한다 | 고정 리터럴 없이 숫자·문자·구분자 묶음으로 된 번호(주민번호, 여권, 전화번호 대부분). **기본 선택지** | 메모리가 거의 없다. 형식 64개마다 표가 하나 늘어 스캔이 한 번 더 돈다 |
+| **Aho-Corasick** | `handwritten/aho_corasick_detector/{cc}.rs` | 2-3바이트 이상의 드문 리터럴 anchor 를 찾고, 그 뒤를 verifier 가 검사한다 | 고정 접두가 있을 때(`AKIA`, `ghp_`, `070`, 번호판 용도 글자) | anchor 가 짧거나 흔하면 후보가 많아져 이득이 없다 |
+| **전용 detector** | `handwritten/card_detector.rs` 등 | 형식만으로 표현하기 어려운 규칙(카드 브랜드·길이 표)을 코드로 검사한다 | 위 셋으로 표현할 수 없을 때. 새 종류는 먼저 제안한다 | 코드 작성 비용 |
 
-각 항목의 "결정론적 검출 가능성"에서는 regex 를 기본으로 표로 기술하고, 그 아래에 handwritten(byte-scan, Aho-Corasick) 대안의 실현 가능성과 **오탐률이 regex 대비 어떻게 달라지는지**를 함께 적는다. 오탐률은 매칭 형식이 같으면 방식과 무관하게 같고, handwritten 이 매칭 단계에서 표 대조나 체크섬을 추가로 수행하거나 (카드번호처럼) 구분자 제약을 의도적으로 풀 때만 달라진다.
+손으로 짠 detector 가 regex 와 정확히 같은 결과를 내면 detector 를 쓰는 것이 기본이다. 평문에서 regex 보다 10% 넘게 느리거나, 결과를 정확히 맞출 수 없거나, 형식이 어느 방식에도 맞지 않으면 regex 로 둔다.
 
-### 점수 체계와 context_words (정확도가 낮은 패턴에 반드시 적용)
+각 항목의 "결정론적 검출 가능성"에서는 regex 를 기본으로 표로 기술하고, 그 아래에 손으로 짠 detector(FixedShape, Aho-Corasick) 대안의 실현 가능성과 **오탐률이 regex 대비 어떻게 달라지는지**를 함께 적는다. 오탐률은 매칭 형식이 같으면 방식과 무관하게 같다.
 
-**현재 코드에서 context_words 는 매치를 걸러내지 않는다.** `compute_score` (`recognizer.rs`)는 context 단어가 매치 주변 ±50자 안에 있으면 1.0, 없으면 0.5 를 돌려주고, 임계값 `SCORE_THRESHOLD` 도 0.5 이므로 context 단어가 없어도 모든 매치가 살아남는다. 점수는 겹침 해소(`detector.rs`)에서 어느 매치를 우선할지 정하는 데에만 쓰인다. 따라서 "context_words 가 있으니 오탐을 걸러준다"는 가정은 현재 성립하지 않는다.
+### 점수 체계와 context_words
 
-이 문서의 regex 표에서 **"score 사용 필요"** 로 표시한 패턴은, 형식만으로는 정확도가 낮아서 context 단어 없이 매칭되면 오탐이 될 가능성이 높은 것들이다. 이런 패턴을 채택하려면 Presidio 와 같은 방식의 점수 체계가 먼저 있어야 한다.
-
-- `RecognizerConfig` 와 `PatternMeta` 에 recognizer 단위 `score` 필드(기본값 0.5)를 추가한다.
-- `compute_score` 를 "기본 점수 + context 가산" 방식으로 바꾸고 임계값 0.5 는 유지한다. 가산값은 **0.5** 를 권장한다. 그러면 기존 recognizer 의 context 매치 점수가 지금과 같은 1.0 으로 유지되어 `tinicore/tests/guardrails/filter_test.rs` 의 `score == 1.0` 단정 3건(5331, 5441, 5471행)이 그대로 통과한다. Presidio 기본값 0.35 를 쓰면 통과·탈락 결과는 같지만 점수가 0.85 로 바뀌어 이 테스트들을 갱신해야 한다.
-- 기존 recognizer 는 모두 기본값 0.5 이므로 통과·탈락 결과가 바뀌지 않는다. `card_number` 와 Aho-Corasick 계열은 Luhn 과 고정 접두가 이미 강한 필터라서 `score` 를 지정할 필요가 없다. `PatternMeta` 를 통해 같은 파이프라인을 타지만 값이 기본이라 영향이 없다.
-- 낮은 `score` 를 준 recognizer 에는 `context_words` 를 반드시 채워야 한다. `compute_score` 는 `context_words` 가 비어 있으면 가산 없이 기본 점수를 돌려주므로, 비워 두면 모든 매치가 탈락한다.
-- 정확도가 낮은 패턴은 같은 `pii_type` 을 가진 별도 recognizer(예: `us_driver_license_numeric`)로 분리해 `score: 0.3` 처럼 낮게 준다. context 없이는 0.3 으로 탈락하고, context 가 있으면 0.8 로 통과한다. pid 가 패턴 단위이고 `PatternMeta` 가 recognizer 설정을 패턴마다 복제하므로, 패턴별 점수보다 recognizer 분리가 스키마 변경이 적다.
-
-context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`, `ach`, `aba` 같은 짧은 단어는 `card`, `routing`, `read` 안에서도 걸린다. 점수 체계를 도입하면 이런 단어가 가산의 근거가 되므로, 짧은 단어는 목록에서 빼거나 앞뒤에 공백을 포함한 형태로 등록해야 한다.
+- recognizer 마다 `score:` 를 줄 수 있다. 생략하면 0.5 다. 주변 50자 안에 context 단어가 있으면 0.5 가 더해지고, 0.5 미만인 매치는 버린다.
+- 형식만으로 근거가 되지 않는 번호(맨 숫자열, 문자 + 숫자)는 `score: 0.3` 으로 둔다. context 단어가 없으면 버려지고, 있으면 0.8 로 보고된다. 검증기·고정 접두·엄격한 형식이 있으면 기본 0.5 로 둔다.
+- 한 recognizer 안의 패턴은 점수를 공유한다. 정확도가 다른 형식은 별도 recognizer(예: `{cc}_phonenumber_weak`)로 나눈다.
+- 낮은 `score` 의 recognizer 는 context_words 가 유일한 통과 수단이므로 반드시 채운다. 비어 있으면 경고가 나고 아무것도 보고하지 않는다.
+- **context 단어는 모든 문자 체계에서 단어 단위로 맞춘다.** 단어 끝 글자와 바로 바깥 글자가 같은 부류(ASCII 영숫자, 한글, 태국 문자, 한자·가나)이면 붙은 것으로 보고 맞추지 않는다. 악센트 라틴 문자, 공백, 구두점은 어느 부류도 아니므로 경계가 된다(`ssn번호`, `número:` 는 맞음, `car` 는 `card` 안에서 맞지 않음).
+- 단어 맨 앞이나 맨 뒤의 `*` 는 그쪽을 연다. `'*여권*'` 은 부분 문자열처럼 맞고, `'신한*'` 은 `신한은행` 에서도 맞는다. YAML 에서는 따옴표로 감싼다. 한글·태국어처럼 단어에 조사나 합성어가 붙는 문자 체계는 보통 `'*…*'` 로 연다. 일상어이거나 다른 단어의 앞부분인 짧은 단어(`국민`, `우리`)만 일부러 닫는다.
+- 닫힌 단어는 형태마다 적어야 한다(`reisepass` 는 `Reisepassnummer` 안에서 맞지 않는다). 연 단어는 가장 짧은 형태 하나로 충분하다.
 
 ### 엔진 제약 (regex 작성 시 유의)
 
-- lazy DFA 이므로 **lookahead·lookbehind·역참조를 쓸 수 없다.** 배제 규칙(예: 특정 접두·구간을 발급하지 않는 번호에서 그 값을 제외하는 규칙. en_US 의 SSN `000`·`666`·`9xx` 배제가 대표 사례)은 regex 가 아니라 `validator.rs` 의 검증 함수로 구현하거나, handwritten detector 안에서 코드로 처리한다.
-- 현재 `validator.rs` 에 존재하는 검증기는 `luhn`, `rrn`, `phonenumber` 세 가지뿐이다. `rrn` 은 자릿수만 확인하고 `phonenumber` 는 항상 `true` 를 돌려준다. 아래 "검증기" 필드에서 "현재"는 이 세 가지 기준이고, "구현 가능"은 새로 작성해야 하는 검증 논리를 뜻한다.
-- **`validator::validate` 는 fail-open 이다.** 모르는 검증기 이름이 오면 `true` 를 돌려준다. 따라서 YAML 에 `ssn`, `aba_routing` 같은 이름을 먼저 적고 함수를 나중에 구현하면 경고 없이 모든 매치가 통과한다. 반드시 **검증기 구현 → YAML 등록** 순서로 작업한다.
-- 단어 경계 처리는 `boundary_check` 와 `boundary_check_reject_before/after` 설정으로 한다. `config.rs` 의 `boundary_check_reject_before` 필드 주석은 패턴 안의 `(?-u:\b)` 대신 이 설정을 쓰도록 안내한다(DFA 상태 수 감소). handwritten detector 도 같은 설정을 따른다.
-- `RecognizerConfig` 에 대소문자 무시 옵션이 없다. 소문자 입력까지 잡으려면 패턴 안에 `(?i)` 인라인 플래그를 넣거나 문자 클래스에 소문자를 포함해야 한다. 기존 `us_passport` 는 `[a-zA-Z]` 로 소문자를 허용하고, 각 국가 문서의 신규 제안은 대문자 `[A-Z]` 만 쓰는 것을 기본으로 한다. 구현 시 통일한다.
+- lazy DFA 이므로 **lookahead·lookbehind·역참조를 쓸 수 없다.** 배제 규칙(예: en_US 의 SSN `000`·`666`·`9xx` 배제)은 regex 가 아니라 검증기나 손으로 짠 detector 안에서 코드로 처리한다.
+- 검증기는 `pii/validators/{cc}.rs` 의 `VALIDATORS` 표에 `fn(&str) -> bool` 로 등록하며, 매치된 문자열만 받는다. 여러 나라가 쓰는 `luhn`, `mrz_731` 은 `common.rs` 에, `digits`, `iban_mod97`, `mrz_check` 같은 도우미는 `helpers.rs` 에 있다.
+- YAML 의 `validation_methods` 에 어느 모듈에도 없는 이름을 적으면 엔진 빌드가 실패한다(어느 layer 의 recognizer 든). 따라서 등록 순서를 지킬 필요는 없지만, 함수가 없으면 아무것도 동작하지 않는다.
+- 단어 경계는 패턴의 `\b` 가 아니라 `boundary_check: true` 와 `boundary_check_reject_before/after` 로 처리한다. `_` 는 앞뒤 모두 거부하는 것이 관례다. `+` 나 `(` 로 시작하는 매치는 앞 글자를 검사하지 않는다(`Tel+1 …`).
+- 도구가 만든 UUID(8-4-4-4-12 hex) 안에 완전히 들어간 매치는 엔진이 버린다. UUID 형식 값 자체를 잡아야 하는 항목이 생기면 따로 검토한다.
+- `RecognizerConfig` 에 대소문자 무시 옵션이 없다. 소문자 입력까지 잡으려면 패턴이나 형식에 소문자를 넣어야 한다. 신규 제안은 대문자만 쓰는 것을 기본으로 한다.
 
 ### regex 표의 형식
 
@@ -77,7 +84,7 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 
 | pii_type | 설명 | 결정론적 검출 | 권장 검출 방식 | 검증기 (현재 / 구현 가능) | score | 기존 구현 | 채택 |
 |---|---|---|---|---|---|---|---|
-| {cc}_{항목} | {한 줄 설명} | 가능 / 가능 (약함) / 불가 | regex / byte-scan handwritten / Aho-Corasick (+ 검증기) | {현재 validator.rs 기준} / {새로 구현 가능한 것} | 기본 / 사용 고려 / **사용 필요** | 기존 / 신규 | 채택 / 조건부 채택 / 미채택 (이유) |
+| {cc}_{항목} | {한 줄 설명} | 가능 / 가능 (약함) / 불가 | regex / FixedShape / Aho-Corasick (+ 검증기) | {이미 있는 검증기} / {새로 구현 가능한 것} | 기본 / 사용 고려 / **사용 필요** | 기존 / 신규 | 채택 / 조건부 채택 / 미채택 (이유) |
 
 이외에 검토했으나 결정론적 검출이 불가능해서 미채택한 항목은 4절에 정리했다.
 
@@ -99,15 +106,15 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
     | `{패턴}` | `{예시}` (`{반례}` 는 거부) | {기본 / score 사용 고려 / **score 사용 필요**}. {병행할 검증기, boundary_check 필요 여부, 오탐 원인} |
 
     {오탐 수준과 원인을 한두 문장으로. lookahead 가 필요한 배제 규칙은 검증기로 넘긴다고 명시}
-  - **byte-scan handwritten**: {가능 여부. 가능하면 어떻게(어떤 표·체크섬을 매칭 단계에서 적용), 오탐률이 regex 대비 동일한지 낮아지는지, 메모리 이점이 있는지}
+  - **FixedShape 형식**: {가능 여부. 가능하면 어떤 묶음으로 나뉘는지(`Run`·`Opt`), 오탐률이 regex 대비 동일한지, 앞 두 바이트가 흔한 문자라 평문에서 느려질 위험이 있는지}
   - **Aho-Corasick**: {고정 리터럴 접두가 있는지. 있으면 anchor 후보와 길이, 없으면 "부적합"}
-  - **권장**: {세 방식 중 하나 + 검증기 + score}
+  - **권장**: {방식 하나 + 검증기 + score}
 - **검증기**:
-  - 현재: {없음 / luhn / rrn / phonenumber}
+  - 현재: {없음 / 이미 있는 검증기 이름(`luhn`, `mrz_731`, 다른 나라 검증기 등)}
   - 구현 가능: {체크섬 알고리즘을 계산식까지. 없으면 "체크섬 없음"과 대안(범위 배제 등)}
 - **채택 여부 및 근거**: {채택 / 조건부 채택 / 미채택}. {한두 문장. 검증기가 없어도 보안상 중요하면 채택}
-- **기존 구현 여부**: {기존 (`pii_filter_config.yaml` `{키}`) / 신규}. {기존이면 개선 권장 사항}
-- **context_words 후보**: {현지어와 영어 모두. 3글자 이하 단어는 다른 단어에 포함되므로 공백 포함 형태로 쓰거나 제외}
+- **기존 구현 여부**: {기존 (`{cc}.yaml` `{키}`) / 신규}. {기존이면 개선 권장 사항}
+- **context_words 후보**: {현지어와 영어 모두. 한글·태국어 등은 여는 쪽을 `*` 로 표시. 일상어는 제외}
 - **비고**: {선택. 다른 항목과의 겹침, 폐지된 구형 형식 등}
 
 ## 4. 검토 후 미채택한 항목
@@ -122,16 +129,15 @@ context_words 는 소문자 부분 문자열 검색이므로 `car`, `tin`, `ead`
 
 ## 5. 구현 시 후속 작업 요약
 
-이 문서에서 도출된, YAML·`validator.rs`·`handwritten/`·엔진에 반영할 작업 목록이다. 검증기는 **함수 구현 → YAML 등록** 순서를 지킨다(`validator::validate` 가 fail-open 이므로 순서가 바뀌면 검증 없이 통과한다).
+이 문서에서 도출된, YAML·`pii/validators/{cc}.rs`·`handwritten/`·엔진에 반영할 작업 목록이다. 나라 추가에 필요한 단계(나라 enum, 검증기 표, 형식 표, 비교 테스트, 명세 테스트, 벤치 문장)는 ARGO `guardrails/AGENTS.md` 의 "Adding a country" 표를 따른다.
 
 | 순서 | 작업 | 대상 | 종류 |
 |---|---|---|---|
-| 선행 | recognizer 단위 `score` 필드와 context 가산 방식 도입 (en_US 문서 5절과 공통. 이미 완료되었으면 이 행 삭제) | 엔진 | 엔진 변경 |
-| 1 | {작업} | {pii_type} | validator 신규 / YAML 신규 / YAML 수정 / handwritten 신규 / 키워드 파일 수정 |
+| 1 | {작업} | {pii_type} | validator 신규 / YAML 신규 / YAML 수정 / FixedShape·Aho-Corasick 형식 신규 / 키워드 파일 수정 |
 
 ## 작성 체크리스트 (완성 후 이 절은 삭제)
 
-- [ ] `pii_filter_config.yaml` 에서 이 국가의 기존 recognizer(`{cc}_*`)를 모두 찾아 "기존"으로 표시하고 패턴·context_words·layers·boundary 설정을 원문 그대로 인용했다
+- [ ] `pii/config/{cc}.yaml` 에서 이 국가의 기존 recognizer(`{cc}_*`)를 모두 찾아 "기존"으로 표시하고 패턴·context_words·layers·boundary 설정을 원문 그대로 인용했다
 - [ ] 항목마다 4가지 기준(법령, 근거, 결정론적 검출, 검증기)을 모두 채웠다
 - [ ] 모든 regex 를 Python `re` 로 "매칭 예시"와 "거부 반례"에 대해 실행해서 확인했다 (`(?-u:\b)` 는 `\b` 로, `boundary_check` 는 인접 영숫자 거부로 모사)
 - [ ] regex 에 lookahead·lookbehind·역참조가 없다
