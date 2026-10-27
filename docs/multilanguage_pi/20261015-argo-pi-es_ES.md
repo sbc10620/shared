@@ -196,7 +196,7 @@ common 규칙 4개(`invisible_payload`, `imperative_pipe_to_shell`, `imperative_
 | common + en + es 전체 regex 규칙 | 20 | 1472 KB |
 | (참고) common + en + es 전체 regex 규칙, 스페인어 주석 규칙 없음 | 19 | 1267 KB |
 
-스페인어 규칙은 지금까지의 locale 중 가장 크다(fr_FR 은 사용자 입력 701 KB, 전체 1199 KB). 붙는 대명사와 그때 바뀌는 악센트, tú·usted·ustedes 형, 동사 앞 대명사 의문문을 모두 대안으로 두었고, es_MX 와 규칙을 공유하기 때문이다. es_MX 어휘를 더하기 전에는 사용자 입력 807 KB, 전체 1328 KB 였다. 규칙 단독으로는 `es_ignore_prior` 261 KB, `es_comment_directive` 210 KB, `es_reveal_secrets` 203 KB, `es_reveal_system_prompt` 173 KB 가 크다. 악센트 없는 입력을 받는 처리는 전체에서 약 18 KB 이다.
+스페인어 규칙은 지금까지의 locale 중 가장 크다(fr_FR 은 사용자 입력 742 KB, 전체 1240 KB). 붙는 대명사와 그때 바뀌는 악센트, tú·usted·ustedes 형, 동사 앞 대명사 의문문을 모두 대안으로 두었고, es_MX 와 규칙을 공유하기 때문이다. es_MX 어휘를 더하기 전에는 사용자 입력 807 KB, 전체 1328 KB 였다. 규칙 단독으로는 `es_ignore_prior` 261 KB, `es_comment_directive` 210 KB, `es_reveal_secrets` 203 KB, `es_reveal_system_prompt` 173 KB 가 크다. 악센트 없는 입력을 받는 처리는 전체에서 약 18 KB 이다.
 
 ## 5. 결정 사항
 
