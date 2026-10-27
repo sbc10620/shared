@@ -4,7 +4,7 @@
 `~/Works/ClawKeeper`(안전 미들웨어)를 조사하고, 이를 ARGO(`~/Works/ARGO-ClawKeeper`,
 `dev/byungchul.so/clawkeeper` 브랜치)의 `tinicore/src/guardrails/`로 가져오는 방안을
 분석한 기록. 실제 포팅 계획은 별도 문서
-[`20260902-clawkeeper-tinicore-porting-plan.md`](./20260902-clawkeeper-tinicore-porting-plan.md) 참고.
+[`20260902-clawkeeper-tinicore-porting-plan.md`](../plans/20260902-clawkeeper-tinicore-porting-plan.md) 참고.
 
 ---
 

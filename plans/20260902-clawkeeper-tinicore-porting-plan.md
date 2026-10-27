@@ -1,7 +1,7 @@
 > **스냅샷 안내**: 이 문서는 2026-09-02 세션에서 Claude Code 플랜 모드로 작성한
 > `tinicore/src/guardrails/` 포팅 계획의 스냅샷이다. **아직 승인/실행 전** —
 > ARGO 저장소(`~/Works/ARGO-ClawKeeper`)에는 어떤 코드 변경도 적용되지 않았다.
-> 배경 분석은 [`20260902-clawkeeper-argo-analysis.md`](./20260902-clawkeeper-argo-analysis.md) 참고.
+> 배경 분석은 [`20260902-clawkeeper-argo-analysis.md`](../docs/20260902-clawkeeper-argo-analysis.md) 참고.
 
 ---
 
