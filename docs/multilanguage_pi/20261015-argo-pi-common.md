@@ -94,7 +94,7 @@ common 규칙도 locale 에 따라 정상 텍스트에서 오탐이 생길 수 �
 | 규칙 | locale | 확인할 것 |
 |---|---|---|
 | `invisible_payload` | th_TH | 타이어 텍스트는 단어 사이에 U+200B(zero-width space)를 넣는 경우가 있다. 그러면 정상 문장마다 경고가 생긴다. warn 이라 차단되지는 않지만, 로그가 넘치는지 확인한다 |
-| `invisible_payload` | en_IN | 힌디어 등 인도계 문자는 U+200C(ZWNJ)·U+200D(ZWJ)를 철자에 쓴다. en_IN 문서에서 현지 문자 문장을 다룬다면 함께 확인한다 |
+| `invisible_payload` | en_IN | 인도계 문자는 일부 철자(마라티어 eyelash ra 등)에 U+200C(ZWNJ)·U+200D(ZWJ)를 쓴다. 표준 철자의 힌디어에는 없다. 결과는 en_IN 문서 1절에 있다 |
 | 나머지 3개 | 전체 | 확인할 것 없음. 셸 문법과 base64 는 locale 과 무관하다 |
 
 ## 3. 알려진 빈틈
