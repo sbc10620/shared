@@ -1,4 +1,4 @@
-# invisible_payload
+# invisible_payload  (label: invisible_chars)
 P (?u)[\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}\u{202A}-\u{202E}\u{2066}-\u{2069}\u{00AD}]
 + click here\u{200B}\u{202E}
 # FALSE POSITIVE (accepted): ZWJ emoji; warn only

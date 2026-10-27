@@ -298,9 +298,9 @@ P (?i)\b(?:za)?ufaj(?:cie)?(?:\s|\xC2\xA0|\xE3\x80\x80)+(?:temu|tej|tym)(?:\s|\x
 - Zaufaj mi
 - Uwaga opiekuna: dziecko ma alergię na orzechy.
 - To jest zatwierdzenie zmian
+- Zaloguj się przez Profil Zaufany
 # KNOWN GAP: "trusted" as an adjective (en \btrust matches "trusted"); zaufan would hit Profil Zaufany
 - To jest zaufane źródło
-- Zaloguj się przez Profil Zaufany
 
 # pl_imperative_credential_read  (label: embedded_directive)
 P (?i)(?:\b(?:uruchom|wykonaj|odpal)(?:cie)?\b|\bprosz(?iu:[ęe])(?:\s|\xC2\xA0|\xE3\x80\x80)+(?:uruchomi(?iu:[ćc])|wykona(?iu:[ćc])|odpali(?iu:[ćc])))[^.\n]*(?:~/\.(?:ssh|aws|gnupg)/|/etc/(?:passwd|shadow|sudoers)|\.aws/credentials|\.ssh/id_|authorized_keys|\.env)(?:\.[A-Za-z0-9_-]+)*|(?:\b(?:przeczytaj|odczytaj|wy(?iu:[śs])wietl|poka(?iu:[żz])|wypisz|wy(?iu:[śs])lij|prze(?iu:[śs])lij|przeka(?iu:[żz]))(?:cie)?|\bprosz(?iu:[ęe])(?:\s|\xC2\xA0|\xE3\x80\x80)+(?:przeczyta(?iu:[ćc])|odczyta(?iu:[ćc])|wy(?iu:[śs])wietli(?iu:[ćc])|pokaza(?iu:[ćc])|wypisa(?iu:[ćc])|wys(?iu:[łl])a(?iu:[ćc])|przes(?iu:[łl])a(?iu:[ćc])))(?:\s|\xC2\xA0|\xE3\x80\x80)+(?:(?:mi|nam|te(?iu:[żz])|tak(?iu:[żz])e|r(?iu:[óo])wnie(?iu:[żz])|potem|nast(?iu:[ęe])pnie|teraz)(?:\s|\xC2\xA0|\xE3\x80\x80)+)?(?:(?:zawarto(?iu:[śs])(?iu:[ćc])|tre(?iu:[śs])(?iu:[ćc]))(?:\s|\xC2\xA0|\xE3\x80\x80)+(?:pliku(?:\s|\xC2\xA0|\xE3\x80\x80)+)?|plik(?:\s|\xC2\xA0|\xE3\x80\x80)+)?(?:~/\.(?:ssh|aws|gnupg)/|/etc/(?:passwd|shadow|sudoers)|\.aws/credentials|\.ssh/id_|authorized_keys)

@@ -32,9 +32,9 @@
   |---|---|---|
   | `click here` + U+200B + U+202E | `plain text` | 실제 공격 형태 |
   | `soft` + U+00AD + `hyphen` | `no-break` + U+00A0 + `space` | U+00A0 은 보이는 공백이라 대상이 아니다 |
-  | 가족 이모지 👨‍👩‍👧, 무지개 깃발 🏳️‍🌈 (U+200D 포함) | | **오탐**. warn 이라 통과한다 |
+  | `family 👨‍👩‍👧`, `🏳️‍🌈` (가족 이모지와 무지개 깃발. U+200D 포함) | | **오탐**. warn 이라 통과한다 |
 
-- **메모**: 양쪽 layer 에서 **warn** 이다. U+200D(zero-width joiner)는 가족·직업·깃발 이모지를 만드는 필수 문법이므로, block 으로 두면 이모지가 들어간 평범한 메시지가 거부된다. 테스트 `invisible_payload_matches_emoji_zwj_but_warns_rather_than_blocks` 가 한국어 이모지 문장 2건이 경고만 받고 통과하는 것을 고정한다. 아랍어·히브리어 같은 RTL 언어는 bidi 제어 문자를 정상적으로 쓰지만, 이번 13개 locale 에는 RTL 언어가 없다. 확인할 locale 은 2절에 있다.
+- **메모**: 양쪽 layer 에서 **warn** 이다. U+200D(zero-width joiner)는 가족·직업·깃발 이모지를 만드는 필수 문법이므로, block 으로 두면 이모지가 들어간 평범한 메시지가 거부된다. 테스트 `invisible_payload_matches_emoji_zwj_but_warns_rather_than_blocks` 가 한국어 이모지 문장 2건이 경고만 받고 통과하는 것을 고정한다. 매칭이 여러 번 생겨도 경고는 메시지(도구 결과) 하나에 한 번이다. 사용자 입력에서는 `evaluate` 가 규칙 id 를 한 번만 기록하고, 도구 결과에서는 규칙을 중복 없이 모은 warn 로그 한 줄이 남는다(th_TH·en_IN 문서 1절). 아랍어·히브리어 같은 RTL 언어는 bidi 제어 문자를 정상적으로 쓴다. 13개 locale 의 주 언어에는 RTL 언어가 없지만, en_IN 사용자는 우르두어를 쓸 수 있고 그 문장의 U+200C 와 bidi 제어 문자가 매칭된다(en_IN 문서 1절). 확인할 locale 은 2절에 있다.
 
 ### imperative_pipe_to_shell
 
@@ -93,8 +93,9 @@ common 규칙도 locale 에 따라 정상 텍스트에서 오탐이 생길 수 �
 
 | 규칙 | locale | 확인할 것 |
 |---|---|---|
-| `invisible_payload` | th_TH | 타이어 텍스트는 단어 사이에 U+200B(zero-width space)를 넣는 경우가 있다. 그러면 정상 문장마다 경고가 생긴다. warn 이라 차단되지는 않지만, 로그가 넘치는지 확인한다 |
-| `invisible_payload` | en_IN | 인도계 문자는 일부 철자(마라티어 eyelash ra 등)에 U+200C(ZWNJ)·U+200D(ZWJ)를 쓴다. 표준 철자의 힌디어에는 없다. 결과는 en_IN 문서 1절에 있다 |
+| `invisible_payload` | th_TH | 타이어 텍스트는 단어 사이에 U+200B(zero-width space)를 넣는 경우가 있다. 매칭은 U+200B 마다 생기지만 경고는 메시지(도구 결과) 하나에 한 번이다. warn 이라 차단되지는 않는다. 결과는 th_TH 문서 1절에 있다 |
+| `invisible_payload` | en_IN | 인도계 문자는 일부 철자(마라티어 eyelash ra 등)에 U+200C(ZWNJ)·U+200D(ZWJ)를 쓴다. 표준 철자의 힌디어에는 없다. 우르두어(RTL)는 단어 안의 U+200C 와 문장을 감싼 bidi 제어 문자가 매칭된다. 결과는 en_IN 문서 1절에 있다 |
+| `invisible_payload` | de_DE, pl_PL | 웹 페이지는 긴 낱말의 줄바꿈 위치를 soft hyphen(U+00AD, HTML `&shy;`)으로 표시하는 경우가 있다. 독일어·폴란드어의 긴 합성어에서 쓰일 수 있고, 그러면 그 페이지마다 경고가 한 번 남는다. 실제 빈도는 측정하지 않았다 |
 | 나머지 3개 | 전체 | 확인할 것 없음. 셸 문법과 base64 는 locale 과 무관하다 |
 
 ## 3. 알려진 빈틈
