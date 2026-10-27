@@ -196,7 +196,7 @@ common 규칙 4개(`invisible_payload`, `imperative_pipe_to_shell`, `imperative_
 | common + en + pl 전체 regex 규칙 | 20 | 1242 KB |
 | (참고) common + en + pl 전체 regex 규칙, 폴란드어 주석 규칙 없음 | 19 | 1025 KB |
 
-폴란드어 규칙은 Romance 계열 locale(es_ES 1472 KB, it_IT 1611 KB)보다 작다. 명령형과 3인칭의 형태가 달라서 "3인칭과 겹치는 형태"를 거르는 대안이 필요 없고, 명사를 어간으로 받아 격 변화 형태를 모두 나열하지 않았기 때문이다. 규칙 단독으로는 `pl_comment_directive` 223 KB, `pl_ignore_prior` 174 KB, `pl_reveal_system_prompt` 155 KB 가 크다. 부호 허용 처리는 전체에서 약 61 KB 이다.
+폴란드어 규칙은 Romance 계열 locale(es_ES 1472 KB, it_IT 1636 KB)보다 작다. 명령형과 3인칭의 형태가 달라서 "3인칭과 겹치는 형태"를 거르는 대안이 필요 없고, 명사를 어간으로 받아 격 변화 형태를 모두 나열하지 않았기 때문이다. 규칙 단독으로는 `pl_comment_directive` 223 KB, `pl_ignore_prior` 174 KB, `pl_reveal_system_prompt` 155 KB 가 크다. 부호 허용 처리는 전체에서 약 61 KB 이다.
 
 ## 5. 결정 사항
 
