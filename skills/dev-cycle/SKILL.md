@@ -41,9 +41,9 @@ agent definitions; each prompt has two parts.
 
 | Role | Always in the prompt | Chosen from the plan for this call |
 | --- | --- | --- |
-| Plan reviewer (step 1) | Read-only; the plan and the repository, never a draft implementation; report only, change nothing | The plan, the user's request and decisions so far, the profile's path table |
+| Plan reviewer (step 1) | Read-only; the plan and the repository, never a draft implementation; report only, change nothing; the "Design principles" section | The plan, the user's request and decisions so far, the profile's path table |
 | Test agent (step 1a) | Spec only, never the implementation; edit test files only, or return values as a list when tests live inside implementation files; a spec that contradicts itself, or an example that fails its own rule, is reported, not fixed | The spec for this commit's scope (the design doc's sections, shapes, rules, labels, layers), the user's decisions that override the doc, where the tests go |
-| Reviewer (step 3) | Read-only; the required method (step 3) and the method on the first line; earlier rounds' decisions are not re-argued | The range, what changed this round, earlier findings and their decisions, the user's decisions, what was already verified |
+| Reviewer (step 3) | Read-only; the required method (step 3) and the method on the first line; the "Design principles" section; earlier rounds' decisions are not re-argued | The range, what changed this round, earlier findings and their decisions, the user's decisions, what was already verified |
 
 - Never pass the test agent the implementation, nor test cases the
   orchestrator picked itself: both bring the implementer's view back in.
@@ -109,6 +109,61 @@ range again. A change of one commit is the same loop with a range of one.
 Reviewing after each commit is not wrong, just slower: a later commit often
 changes what an earlier finding was about. Do it only when the user asks.
 
+## Design principles (plan review and code review)
+
+Both reviewers (step 1 and step 3) check the change's structure against the
+list below, besides correctness. The list is language-neutral: it holds for
+object-oriented, functional and multi-paradigm code alike. Read "module" as
+whatever unit the language groups code by (class, module, package, crate,
+file), and "interface" as whatever it abstracts behaviour with (interface,
+trait, protocol, abstract class, function type, closure). The `code-review`
+skill does not carry this list, so the orchestrator puts it in both reviewer
+prompts, and the step-3 reviewer hands it on in the skill's arguments
+(step 3).
+
+Scope: judge only what the change adds or changes, plus existing structure
+the change extends (a new entry in an existing global table extends that
+table). A principle the untouched code already breaks is out of scope.
+
+Each item: what to look for, then the usual fix.
+
+**SOLID, stated without classes**
+
+| Principle | Look for | Usual fix |
+| --- | --- | --- |
+| Single responsibility | One module or function that changes for two unrelated reasons (parsing and policy, scanning and reporting) | Split along the reason to change |
+| Open/closed | Adding a case (a country, a provider, a rule) means editing a central list or `switch` in code that is otherwise generic | Let the case register itself, or pass the cases in; an exhaustive `match` the compiler checks is acceptable when it is the ONE mapping place |
+| Liskov substitution | An implementation of an interface that rejects inputs, panics or ignores calls the interface allows; a caller that checks which implementation it got | Make the implementation honour the contract, or narrow the interface |
+| Interface segregation | A caller forced to provide or depend on members it never uses (dummy closures, `unimplemented!()`, no-op callbacks) | Split the interface |
+| Dependency inversion | A generic, lower-level component (an engine, a store, a transport) that names a specific consumer's concept (a domain type, a product rule, a data format only one caller uses) | The generic component depends on an abstraction (an interface, a function parameter); the consumer supplies the concrete behaviour |
+
+**Dependencies and state**
+
+| Principle | Look for | Usual fix |
+| --- | --- | --- |
+| Explicit dependencies (dependency injection) | Code that reaches a process-wide registry, global table, singleton or environment variable to find what it needs, where the caller already knows it | Pass it in: an argument, a constructor field, a closure that captures it |
+| Least privilege / least knowledge | A component that can see more than its job needs (every country's table when two are selected; a whole config when it reads one key); a chain of reaches through other objects' internals | Hand it only the subset it uses |
+| Mechanism vs policy | A reusable mechanism with a hard-coded decision that belongs to one user of it | Keep the mechanism generic; take the decision as a parameter or hook |
+| No boolean flag parameters | A `bool` (or mode enum) that makes the callee branch on the caller's situation | Pass the behaviour itself (a function, a strategy value), or split into two functions |
+| Global mutable state | New process-wide mutable state, or new readers of it | Prefer values passed down; if it must exist, one owner, set once, documented |
+
+**Make mistakes impossible, or loud**
+
+| Principle | Look for | Usual fix |
+| --- | --- | --- |
+| Illegal states unrepresentable | An invariant kept only by a naming convention, a comment or a test (unique names across tables, "always set together") | Encode it in types or construction: a constructor that refuses duplicates, a required field, an exhaustive `match` |
+| Fail fast | A misconfiguration that is logged and skipped, or silently resolved to a default, where a build or boot error would be safe | Refuse at build or boot time; keep fail-open only where a documented decision says so |
+| Explicit over implicit | Behaviour inferred from something incidental (a name prefix, list order, the first match in a search) when an explicit value is available | Use the explicit value; if inference stays, test the rule it relies on |
+| Consistency / least astonishment | A module laid out, named or wired differently from its siblings without a reason | Match the siblings, or state the reason in a comment |
+
+Reporting: a design finding names the principle and the concrete code
+(`file:line`), and says what the fix would change for a caller. Without a
+runtime effect it is labelled "사실이지만 동작 영향 없음" in step 4, with
+"설계:" leading its 지적 cell, so the user can pick it out; with a runtime
+effect (a wrong lookup, a skipped guard) it is "고칠 결함" like any other
+defect. Do not report a principle in the abstract, nor one the user already
+decided against (it goes in the "do not re-argue" list).
+
 ## 0. Find the project profile
 
 ```bash
@@ -139,7 +194,10 @@ profile.
   - verification: each commit's changed paths get the checks the profile
     ties to them;
   - the repository's own rules (`AGENTS.md`, `CLAUDE.md`) and risks the plan
-    misses.
+    misses;
+  - the design: the structure the plan proposes, against "Design principles"
+    (a new global table, a flag where a function would do, an invariant left
+    to a convention). Cheapest to change here, before any code exists.
 
   Check every finding against the code, as in step 3, then show the plan with
   the findings: fold in the ones that hold, and list the ones left out with
@@ -254,6 +312,17 @@ Run the review in a subagent, read-only, over the change (`<base>..HEAD`):
 - **Other agents** (no `code-review` skill): review the range by hand for
   correctness, edge cases, regressions, consistency between code, config,
   tests and docs, and the repository's own rules.
+
+Design principles are checked in the same pass, never by a separate agent
+or a second review (that doubles the tokens for one range):
+
+- **`code-review` skill:** the subagent passes the focus through the skill's
+  arguments, in one call:
+  `high <base>..HEAD — Report findings only, no edits.` then the "Design
+  principles" items (principle name and its "Look for" cell, one line each),
+  the earlier rounds' findings and decisions, and the user's guiding rules.
+  The skill does not know the list otherwise.
+- **Manual review:** the same list is part of what is reviewed by hand.
 
 Either way, the report's first line states the method actually used
 ("code-review skill, high" / "manual review"). A report without that line,
