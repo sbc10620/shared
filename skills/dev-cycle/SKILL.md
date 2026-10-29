@@ -248,6 +248,7 @@ Then check every finding against the code before reporting it:
 ## 7. Report, then wait
 
 ```
+방법: <the reviewer's first line, e.g. code-review skill, medium>
 결론: 고칠 결함 <n>건 / 사실이지만 동작 영향 없음 <n>건 / 해당 없음·이미 처리됨 <n>건
 
 | # | 지적 | 판정 | 확인 결과 (한 줄) | 수정안 |
@@ -275,9 +276,9 @@ fixed, from any of the three groups. Do not edit before that.
 - Fix the chosen findings and amend each fix into the commit it belongs to
   right away (`git commit --amend` when it is HEAD, otherwise
   `git commit --fixup=<commit>` immediately followed by
-  `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <commit>^`; it runs
-  without an editor, so it is not interactive and is allowed where
-  interactive git commands are not). Do not leave `fixup!` commits standing
+  `git rebase --autosquash <commit>^`, which needs no `-i` from Git 2.44 on;
+  with an older Git use `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash
+  <commit>^`, which opens no editor either). Do not leave `fixup!` commits standing
   between rounds. A new commit only when no existing commit is the fix's
   home.
 - Before amending, check the structure the fix adds or extends against
@@ -331,7 +332,8 @@ HEAD:
   allowed differences, so it is not raised again.
 - A failure, or a difference the user calls a defect, is fixed and
   re-checked here (only the affected part), goes through the review loop
-  (steps 6 to 8), and then this step runs again on the new HEAD.
+  (steps 6 to 8), and then this whole step runs again on the new HEAD.
+  "Once" in the title means once when nothing needs fixing.
 
 Report the result. Pushing, opening the PR, and commenting are separate
 instructions; wait for each.
