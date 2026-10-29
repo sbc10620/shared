@@ -19,7 +19,15 @@ Checks, per box line (elided lines skipped):
                  box; a type/data box over 6 lines shows `...`; a figure
                  holds at most 18 boxes; figure 1 starts at `main()` (or the
                  group states `entry_exception`), and every later figure
-                 starts at a box an earlier figure already drew.
+                 starts at a box an earlier figure already drew;
+  5. folding   — a call line's `hops` is a real call chain at `after` (the
+                 line calls hops[0], each hop's body calls the next, the last
+                 calls the target box) holding no changed definition and no
+                 `via` function; and an unchanged function box is drawn only
+                 when it is the entry, a `via` function, the direct caller of
+                 a new or changed box, or a branch box (two or more call
+                 targets) — any other unchanged function is folded into
+                 `hops`.
 Exit 1 with a list on any failure.
 """
 import json
@@ -347,6 +355,36 @@ def _targets(ln):
     return t, (k if isinstance(k, list) else [k] * len(t))
 
 
+def hop_name(h):
+    """`name` or `name@path-suffix` -> (name, suffix)."""
+    name, _, where = h.partition("@")
+    return name.strip(), where.strip()
+
+
+def hop_bodies(repo, after, hop, cache):
+    """The bodies (lists of source lines) of every non-test definition of a
+    hop at `after`; `name@suffix` keeps only definitions in matching paths."""
+    if hop in cache:
+        return cache[hop]
+    name, where = hop_name(hop)
+    out = subprocess.run(["git", "-C", repo, "grep", "-nwF", name, after],
+                         capture_output=True, text=True).stdout.splitlines()
+    bodies, files = [], {}
+    for hit in out:
+        _, path, line, _ = (hit.split(":", 3) + ["", "", "", ""])[:4]
+        if not path.endswith(SOURCE_EXT) or TEST_PATH.search(path) or (where and not path.endswith(where)):
+            continue
+        if path not in files:
+            files[path] = git(repo, "show", f"{after}:{path}").splitlines()
+        lines = files[path]
+        i = int(line) - 1
+        d = definition(lines, i, path)
+        if d and d[0] == name:
+            bodies.append(lines[i + 1:block_end(lines, i) + 1])
+    cache[hop] = bodies
+    return bodies
+
+
 def git(repo, *args):
     return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, check=True).stdout
 
@@ -497,12 +535,59 @@ def main():
                     if kind == "use" or t not in by_id:
                         continue
                     callee = re.split(r"::|\.", re.sub(r"\(.*$", "", by_id[t]["name"]))[-1].split()[-1]
+                    if ln.get("hops"):
+                        callee = hop_name(ln["hops"][0])[0].split("::")[-1]
                     alias = ln.get("callee")
                     names = [callee] + ([alias] if isinstance(alias, str) else list(alias or []))
                     here = ln.get("code", "") + " " + (lines[k - 1].get("code", "") if k else "")
                     if not any(re.search(rf"\b{re.escape(c)}\b", here) for c in names):
                         problems.append(f"fig{fi+1} {n['id']}: the arrow to {t} leaves a line that does not call "
                                         f"`{callee}`: {ln.get('code', '')!r}")
+    # Folded calls (`hops`) and which unchanged boxes may stay (Step 1.3).
+    via_names = list((group.get("via") or {}).keys())
+    changed_names = {name for (name, _, _) in changed}
+    body_cache = {}
+
+    def hop_body_lookup(h):
+        return hop_bodies(repo, after, h, body_cache)
+
+    def is_via(name):
+        return any(re.search(rf"(^|::|\.){re.escape(v)}(\(\))?$", name) or name == v for v in via_names)
+
+    for fi, fig in enumerate(group["figures"]):
+        by_id = {n["id"]: n for n in fig["nodes"]}
+        called = {t for n in fig["nodes"] for ln in n.get("lines", []) for t, _ in zip(*_targets(ln))}
+        for n in fig["nodes"]:
+            for ln in n.get("lines", []):
+                hops = ln.get("hops")
+                if not hops:
+                    continue
+                tos = [t for t, k in zip(*_targets(ln)) if k != "use"]
+                if len(tos) != 1 or tos[0] not in by_id:
+                    problems.append(f"fig{fi+1} {n['id']}: a line with `hops` has exactly one call target box")
+                    continue
+                target = re.split(r"::|\.", re.sub(r"\(.*$", "", by_id[tos[0]]["name"]))[-1].split()[-1]
+                chain = [hop_name(h)[0].split("::")[-1] for h in hops] + [target]
+                for h, nxt in zip(hops, chain[1:]):
+                    hname = hop_name(h)[0].split("::")[-1]
+                    if hname in changed_names:
+                        problems.append(f"fig{fi+1} {n['id']}: hop `{h}` is a changed definition — draw it as a box")
+                    if is_via(hop_name(h)[0]):
+                        problems.append(f"fig{fi+1} {n['id']}: hop `{h}` is a `via` function — draw it as a box")
+                    bodies = hop_body_lookup(h)
+                    if not bodies:
+                        problems.append(f"fig{fi+1} {n['id']}: hop `{h}` has no definition at {after} "
+                                        "(write `name@path` when the name is ambiguous)")
+                    elif not any(re.search(rf"\b{re.escape(nxt)}\b", l) for b in bodies for l in b):
+                        problems.append(f"fig{fi+1} {n['id']}: hop `{h}` does not call `{nxt}` at {after}")
+        for n in fig["nodes"]:
+            if n["kind"] != "fn" or n.get("status") != "same" or n["id"] not in called or is_via(n["name"]):
+                continue
+            calls = {t for ln in n.get("lines", []) for t, k in zip(*_targets(ln)) if k != "use" and t in by_id}
+            hands_off = any(by_id[t].get("status") in ("new", "changed") for t in calls)
+            if not hands_off and len(calls) < 2:
+                problems.append(f"fig{fi+1} {n['id']}: unchanged `{n['name']}` only passes the path on — fold it "
+                                "into the `hops` of the line that calls it (Step 1.3)")
     if len(group["figures"]) > 1 and len(unique) <= 18:
         problems.append(f"{len(unique)} distinct boxes fit in one figure — do not split (Step 2)")
     # A `not_drawn` key names a changed definition: `name`, or, when two

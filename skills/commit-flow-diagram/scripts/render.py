@@ -249,6 +249,20 @@ def short_name(node):
     return re.split(r"::|\.", re.sub(r"\(.*$", "", node["name"]))[-1]
 
 
+def hop_short(h):
+    """`a::b::run@x/y.rs` -> `run`."""
+    return re.split(r"::|\.", h.partition("@")[0].strip())[-1]
+
+
+def hops_label(hops):
+    """The folded functions on an arrow: all of them up to three, else the
+    first two, a count, and the last."""
+    names = [hop_short(h) for h in hops]
+    if len(names) <= 3:
+        return " → ".join(names)
+    return f"{names[0]} → {names[1]} → …({len(names) - 3}개)… → {names[-1]}"
+
+
 def callee_names(line, by_id):
     """Identifiers to underline, each mapped to the box id it jumps to: the
     called function's own name for each call edge, or the `callee` name the
@@ -262,6 +276,8 @@ def callee_names(line, by_id):
         kind = kinds[i] if isinstance(kinds, list) else kinds
         if kind in ("call", "defer") and t in by_id:
             name = short_name(by_id[t])
+            if line.get("hops"):
+                name = hop_short(line["hops"][0])
             if re.search(rf"\b{re.escape(name)}\b", code):
                 names[name] = t
             else:
@@ -396,10 +412,23 @@ def layout(nodes):
     cols = sorted({n["col"] for n in order})
     x = MARGIN
     col_x = {}
+    right = 0
     for c in cols:
         col_x[c] = x
-        x += max(n["w"] for n in order if n["col"] == c) + COL_GAP
-    total_w = x - COL_GAP + MARGIN
+        widest = max(n["w"] for n in order if n["col"] == c)
+        # A folded call between two boxes of one column puts its label right of
+        # the vertical run (render_edges); keep the next column clear of it.
+        reach = widest
+        for n in order:
+            if n["col"] != c:
+                continue
+            for ln, t, kind in edges_of(n):
+                if ln.get("hops") and kind != "use" and t in by_id and by_id[t]["col"] == c:
+                    tw = text_width("⋯ " + hops_label(ln["hops"]), 11) + 12
+                    reach = max(reach, max(n["w"], by_id[t]["w"]) + 36 + tw)
+        right = max(right, x + reach + 12)
+        x += max(widest + COL_GAP, reach + 24)
+    total_w = max(x - COL_GAP, right) + MARGIN
     top0 = MARGIN + 70
     col_bottom = {c: top0 for c in cols}
     for c in cols:
@@ -572,12 +601,30 @@ def render_edges(nodes, by_id, out):
                 d = f"M{x1},{y1} C{x1+dx},{y1} {x2-dx},{y2} {x2-2},{y2}"
             if kind == "use":
                 attrs = 'stroke="#7d8590" stroke-width="1.4" stroke-dasharray="2 4" fill="none"'
+            elif ln.get("hops"):
+                attrs = ('stroke="#79a8ff" stroke-width="1.5" stroke-dasharray="10 4 2 4" fill="none" '
+                         'marker-end="url(#arrow)"')
             elif kind == "defer":
                 attrs = ('stroke="#c297ff" stroke-width="1.6" stroke-dasharray="8 5" fill="none" '
                          'marker-end="url(#arrow-defer)"')
             else:
                 attrs = 'stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"'
             out.append(f'<path d="{d}" {attrs}/>')
+            if ln.get("hops"):
+                text = "⋯ " + hops_label(ln["hops"])
+                full = " → ".join(h.partition("@")[0].strip() for h in ln["hops"])
+                tw = text_width(text, 11) + 12
+                if tgt["col"] == n["col"]:
+                    # Same column: the midpoint lies on the boxes' edge, so the
+                    # label sits right of the vertical run, clear of both boxes.
+                    lx, ly = xm + 8 + tw / 2, (y1 + y2) / 2 + 2
+                else:
+                    lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6
+                out.append(f'<g class="hops"><title>{escape("거친 함수: " + full)}</title>'
+                           f'<rect x="{lx-tw/2}" y="{ly-12}" width="{tw}" height="17" rx="8" fill="{BOX}" '
+                           f'stroke="#79a8ff" stroke-width="0.9" stroke-dasharray="3 2"/>'
+                           f'<text x="{lx}" y="{ly+1}" text-anchor="middle" font-family="{CODE_FONT}" '
+                           f'font-size="11" fill="#79a8ff">{escape(text)}</text></g>')
             if ln.get("label"):
                 lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6
                 tw = text_width(ln["label"], 11) + 10
@@ -614,6 +661,9 @@ def render_legend(x, y, out):
     cx += 10
     out.append(f'<path d="M{cx},{y-4} h40" stroke="#79a8ff" stroke-width="1.5" marker-end="url(#arrow)"/>')
     cx = label(cx + 48, "호출 (호출 줄은 굵은 기울임, 호출되는 함수는 밑줄)")
+    out.append(f'<path d="M{cx},{y-4} h40" stroke="#79a8ff" stroke-width="1.5" stroke-dasharray="10 4 2 4" '
+               f'marker-end="url(#arrow)"/>')
+    cx = label(cx + 48, "중간 호출 생략 (라벨: 거친 함수)")
     out.append(f'<path d="M{cx},{y-4} h40" stroke="#c297ff" stroke-width="1.6" stroke-dasharray="8 5" '
                f'marker-end="url(#arrow-defer)"/>')
     cx = label(cx + 48, "나중에 실행(클로저 등록)")
