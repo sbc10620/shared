@@ -208,8 +208,9 @@ finding was about. Run it in a read-only subagent.
 
 - **With the `code-review` skill** (decide by the skill list, not by which
   model or agent you are): the subagent MUST run it, at **high** effort in
-  the first round and **medium** from the second round on. Every round
-  covers the whole range; from the second, the prompt points it at what
+  the first round and **medium** from the second round on, including a
+  round reopened by a fix from step 9 or 10. Every round covers the whole
+  range; from the second, the prompt points it at what
   changed this round. (High runs several finder angles for recall; medium
   makes one careful correctness pass and reports only what it believes is
   real.) Pass the focus in the skill's arguments, in one call:
@@ -296,14 +297,17 @@ fixed, from any of the three groups. Do not edit before that.
   problem (naming, duplication, comments, counts) → the implementer fixes
   it; a corrected or added test that now fails means the implementation is
   wrong.
-- Back to step 5 with the affected set of the FIX, then to step 6.
+- Back to step 5 with the affected set of the FIX, then to step 6 unless
+  the round ends the loop (next item).
 - The cycle ends after a round that had nothing to fix, or whose fixes
   touched only docs and tests (doc comments included), with every test
-  passing. "Tests" means test files and test-only code (test modules such as
-  Rust `#[cfg(test)]`, test helpers and fixtures); everything that ships is
-  "the implementation". A round whose fixes touched the implementation is always followed
-  by another review round, even if every finding was minor: a fix can bring
-  its own defect.
+  passing. "Tests" means code built or run only for tests: test files and
+  directories, and test-only blocks inside production files (e.g. Rust
+  `#[cfg(test)]` modules, for which the test agent still returns values
+  only, step 3). Code in the normal build is "the implementation", even when
+  only tests call it. A round whose fixes touched the implementation is
+  always followed by another review round, even if every finding was minor:
+  a fix can bring its own defect.
 
 ## 9. Slow checks after the review loop
 
@@ -325,6 +329,12 @@ On the final HEAD:
   was taken (per-test outcomes: newly failing, disappeared, added);
 - the full e2e from the profile;
 - the profile's pre-PR checklist.
+
+A difference from the baseline the plan does not allow stops the cycle, and
+the user decides, as in step 9. A failure here, or a difference the user
+calls a defect, is fixed and re-checked here (only the affected part), goes
+through the review loop (steps 6 to 8), and then this step runs again on the
+new HEAD.
 
 Report the result. Pushing, opening the PR, and commenting are separate
 instructions; wait for each.
