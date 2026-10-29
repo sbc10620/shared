@@ -33,9 +33,9 @@ lists in `bash -c '...'`.
   the build.
 - e2e: the `argo-e2e` skill (release `argo` with and without `guardrails`
   against a mock LLM). Its two release builds of `argo-cli` are the costliest
-  builds here and share nothing with the other checks; run the phase's
-  suites with `--only <suite>` after the review loop, every spec before the
-  PR. A
+  builds here and share nothing with the other checks; run every spec
+  before the PR (`--only <suite>` runs one suite, e.g. at a milestone's
+  end). A
   spec must use the config format of the branch under test (flat `pii_*`
   keys vs the `[pii]` section); write a branch spec when the shipped ones do
   not fit, and keep it out of the repository.
@@ -53,7 +53,7 @@ lists in `bash -c '...'`.
     a failure to investigate.
   - `scripts/pii_base_vs_head.sh`: the base's and HEAD's detection results
     on one corpus (see Baselines). `keep-base <keepdir>` before the first
-    edit, `compare-kept <keepdir>` after the review loop; `compare
+    edit, `compare-kept <keepdir>` before the PR; `compare
     <base-rev> <workdir>` only when no base was kept or base and HEAD use
     different rule layouts (it checks the base out, so both sides rebuild);
     `dump <workdir> <name>` for the current tree alone, reading
@@ -67,7 +67,7 @@ The tests column gives the arguments only: tinicore tests are
 (without the features the filters match nothing and the build is not the
 one the other checks share).
 
-| changed path | tests (every verification) | extra checks (after the review loop, except `cargo check --workspace`: every verification) | e2e suite (after the review loop) |
+| changed path | tests (every verification) | extra checks (before the PR, except `cargo check --workspace`: every verification) | e2e suite (before the PR) |
 | --- | --- | --- | --- |
 | `tinicore/src/guardrails/pii/countries/*/rules.yaml` (older trees: `pii/config/*.yaml`) | `--test guardrails_filter_test --test guardrails_compile_guard_test`, lib `-- guardrails` | PII base-vs-head comparison when `common`'s rule file changed (not for a country's own YAML file: its spec tests cover it); `detector_vs_regex.sh` when a hand-written type was added or its matching logic changed | PII suites |
 | `tinicore/src/guardrails/pii/handwritten/`, `pii/validators/`, `pii/countries/*/*.rs`, `pii/rules.rs`, `pii/uuid.rs`, `pii/labels.rs` | lib `-- handwritten guardrails`, filter + compile guard tests | PII base-vs-head comparison when a hand-written detector's logic, a shared validator, `rules.rs`, `uuid.rs` or `labels.rs` changed (not a country's own validator or table); `detector_vs_regex.sh` when a detector was converted, added or its matching logic changed | PII suites |
@@ -115,8 +115,7 @@ The moments are the skill's ("When each check runs"). A phase is e.g.
 | --- | --- |
 | before editing (step 2, on the clean commit the phase starts from) | `pii_base_vs_head.sh keep-base` when a path the plan changes asks for the PII base-vs-head comparison (path table); the speed check's bench binaries (same release build) and the memory check's VM binary when the plan names those checks; `test_outcomes_record.sh` on the base when the change may move tests. All of them finish before the first edit: each compiles the tree on disk |
 | every verification (after implementing a commit, after each review fix) | fmt, the clippy lane(s) of the touched crates, the tests column of the table above; `cargo check --workspace --all-targets` when `tinicore-traits` changed |
-| after the review loop (step 9: the loop has ended and the commits are settled) | on ONE release build of HEAD, back to back: `pii_base_vs_head.sh compare-kept` when the path table asks for the PII base-vs-head comparison; `detector_vs_regex.sh` when the phase converted a regex to a hand-written detector, added hand-written detectors (a new country's included) or changed a detector's matching logic (shape, boundaries, separators); the speed check when the plan names it. Then the e2e suites of the behaviour the phase changed, and the memory check when the plan names it |
-| before the PR (once, on the final HEAD) | the Pre-PR checklist: full suites (last), every e2e spec, the Core audits |
+| before the PR (step 9: once the review loop has ended, on the final HEAD) | first, on ONE release build of HEAD, back to back: `pii_base_vs_head.sh compare-kept` when the path table asks for the PII base-vs-head comparison; `detector_vs_regex.sh` when the phase converted a regex to a hand-written detector, added hand-written detectors (a new country's included) or changed a detector's matching logic (shape, boundaries, separators); the speed check when the plan names it. Then the e2e suites of the behaviour the phase changed, and the memory check when the plan names it; then the Pre-PR checklist: full suites (last), every e2e spec, the Core audits |
 
 ## Speed check (PII detectors and engine)
 
@@ -125,7 +124,7 @@ how to run it.
 
 No path triggers it: the plan names it for a commit that can change scan
 speed (the scan path, a detector, the engine, a validator), or the user
-asks. It is reported once, after the review loop (every commit made and
+asks. It is reported once, before the PR (every commit made and
 the review loop over), next to the base; the user decides what to do with
 it. It does not stop the cycle.
 
@@ -155,7 +154,7 @@ it. It does not stop the cycle.
 No path triggers it: the plan names it for a commit that can change the
 guardrails' memory (engine building or residency, pinning, the compiled
 rule set, scan caches and vaults, anything kept across turns), or the user
-asks. It is reported once, after the review loop (every commit made and
+asks. It is reported once, before the PR (every commit made and
 the review loop over), next to the base; the user decides what to do with
 it. It does not stop the cycle.
 
@@ -231,7 +230,7 @@ it. It does not stop the cycle.
   covered by their spec tests instead.
   `scripts/pii_base_vs_head.sh keep-base <keepdir>` NOW, on the clean
   commit the phase starts from: it keeps the release dump binary, its
-  commit, its rule layout and the dump tool's hash. After the review loop
+  commit, its rule layout and the dump tool's hash. Before the PR
   `compare-kept <keepdir>` extracts the corpus from HEAD, builds HEAD's
   binary, runs both and diffs, with no checkout. Without a kept base,
   `compare <base-rev> <workdir>` checks the base out instead (both sides

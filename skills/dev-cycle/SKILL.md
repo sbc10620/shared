@@ -1,6 +1,6 @@
 ---
 name: dev-cycle
-description: "Run a code change through the development cycle that ends in a PR: the first plan reviewed once by a read-only subagent before user feedback; for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range (the code-review skill at high effort for the first round, medium after that), fix, and repeat until a round's fixes touch only docs and tests or there is nothing to fix; slow checks after the review loop, then the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
+description: "Run a code change through the development cycle that ends in a PR: the first plan reviewed once by a read-only subagent before user feedback; for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range (the code-review skill at high effort for the first round, medium after that), fix, and repeat until a round's fixes touch only docs and tests or there is nothing to fix; then, once before the PR, the slow checks, the full suites and the full e2e. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
 user-invocable: true
 ---
 
@@ -21,8 +21,7 @@ once every planned commit exists:
         └── verify what the fix affects ◄── fix the chosen findings (amend into their commits)
   ends after a round whose fixes touch only docs and tests, or that has nothing to fix
 
-after the review loop: the slow checks the profile defers to it
-then, once, before the PR: full suites + full e2e on the final HEAD
+once, before the PR: slow checks + full suites + full e2e on the final HEAD
 ```
 
 Running everything on every verification is wasted time: a cold full test
@@ -42,7 +41,7 @@ agent definitions.
 
 | Role | Step | Given | Never given / never does |
 | --- | --- | --- | --- |
-| Orchestrator (the implementer) | 4, 5, 8 | Everything; implements and fixes to the design principles | — |
+| Orchestrator (the implementer) | every step not run by a helper below | Everything; implements and fixes to the design principles | — |
 | Plan reviewer | 2 | The plan, the repository, the user's decisions, the profile's path table, the design principles | A draft implementation; edits |
 | Test agent | 3 | The spec for this commit, the user's decisions that override it, the test conventions | The implementation; test cases the orchestrator picked |
 | Reviewer | 6 | The range, this round's changes, earlier findings and decisions ("do not re-argue"), what was verified, the design principles | Edits |
@@ -55,15 +54,14 @@ agent definitions.
 
 ## When each check runs
 
-Every check belongs to one of four moments; the profile assigns them (see
+Every check belongs to one of three moments; the profile assigns them (see
 `references/profile-guide.md` when there is no profile).
 
 | moment | what runs |
 | --- | --- |
 | before editing (step 2): on the commit the change starts from | the baselines and kept base binaries the profile or the plan asks for |
 | every verification: after implementing a commit (step 4), after each review fix (step 8) | the fast checks of step 5, for the affected set |
-| after the review loop (step 9): the loop has ended and the commits are settled | the slow checks the profile defers here (regression comparisons, e2e suites, performance measurements) |
-| before the PR (step 10): once, on the final HEAD | the full test suites (compared with the baseline), the full e2e, the pre-PR checklist |
+| before the PR (step 9): once the review loop has ended, on the final HEAD | the slow checks the profile defers here (regression comparisons, performance measurements), the full test suites (compared with the baseline), the full e2e, the pre-PR checklist |
 
 A check the profile assigns no moment runs only when the plan names it or
 the user asks. A check that compares before and after compares the base
@@ -72,11 +70,12 @@ down commit by commit. At one moment, run the checks that share a build
 back to back, narrower before wider (the profile lists the groups).
 
 A large plan can be split into milestones: intermediate points, each ending
-in settled commits. The review loop and step 9 run once per milestone.
-Step 10 runs per milestone when each milestone gets its own PR, and once at
-the end when the milestones go into one PR. "The phase" in this document is
-the one plan, or the one milestone, being worked on. The review loop never
-waits for the slow checks.
+in settled commits. The review loop runs once per milestone. Step 9 runs
+per milestone when each milestone gets its own PR, and once at the end when
+the milestones go into one PR; in the latter case the slow checks may also
+be run at the end of a milestone, to find a problem earlier. "The phase" in
+this document is the one plan, or the one milestone, being worked on. The
+review loop never waits for the slow checks.
 
 "Round" means one pass of the review loop (steps 6 to 8), never a
 verification.
@@ -169,7 +168,7 @@ Fix what you find now; a structural problem the review finds costs a round.
 Work out the affected set from the changed paths
 (`git diff --name-only <base>...HEAD` plus the working tree) and the
 profile's path table. Run, in order, what belongs to this moment (checks
-deferred to after the review loop or to the PR are not run here):
+deferred to the PR are not run here):
 
 1. formatter and linter in the profile's configurations;
 2. the project's audit / policy scripts, if any;
@@ -209,7 +208,7 @@ finding was about. Run it in a read-only subagent.
 - **With the `code-review` skill** (decide by the skill list, not by which
   model or agent you are): the subagent MUST run it, at **high** effort in
   the first round and **medium** from the second round on, including a
-  round reopened by a fix from step 9 or 10. Every round covers the whole
+  round reopened by a fix from step 9. Every round covers the whole
   range; from the second, the prompt points it at what
   changed this round. (High runs several finder angles for recall; medium
   makes one careful correctness pass and reports only what it believes is
@@ -276,8 +275,9 @@ fixed, from any of the three groups. Do not edit before that.
 - Fix the chosen findings and amend each fix into the commit it belongs to
   right away (`git commit --amend` when it is HEAD, otherwise
   `git commit --fixup=<commit>` immediately followed by
-  `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <commit>^`, which runs
-  without an editor). Do not leave `fixup!` commits standing
+  `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <commit>^`; it runs
+  without an editor, so it is not interactive and is allowed where
+  interactive git commands are not). Do not leave `fixup!` commits standing
   between rounds. A new commit only when no existing commit is the fix's
   home.
 - Before amending, check the structure the fix adds or extends against
@@ -309,32 +309,29 @@ fixed, from any of the three groups. Do not edit before that.
   always followed by another review round, even if every finding was minor:
   a fix can bring its own defect.
 
-## 9. Slow checks after the review loop
+## 9. Before the PR (once)
 
-Once the review loop has ended and the commits are settled, run the slow
-checks the profile defers to this moment (regression comparisons, e2e
-suites, performance measurements), for what the phase changed, before
-step 10. A difference the plan does not allow (a regression comparison,
-a performance measurement) stops the cycle: report it and let the user
-decide whether it is a defect to fix or a behaviour the plan should allow.
-A failure here, or a difference the user calls a defect, is fixed and
-re-checked here (only the affected part), then the fix goes through the
-review loop (steps 6 to 8) like any other fix.
+Once the review loop has ended and the commits are settled, on the final
+HEAD:
 
-## 10. Before the PR (once)
-
-On the final HEAD:
-
+- the slow checks the profile defers to this moment (regression
+  comparisons, performance measurements), for what the phase changed;
 - the full test suites from the profile, compared with the baseline if one
   was taken (per-test outcomes: newly failing, disappeared, added);
 - the full e2e from the profile;
 - the profile's pre-PR checklist.
 
-A difference from the baseline the plan does not allow stops the cycle, and
-the user decides, as in step 9. A failure here, or a difference the user
-calls a defect, is fixed and re-checked here (only the affected part), goes
-through the review loop (steps 6 to 8), and then this step runs again on the
-new HEAD.
+- A test that passed on the base and now fails is a failure: find the cause
+  and fix it (a failure that also happens on the base, or a flaky test that
+  passes on a rerun, is reported, not fixed).
+- A difference the plan does not allow (a regression comparison, a
+  performance measurement, a test that disappeared or appeared) stops the
+  cycle: report it and let the user decide whether it is a defect to fix or
+  a behaviour to allow. An allowed difference is written into the plan's
+  allowed differences, so it is not raised again.
+- A failure, or a difference the user calls a defect, is fixed and
+  re-checked here (only the affected part), goes through the review loop
+  (steps 6 to 8), and then this step runs again on the new HEAD.
 
 Report the result. Pushing, opening the PR, and commenting are separate
 instructions; wait for each.
@@ -343,7 +340,7 @@ After a history rewrite (squash, rebase, reword), verify the final HEAD
 only, not each commit. A rewrite that leaves the tree identical
 (`git diff --quiet <old> <new>`) needs no re-run.
 
-## 11. Grow the profile
+## 10. Grow the profile
 
 When the cycle ran without a profile, found a profile wrong or incomplete,
 or adapted one of its tools, follow "Changing a profile" in

@@ -12,7 +12,7 @@ wrong or incomplete, or when a profile tool had to be adapted for a branch.
 Discover from the repository: its `AGENTS.md` / `CLAUDE.md`, CI workflow
 files, `Cargo.toml` / `package.json` / `Makefile` test targets, and any e2e
 skill named for the project. Note what you used; at the end of the cycle
-(step 11) it becomes a profile draft.
+(step 10) it becomes a profile draft.
 
 ## What a profile holds
 
@@ -32,7 +32,7 @@ skill named for the project. Note what you used; at the end of the cycle
 | group (what must match to share the build) | checks | cost |   (cheapest first; coarse units, not minutes)
 
 ## When each check runs
-| when | checks |   (before editing / every verification / after the review loop / before the PR)
+| when | checks |   (before editing / every verification / before the PR)
 
 ## Tests: where they live, who writes them
 - where new behaviour's tests go (files, tables), and whether unit tests sit
@@ -47,8 +47,7 @@ skill named for the project. Note what you used; at the end of the cycle
 
 - Fast checks (formatter, linter, the touched modules' tests) belong to
   every verification. Anything that needs a release build, a whole-suite
-  run or a base-vs-head comparison belongs after the review loop or before
-  the PR.
+  run or a base-vs-head comparison belongs before the PR.
 - A check given no moment runs only when a plan names it or the user asks.
 - A check that compares before and after needs its base built before the
   first edit (step 2) and kept outside the target directory, so that at the
