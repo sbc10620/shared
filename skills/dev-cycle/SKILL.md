@@ -1,6 +1,6 @@
 ---
 name: dev-cycle
-description: "Run a code change through the development cycle that ends in a PR: the first plan reviewed once by a read-only subagent before user feedback; for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range with /code-review, fix, and repeat until the review asks for no change or only doc changes; slow checks at the end of the phase, then the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
+description: "Run a code change through the development cycle that ends in a PR: the first plan reviewed once by a read-only subagent before user feedback; for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range (the code-review skill at high effort for the first round, medium after that), fix, and repeat until a round's fixes touch only docs and tests or there is nothing to fix; slow checks after the review loop, then the full suites and the full e2e once before the PR. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
 user-invocable: true
 ---
 
@@ -12,251 +12,164 @@ One loop for every code change that will become a PR:
 plan ─► plan review (read-only subagent, once) ─► user feedback ─► agreed plan
 
 for each planned commit:
-  spec ─► tests from the spec (separate agent) ─► implement ─► verify what it affects ─► commit
+  spec ─► tests from the spec (separate agent) ─► implement ─► verify what this change affects ─► commit
 
 once every planned commit exists:
-  /code-review over the whole range ─► report, wait for decisions
+  review the whole range in a read-only subagent ─► report, wait for decisions
+  (code-review skill: high in round 1, medium from round 2; no skill: by hand)
         ▲                                         │
-        └── verify the fix ◄── fix the chosen findings (amend into their commits)
-  ends when a review round asks for no change, only doc changes, or only
-  spec-derived test rows that pass
+        └── verify what the fix affects ◄── fix the chosen findings (amend into their commits)
+  ends after a round whose fixes touch only docs and tests, or that has nothing to fix
 
-end of the phase: the slow checks the profile defers to it
+after the review loop: the slow checks the profile defers to it
 then, once, before the PR: full suites + full e2e on the final HEAD
 ```
 
 Running everything on every verification is wasted time: a cold full test
-suite or a release e2e build is the costliest work in the cycle, and a fix to
-one module cannot break another module's tests. The full run happens once, on the commit that will be
-reviewed.
+suite or a release e2e build is the costliest work in the cycle, and a fix
+to one module cannot break another module's tests. The full run happens
+once, on the commit that will be reviewed.
 
-This document is Claude-facing and stays in English. Reports to the user are in
-the user's language.
+This document is Claude-facing and stays in English; reports to the user
+are in the user's language. Two files beside it are read when a step says
+so: `references/design-principles.md` and `references/profile-guide.md`.
 
-## Roles and prompts
+## Roles
 
-The one running this skill is the **orchestrator**: it implements, and it
-writes the prompt for every helper agent from the plan. There are no fixed
-agent definitions; each prompt has two parts.
+The one running this skill is the **orchestrator**: it implements, runs the
+checks, and writes every helper's prompt from the plan. There are no fixed
+agent definitions.
 
-| Role | Always in the prompt | Chosen from the plan for this call |
-| --- | --- | --- |
-| Plan reviewer (step 1) | Read-only; the plan and the repository, never a draft implementation; report only, change nothing; the "Design principles" section | The plan, the user's request and decisions so far, the profile's path table |
-| Test agent (step 1a) | Spec only, never the implementation; edit test files only, or return values as a list when tests live inside implementation files; a spec that contradicts itself, or an example that fails its own rule, is reported, not fixed | The spec for this commit's scope (the design doc's sections, shapes, rules, labels, layers), the user's decisions that override the doc, where the tests go |
-| Reviewer (step 3) | Read-only; the required method (step 3) and the method on the first line; the "Design principles" section; earlier rounds' decisions are not re-argued | The range, what changed this round, earlier findings and their decisions, the user's decisions, what was already verified |
+| Role | Step | Given | Never given / never does |
+| --- | --- | --- | --- |
+| Orchestrator (the implementer) | 4, 5, 8 | Everything; implements and fixes to the design principles | — |
+| Plan reviewer | 2 | The plan, the repository, the user's decisions, the profile's path table, the design principles | A draft implementation; edits |
+| Test agent | 3 | The spec for this commit, the user's decisions that override it, the test conventions | The implementation; test cases the orchestrator picked |
+| Reviewer | 6 | The range, this round's changes, earlier findings and decisions ("do not re-argue"), what was verified, the design principles | Edits |
 
-- Never pass the test agent the implementation, nor test cases the
-  orchestrator picked itself: both bring the implementer's view back in.
-- Never write a "do it yourself if the skill is missing" fallback into a
-  reviewer prompt (step 3).
+- The orchestrator picks the review method from its skill list and names it
+  in the reviewer prompt. A manual review in place of an available skill is
+  allowed only when the skill fails to run (step 6).
 - When reporting a helper's result, say in a line or two what it was given.
   Show the full prompt only when the user asks.
 
 ## When each check runs
 
-Every check belongs to one of four moments. The profile assigns its checks
-to them; without a profile, put fast checks (formatter, linter, the touched
-modules' tests) in every verification, and anything that needs a release
-build, a whole-suite run or a base-vs-head comparison at the end of the
-phase or before the PR.
+Every check belongs to one of four moments; the profile assigns them (see
+`references/profile-guide.md` when there is no profile).
 
 | moment | what runs |
 | --- | --- |
-| before editing: step 1, on the commit the change starts from | the baselines and kept base binaries the profile or the plan asks for |
-| every verification: after implementing a commit, after each review fix | the fast checks of step 2, for the affected set |
-| end of the phase: the review loop has ended and the commits are settled | the slow checks the profile defers here (regression comparisons, e2e suites, performance measurements) |
-| before the PR: once, on the final HEAD | step 6 |
+| before editing (step 2): on the commit the change starts from | the baselines and kept base binaries the profile or the plan asks for |
+| every verification: after implementing a commit (step 4), after each review fix (step 8) | the fast checks of step 5, for the affected set |
+| after the review loop (step 9): the loop has ended and the commits are settled | the slow checks the profile defers here (regression comparisons, e2e suites, performance measurements) |
+| before the PR (step 10): once, on the final HEAD | the full test suites (compared with the baseline), the full e2e, the pre-PR checklist |
 
-A phase is one unit of work that ends in settled commits: the commits of one
-plan, or one milestone of a longer plan. A failure found at the end of the
-phase is fixed and re-checked there (only the affected part), then goes
-through the review loop like any other fix. The review loop never waits for
-the slow checks.
+A check the profile assigns no moment runs only when the plan names it or
+the user asks. A check that compares before and after compares the base
+with HEAD once; only a difference the plan does not explain is narrowed
+down commit by commit. At one moment, run the checks that share a build
+back to back, narrower before wider (the profile lists the groups).
 
-A check the profile assigns no moment runs only when it is called for: the
-plan names it for the commits that need it, or the user asks. The plan
-reviewer (step 1) checks that the plan names such a check where the change
-needs it.
+A large plan can be split into milestones: intermediate points, each ending
+in settled commits. The review loop and step 9 run once per milestone.
+Step 10 runs per milestone when each milestone gets its own PR, and once at
+the end when the milestones go into one PR. "The phase" in this document is
+the one plan, or the one milestone, being worked on. The review loop never
+waits for the slow checks.
 
-"Round" in this document means one pass of the review loop (step 3 to
-step 5), never a verification.
+"Round" means one pass of the review loop (steps 6 to 8), never a
+verification.
 
-A check that compares before and after (a regression comparison, a test
-outcome comparison, a performance measurement) compares the base with HEAD
-once. When every difference is one the plan explains, it is done. Only an
-unexplained difference is narrowed down commit by commit, to find the
-commit that made it. When such a check needs a base build, build the base
-binaries before the first edit (step 1) and keep them outside the target
-directory; at the end only HEAD is built. Checking the base out later
-rebuilds both sides and changes the tree under any other running check.
-
-Checks share a build only when the compiled library is the same: the
-package, check vs codegen, the build profile and the feature set. At one moment, run
-the checks that share a build back to back so the build happens once, and
-run a wider check (a full suite) after the narrower ones whose builds it
-reuses. The profile lists its groups of checks that share a build, ordered
-from the cheapest to the costliest.
-
-## When the review runs
-
-The review covers the whole change, not each commit on its own. A change
-planned as several commits goes through steps 1a and 2 commit by commit, and
-each commit is made as soon as its checks pass. Step 3 starts once every
-planned commit exists and reviews `<base>..HEAD` in one pass. Fixes go into
-the commit they belong to (step 5), and every later round reviews the whole
-range again. A change of one commit is the same loop with a range of one.
-
-Reviewing after each commit is not wrong, just slower: a later commit often
-changes what an earlier finding was about. Do it only when the user asks.
-
-## Design principles (plan review and code review)
-
-Both reviewers (step 1 and step 3) check the change's structure against the
-list below, besides correctness. The list is language-neutral: it holds for
-object-oriented, functional and multi-paradigm code alike. Read "module" as
-whatever unit the language groups code by (class, module, package, crate,
-file), and "interface" as whatever it abstracts behaviour with (interface,
-trait, protocol, abstract class, function type, closure). The `code-review`
-skill does not carry this list, so the orchestrator puts it in both reviewer
-prompts, and the step-3 reviewer hands it on in the skill's arguments
-(step 3).
-
-Scope: judge only what the change adds or changes, plus existing structure
-the change extends (a new entry in an existing global table extends that
-table). A principle the untouched code already breaks is out of scope.
-
-Each item: what to look for, then the usual fix.
-
-**SOLID, stated without classes**
-
-| Principle | Look for | Usual fix |
-| --- | --- | --- |
-| Single responsibility | One module or function that changes for two unrelated reasons (parsing and policy, scanning and reporting) | Split along the reason to change |
-| Open/closed | Adding a case (a country, a provider, a rule) means editing a central list or `switch` in code that is otherwise generic | Let the case register itself, or pass the cases in; an exhaustive `match` the compiler checks is acceptable when it is the ONE mapping place |
-| Liskov substitution | An implementation of an interface that rejects inputs, panics or ignores calls the interface allows; a caller that checks which implementation it got | Make the implementation honour the contract, or narrow the interface |
-| Interface segregation | A caller forced to provide or depend on members it never uses (dummy closures, `unimplemented!()`, no-op callbacks) | Split the interface |
-| Dependency inversion | A generic, lower-level component (an engine, a store, a transport) that names a specific consumer's concept (a domain type, a product rule, a data format only one caller uses) | The generic component depends on an abstraction (an interface, a function parameter); the consumer supplies the concrete behaviour |
-
-**Dependencies and state**
-
-| Principle | Look for | Usual fix |
-| --- | --- | --- |
-| Explicit dependencies (dependency injection) | Code that reaches a process-wide registry, global table, singleton or environment variable to find what it needs, where the caller already knows it | Pass it in: an argument, a constructor field, a closure that captures it |
-| Least privilege / least knowledge | A component that can see more than its job needs (every country's table when two are selected; a whole config when it reads one key); a chain of reaches through other objects' internals | Hand it only the subset it uses |
-| Mechanism vs policy | A reusable mechanism with a hard-coded decision that belongs to one user of it | Keep the mechanism generic; take the decision as a parameter or hook |
-| No boolean flag parameters | A `bool` (or mode enum) that makes the callee branch on the caller's situation | Pass the behaviour itself (a function, a strategy value), or split into two functions |
-| Global mutable state | New process-wide mutable state, or new readers of it | Prefer values passed down; if it must exist, one owner, set once, documented |
-
-**Make mistakes impossible, or loud**
-
-| Principle | Look for | Usual fix |
-| --- | --- | --- |
-| Illegal states unrepresentable | An invariant kept only by a naming convention, a comment or a test (unique names across tables, "always set together") | Encode it in types or construction: a constructor that refuses duplicates, a required field, an exhaustive `match` |
-| Fail fast | A misconfiguration that is logged and skipped, or silently resolved to a default, where a build or boot error would be safe | Refuse at build or boot time; keep fail-open only where a documented decision says so |
-| Explicit over implicit | Behaviour inferred from something incidental (a name prefix, list order, the first match in a search) when an explicit value is available | Use the explicit value; if inference stays, test the rule it relies on |
-| Consistency / least astonishment | A module laid out, named or wired differently from its siblings without a reason | Match the siblings, or state the reason in a comment |
-
-Reporting: a design finding names the principle and the concrete code
-(`file:line`), and says what the fix would change for a caller. Without a
-runtime effect it is labelled "사실이지만 동작 영향 없음" in step 4, with
-"설계:" leading its 지적 cell, so the user can pick it out; with a runtime
-effect (a wrong lookup, a skipped guard) it is "고칠 결함" like any other
-defect. Do not report a principle in the abstract, nor one the user already
-decided against (it goes in the "do not re-argue" list).
-
-## 0. Find the project profile
+## 1. Find the project profile
 
 ```bash
 repo=$(basename -s .git "$(git remote get-url origin 2>/dev/null)")
 ```
 
-Read `profiles/$repo.md` in this skill's directory. Keyed by the remote's
-repository name, not the directory, so every worktree of one repository shares
-one profile. A profile says, per step, which commands to run and which changed
-paths call for which tests, extra regression checks and e2e suites.
+Read `profiles/$repo.md` in this skill's directory. The file always lives
+there, never in the repository: the repository only supplies the name, its
+`origin` remote's repository name, so every worktree of one repository
+shares one profile. No profile → follow "Without a profile" in
+`references/profile-guide.md`.
 
-No profile → discover from the repository: its `AGENTS.md` / `CLAUDE.md`, CI
-workflow files, `Cargo.toml` / `package.json` / `Makefile` test targets, and
-any e2e skill named for the project. Note what you used; step 7 turns it into a
-profile.
-
-## 1. Before the first edit
+## 2. Before the first edit
 
 - Agree on the plan first; this skill does not replace planning.
-- Have the first complete plan reviewed once, by a read-only subagent, before
-  showing it to the user for feedback. The reviewer checks:
+- Have the first complete plan reviewed once, by a read-only subagent,
+  before showing it to the user. The reviewer checks:
   - facts: every file, function, line, call site and config value the plan
     names exists and says what the plan claims;
   - the spec: each commit's spec is concrete enough for the test agent to
     fix expected values, and does not contradict itself;
-  - the commits: order and dependencies, and the allowed regression
-    differences of each;
+  - the commits: order, dependencies, and the regression differences each
+    may cause;
   - verification: each commit's changed paths get the checks the profile
-    ties to them;
-  - the repository's own rules (`AGENTS.md`, `CLAUDE.md`) and risks the plan
-    misses;
-  - the design: the structure the plan proposes, against "Design principles"
-    (a new global table, a flag where a function would do, an invariant left
-    to a convention). Cheapest to change here, before any code exists.
+    ties to them, and a check the profile assigns no moment is named where
+    the change needs it;
+  - the repository's own rules (`AGENTS.md`, `CLAUDE.md`) and risks the
+    plan misses;
+  - the design, against `references/design-principles.md` (a new global
+    table, a flag where a function would do, an invariant left to a
+    convention). Cheapest to change here, before any code exists.
 
-  Check every finding against the code, as in step 3, then show the plan with
-  the findings: fold in the ones that hold, and list the ones left out with
-  the reason. A plan revised from the user's feedback is not reviewed again.
-- If the profile asks for a baseline (a regression comparison, recorded test
-  outcomes, base binaries kept for a comparison or a measurement the plan
-  names), take it NOW, on the commit the change starts from, and let every
-  baseline build and run finish before the first edit: each compiles the
-  tree on disk. A baseline taken after editing compares the change with
-  itself.
+  Check every finding against the code, as in step 6, then show the plan
+  with the findings: fold in the ones that hold, list the others with the
+  reason. A plan revised from the user's feedback is not reviewed again.
+- Take the baselines the profile or the plan asks for NOW, on the commit the
+  change starts from (regression comparisons, recorded test outcomes, base
+  binaries kept outside the target directory), and let every baseline build
+  and run finish before the first edit: each compiles the tree on disk. A
+  baseline taken after editing compares the change with itself.
 - Never use a bare `git stash` (the stash is shared across worktrees). Set
   work aside with a temporary commit.
 
-## 1a. Tests first, from the spec, by a separate agent
+## 3. Tests first, from the spec, by a separate agent
 
 A test written by whoever writes the code tends to follow the code rather
 than the intent. So the expected values of NEW behaviour are fixed first,
 by another agent that sees only the spec.
 
-- **Spec** means what the change is meant to do, written down: the plan, a
+- **Spec**: what the change is meant to do, written down: the plan, a
   design document, an issue, or for a bug fix the reproducing input and the
   correct result.
 - Give the test agent the spec and the project's test conventions (the
-  profile says where tests live). Never the implementation, nor a draft of
-  it.
-- What it writes, by where the tests live (the profile says which applies):
-  - tests in their own files (integration tests; unit tests in languages
-    that keep them apart, e.g. `*.test.ts`, `test_*.py`, `*_test.go`): it
-    writes them directly, touching test files only;
-  - tests inside implementation files (e.g. Rust `#[cfg(test)]` modules):
-    it does not open the file; it returns the expected values as a list
-    (input, expected result, the spec text it comes from), and the
-    implementer inserts them unchanged.
+  profile says where tests live), never the implementation or a draft of it.
+- Tests in their own files (integration tests; unit tests in languages that
+  keep them apart, e.g. `*.test.ts`, `test_*.py`, `*_test.go`): the agent
+  writes them, touching test files only. Tests inside implementation files
+  (e.g. Rust `#[cfg(test)]` modules): it does not open the file; it returns
+  the expected values as a list (input, expected result, the spec text it
+  comes from), and the implementer inserts them unchanged.
 - New tests failing at this point is expected.
-- Who runs it: Claude runs it as a subagent; other agents use a separate
-  session; or the user writes the tests.
-- Not this agent's job: tests that check the implementation's own design
-  (helpers, offsets, internal structure) and structural edits that follow
-  the code (counts, sample lists, keeping existing rows). The implementer
-  writes those.
-- Do not run the test agent and the implementation at the same time in one
-  worktree.
-- Skip this step, and say so in the report, when there is no spec to derive
-  expectations from (a refactor or a performance change: there "behaviour
-  unchanged" is shown by the existing tests and the regression checks) or
-  the change is trivial (a typo, one config value).
+- Claude runs the agent as a subagent; other agents use a separate session,
+  or the user writes the tests. Never run it and the implementation at the
+  same time in one worktree.
+- Not this agent's job: tests of the implementation's own design (helpers,
+  offsets, internal structure) and structural edits that follow the code
+  (counts, sample lists). The implementer writes those.
+- Skip this step, and say so, when there is no spec to derive expectations
+  from (a refactor or a performance change: "behaviour unchanged" is shown
+  by the existing tests and the regression checks) or the change is trivial
+  (a typo, one config value).
 
-Then implement until those tests pass. When a test and the implementation
-disagree, change neither on your own: report the test, the spec text it came
-from, and what the code does, and let the user decide. Bending a test to the
-code is the bias this step exists to remove.
+## 4. Implement
 
-## 2. Verify what the change affects
+Implement until the step-3 tests pass. When a test and the implementation
+disagree, change neither on your own: report the test, the spec text it
+came from, and what the code does, and let the user decide. Bending a test
+to the code is the bias step 3 exists to remove.
+
+Before committing, read `references/design-principles.md` and check the
+structure the commit adds or extends against it, as the reviewers will.
+Fix what you find now; a structural problem the review finds costs a round.
+
+## 5. Verify what each change affects, before every commit and after every fix
 
 Work out the affected set from the changed paths
-(`git diff --name-only <base>...HEAD` plus the working tree) and the profile's
-path table. Run, in order, the checks that belong to this moment (see "When
-each check runs"); a check the profile defers to the end of the phase or to
-the PR is not run here:
+(`git diff --name-only <base>...HEAD` plus the working tree) and the
+profile's path table. Run, in order, what belongs to this moment (checks
+deferred to after the review loop or to the PR are not run here):
 
 1. formatter and linter in the profile's configurations;
 2. the project's audit / policy scripts, if any;
@@ -264,87 +177,75 @@ the PR is not run here:
 4. extra regression checks the profile ties to these paths;
 5. the e2e cases for the behaviour the change touches (one suite, not all).
 
-A step the project cannot run (no e2e, no linter) is skipped, and the report
-says so in one line: what was skipped, and what it would have covered. Never
-skip silently. Do not build a new e2e harness on the fly; propose one instead.
+- A step the project cannot run (no e2e, no linter) is skipped, and the
+  report says so in one line: what was skipped, and what it would have
+  covered. Never skip silently. Do not build a new e2e harness on the fly;
+  propose one instead.
+- A profile tool that does not fit the branch under test is adapted in a
+  scratch copy, never in the profile or the repository; the note says what
+  was adapted and why (`references/profile-guide.md` says what happens to
+  it when the cycle ends).
+- A failing check stops the cycle until its cause is found and fixed; that
+  is the orchestrator's work, not a wait for the user. A test expectation
+  is changed only when the change intends it, and the report names each one.
 
-A profile tool that does not fit the branch under test (it calls an API the
-branch or the base lacks, or expects a file layout the tree does not have)
-is adapted in a scratch copy for this change, never in the profile and
-never in the repository. The verification note says what was adapted and
-why.
-
-When the cycle ends, judge each adaptation: would the profile's tool be
-better off working this way on every branch (a layout or API difference
-that will recur, not a one-off workaround)? If so, propose folding it into
-the profile's tool so that one tool serves both, together with the profile
-text that describes the tool. Once the user agrees, change the tool, update
-the profile, and sync the shared copy (step 7). A one-off adaptation stays
-in scratch and is not carried forward.
-
-A failing check stops the cycle until its cause is found and fixed; that is
-the orchestrator's work, not a wait for the user. A test expectation is
-changed only when the change intends it, and the report names each one.
-
-Report each verification as a progress note and keep going: once a commit's
-checks pass, move on to the next planned commit, and after the last one, to
-the review (step 3). The note carries:
-
-- the result lines as the tools printed them (e.g. `test result: ok. 364
-  passed; 0 failed`) and the name of every failing test;
-- every edit to a spec-derived test since the test agent wrote it, as a diff
-  with its reason, or "no test edits".
+Report each verification as a progress note and keep going: to the next
+planned commit, and after the last one, to the review (step 6). The note
+carries the result lines as the tools printed them (e.g. `test result: ok.
+364 passed; 0 failed`), the name of every failing test, and every edit to a
+spec-derived test since the test agent wrote it (a diff with its reason, or
+"no test edits").
 
 Before the review, stop and wait for the user only when a spec-derived test
-and the implementation disagree (step 1a), or a regression comparison shows
+and the implementation disagree (step 4), or a regression comparison shows
 a difference the plan does not allow.
 
-## 3. Review
+## 6. Review
 
-Run the review in a subagent, read-only, over the change (`<base>..HEAD`):
+The review covers the whole change (`<base>..HEAD`), never each commit on
+its own, unless the user asks: a later commit often changes what an earlier
+finding was about. Run it in a read-only subagent.
 
-- **Claude (Claude Code):** the subagent MUST run the `code-review` skill at
-  high effort. No substitute review: if the skill cannot be run, the subagent
-  stops and reports that, and the round is repeated once it can. A fixup that
-  looks small is not a reason to skip the skill. Do not write an "if the skill
-  is unavailable, review it yourself" fallback into the prompt; a subagent
-  reads it as permission.
-- **Other agents** (no `code-review` skill): review the range by hand for
-  correctness, edge cases, regressions, consistency between code, config,
-  tests and docs, and the repository's own rules.
+- **With the `code-review` skill** (decide by the skill list, not by which
+  model or agent you are): the subagent MUST run it, at **high** effort in
+  the first round and **medium** from the second round on. Every round
+  covers the whole range; from the second, the prompt points it at what
+  changed this round. (High runs several finder angles for recall; medium
+  makes one careful correctness pass and reports only what it believes is
+  real.) Pass the focus in the skill's arguments, in one call:
+  `<level> <base>..HEAD — Report findings only, no edits.` then one line per
+  item of `references/design-principles.md` (the principle and its "Look
+  for" cell), the earlier rounds' findings and decisions, and the user's
+  guiding rules; the skill does not know the list otherwise. If the skill
+  fails to run, the subagent reviews the range by hand in the same pass and
+  says so on its first line ("manual review — code-review skill failed:
+  <reason>"); the orchestrator passes that on in its report. A fixup that
+  looks small is no reason to skip the skill.
+- **Without the skill:** review the range by hand for correctness, edge
+  cases, regressions, consistency between code, config, tests and docs, the
+  repository's own rules, and the design principles, in the same pass.
 
-Design principles are checked in the same pass, never by a separate agent
-or a second review (that doubles the tokens for one range):
-
-- **`code-review` skill:** the subagent passes the focus through the skill's
-  arguments, in one call:
-  `high <base>..HEAD — Report findings only, no edits.` then the "Design
-  principles" items (principle name and its "Look for" cell, one line each),
-  the earlier rounds' findings and decisions, and the user's guiding rules.
-  The skill does not know the list otherwise.
-- **Manual review:** the same list is part of what is reviewed by hand.
-
-Either way, the report's first line states the method actually used
-("code-review skill, high" / "manual review"). A report without that line,
-or with a different method than required, is rerun, not used.
+Design principles are never checked by a separate agent or a second review
+(that doubles the tokens for one range). The report's first line states the
+method actually used ("code-review skill, high", "code-review skill,
+medium" or "manual review"); a report without it, or with another method
+than required and no reason given, is rerun, not used.
 
 From the second round on, the prompt carries the earlier rounds' findings
 with their decisions, and the decisions already made, marked "do not
-re-argue".
-
-A fix that changes behaviour gets its expected values the step-1a way when
-the spec covers the case: from the test agent, not from the implementer.
+re-argue". A fix that changes behaviour the spec covers gets its expected
+values from the test agent (step 3), not from the implementer.
 
 Then check every finding against the code before reporting it:
 
 - "X derives from Y" → follow the binding to its source.
 - "call sites are A, B, C" → search the name across the workspace and count.
-- a race or ordering claim → write the sequence down statement by statement and
-  decide from it, not from how likely it sounds.
-- the reviewer's tone ("blocking", "likely bug") is not evidence; only what the
-  code does is.
+- a race or ordering claim → write the sequence down statement by statement
+  and decide from it, not from how likely it sounds.
+- the reviewer's tone ("blocking", "likely bug") is not evidence; only what
+  the code does is.
 
-## 4. Report, then wait
+## 7. Report, then wait
 
 ```
 결론: 고칠 결함 <n>건 / 사실이지만 동작 영향 없음 <n>건 / 해당 없음·이미 처리됨 <n>건
@@ -353,102 +254,88 @@ Then check every finding against the code before reporting it:
 | --- | --- | --- | --- | --- |
 ```
 
-Every finding gets a row. The three labels, always written out (never as bare
-letters):
+Every finding gets a row. The three labels, always written out (never as
+bare letters):
 
-- **고칠 결함** — a runtime defect reproducible from the code, or a guard that
-  is silently skipped.
-- **사실이지만 동작 영향 없음** — true, with no behavioural effect: doc wording,
-  a log level, test consistency, a check on a path no caller reaches.
-- **해당 없음·이미 처리됨** — the premise is wrong, the code already handles
-  it, it is outside the change, or an earlier round answered it.
+- **고칠 결함** — a runtime defect reproducible from the code, or a guard
+  that is silently skipped.
+- **사실이지만 동작 영향 없음** — true, with no behavioural effect: doc
+  wording, a log level, test consistency, a check on a path no caller
+  reaches.
+- **해당 없음·이미 처리됨** — the premise is wrong, the code already
+  handles it, it is outside the change, or an earlier round answered it.
 
-Give a fix sketch (file, line, the change) for each finding that has one, then
-STOP. The user picks what is fixed, from any of the three groups. Do not edit
-before that.
+A design finding follows "Reporting a design finding" in
+`references/design-principles.md`. Give a fix sketch (file, line, the
+change) for each finding that has one, then STOP. The user picks what is
+fixed, from any of the three groups. Do not edit before that.
 
-## 5. Fix, re-verify, re-review
+## 8. Fix, re-verify, re-review
 
 - Fix the chosen findings and amend each fix into the commit it belongs to
   right away (`git commit --amend` when it is HEAD, otherwise
   `git commit --fixup=<commit>` immediately followed by
-  `git rebase -i --autosquash`). Do not leave `fixup!` commits standing
+  `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <commit>^`, which runs
+  without an editor). Do not leave `fixup!` commits standing
   between rounds. A new commit only when no existing commit is the fix's
-  home (e.g. a change to a file the series never touched for that purpose).
-- Rewriting history while a background check has the tree checked out (a
-  regression dump at a base revision) breaks that check: wait for it first.
-- Keep the pre-amend SHA while an unexplained difference is being narrowed
-  down commit by commit: it is the base of that per-commit comparison.
-- When a finding is about a test:
-  - a spec-derived expectation is wrong, or a case the spec covers has no
-    test → the test agent fixes it (step 1a), given the finding and the
-    spec text; if the spec itself is unclear or wrong, the user decides
-    the spec first;
-  - a test of the implementation's own design, or a structural problem
-    (naming, duplication, comments, counts) → the implementer fixes it;
-  - a corrected or added test that now fails means the implementation is
-    wrong: fix the code, then verify and review as for any code fix.
-- Back to step 2 with the affected set of the FIX, not of the whole change.
-- Back to step 3. A round whose fixes touched code is always followed by
-  another review round, even if every finding was minor: a fix can bring its
-  own defect.
-- The cycle ends after a round whose fixes were doc-only, had nothing to
-  fix, or only changed spec-derived test rows or expected values written by
-  the test agent, all passing. A round that changed test logic (helpers,
-  how results are compared, test structure) or the implementation is
-  followed by another review round.
+  home.
+- Before amending, check the structure the fix adds or extends against
+  `references/design-principles.md`, as in step 4.
+- When a fix changes behaviour (what a function returns or refuses, an
+  order, a message, a default), search the whole repository for what still
+  states the old behaviour: comments and doc comments, docs, error and log
+  messages, test names and expectations. Fix them in the same amend.
+- Do not rewrite history while a background check has the tree checked out
+  (a regression dump at a base revision); wait for it first. Keep the
+  pre-amend SHA while an unexplained difference is being narrowed down
+  commit by commit.
+- A finding about a test: a wrong spec-derived expectation, or a case the
+  spec covers with no test → the test agent fixes it (step 3), given the
+  finding and the spec text (an unclear spec is the user's to settle
+  first); a test of the implementation's own design, or a structural
+  problem (naming, duplication, comments, counts) → the implementer fixes
+  it; a corrected or added test that now fails means the implementation is
+  wrong.
+- Back to step 5 with the affected set of the FIX, then to step 6.
+- The cycle ends after a round that had nothing to fix, or whose fixes
+  touched only docs and tests (doc comments included), with every test
+  passing. "Tests" means test files and test-only code (test modules such as
+  Rust `#[cfg(test)]`, test helpers and fixtures); everything that ships is
+  "the implementation". A round whose fixes touched the implementation is always followed
+  by another review round, even if every finding was minor: a fix can bring
+  its own defect.
 
-## 6. Before the PR (once)
+## 9. Slow checks after the review loop
+
+Once the review loop has ended and the commits are settled, run the slow
+checks the profile defers to this moment (regression comparisons, e2e
+suites, performance measurements), for what the phase changed, before
+step 10. A difference the plan does not allow (a regression comparison,
+a performance measurement) stops the cycle: report it and let the user
+decide whether it is a defect to fix or a behaviour the plan should allow.
+A failure here, or a difference the user calls a defect, is fixed and
+re-checked here (only the affected part), then the fix goes through the
+review loop (steps 6 to 8) like any other fix.
+
+## 10. Before the PR (once)
 
 On the final HEAD:
 
-- the full test suites from the profile, compared with the baseline if one was
-  taken (per-test outcomes: newly failing, disappeared, added);
+- the full test suites from the profile, compared with the baseline if one
+  was taken (per-test outcomes: newly failing, disappeared, added);
 - the full e2e from the profile;
 - the profile's pre-PR checklist.
 
 Report the result. Pushing, opening the PR, and commenting are separate
 instructions; wait for each.
 
-After a history rewrite (squash, rebase, reword), verify the final HEAD only,
-not each commit. A rewrite that leaves the tree identical
+After a history rewrite (squash, rebase, reword), verify the final HEAD
+only, not each commit. A rewrite that leaves the tree identical
 (`git diff --quiet <old> <new>`) needs no re-run.
 
-## 7. Grow the profile
+## 11. Grow the profile
 
-When the cycle ran without a profile, or found a profile wrong or incomplete,
-show a profile draft (or a diff of the profile) built from the commands that
-were actually used, and save it to `profiles/<repo>.md` only after approval.
-
-A profile holds:
-
-```markdown
-# <repo>
-
-## Commands
-- formatter / linter (every configuration that CI runs)
-- audits
-- full test suites (pre-PR), and what they reuse from the earlier checks
-- e2e: the skill or script, how to pick one suite
-
-## Path → affected checks
-| changed path | tests | extra checks | e2e suite |
-
-## Check cost and shared builds
-| group (what must match to share the build) | checks | cost |   (cheapest first; coarse units, not minutes)
-
-## When each check runs
-| when | checks |   (before editing / every verification / end of the phase / before the PR)
-
-## Tests: where they live, who writes them
-- where new behaviour's tests go (files, tables), and whether unit tests sit
-  inside implementation files (then the test agent returns values only)
-
-## Baselines to take before editing
-## Pre-PR checklist
-## Pitfalls (things that cost time before)
-```
-
-Scripts a profile needs live beside it in `profiles/<repo>/scripts/`. They are
-personal tooling: they are never added to the project repository, and the
-shared copy of this skill leaves them out.
+When the cycle ran without a profile, found a profile wrong or incomplete,
+or adapted one of its tools, follow "Changing a profile" in
+`references/profile-guide.md`: show a draft or a diff, and save it only
+after approval.
