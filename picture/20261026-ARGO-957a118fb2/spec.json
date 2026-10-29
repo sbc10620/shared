@@ -5,7 +5,6 @@
  "after": "957a118fb2",
  "range": "ARGO · 957a118fb2~1..957a118fb2 · argo-cli main() · feature guardrails",
  "via": {
-  "compile_from_yaml": "validator 이름은 PII 규칙에만 있음",
   "PiiSpanDetector::detect": "validator 이름은 PII 규칙에만 있음"
  },
  "not_drawn": {
@@ -32,18 +31,84 @@
       },
       {
        "code": "            runtime.block_on(tinicli::run_cli());",
-       "to": "compile",
-       "note": "부팅 때 PII 엔진을 처음 빌드",
+       "to": "run",
+       "note": "CLI 본체 실행",
        "hops": [
-        "run_cli",
-        "run@tinicli/src/cli_entry.rs",
-        "install_guardrails_from_config",
-        "build_pii",
-        "build_layer_detector",
-        "try_for_layer",
-        "shared_layer_filter",
-        "shared_slot"
+        "run_cli"
        ]
+      },
+      {
+       "elide": true,
+       "indent": 8
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "kind": "fn",
+     "status": "same",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "to": "slot",
+       "note": "부팅 때 guardrail 설치",
+       "hops": [
+        "install_guardrails_from_config",
+        "engine_guard"
+       ]
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            run_tui::run_tui(",
+       "note": "사용자 입력을 검사하는 흐름 → 그림 2"
+      },
+      {
+       "elide": true,
+       "indent": 16
+      }
+     ]
+    },
+    {
+     "id": "slot",
+     "kind": "fn",
+     "status": "same",
+     "name": "shared_slot()",
+     "file": "tinicore/src/guardrails/pii/shared.rs:75",
+     "lines": [
+      {
+       "elide": true,
+       "indent": 4
+      },
+      {
+       "code": "            compile_from_yaml(",
+       "to": "compile",
+       "edge": "defer",
+       "label": "엔진이 필요할 때 실행",
+       "note": "엔진 slot 에 빌드 방법 등록"
+      },
+      {
+       "code": "                super::UNIFIED_CONFIG_YAML,"
+      },
+      {
+       "code": "                None,"
+      },
+      {
+       "code": "                DEFAULT_CHUNK_SIZE,"
+      },
+      {
+       "code": "                &super::extensions(),"
+      },
+      {
+       "code": "            )"
       },
       {
        "elide": true,
@@ -459,24 +524,30 @@
    "caption": "PatternMeta 에 보관한 validator 에 전체 텍스트와 일치 범위를 넘깁니다.",
    "nodes": [
     {
-     "id": "main",
+     "id": "run",
      "kind": "fn",
      "status": "same",
-     "name": "main()",
-     "file": "argo-cli/src/main.rs:10",
+     "name": "cli_entry::run()",
+     "file": "tinicli/src/cli_entry.rs:157",
      "lines": [
       {
        "elide": true,
        "indent": 4
       },
       {
-       "code": "            runtime.block_on(tinicli::run_cli());",
+       "code": "        match install_guardrails_from_config(GuardrailsConfig {",
+       "note": "그림 1 에서 엔진 빌드 방법 등록"
+      },
+      {
+       "elide": true,
+       "indent": 8
+      },
+      {
+       "code": "            run_tui::run_tui(",
        "to": "detect",
        "note": "입력 guardrail 이 사용자 문장 검사",
        "hops": [
-        "run_cli",
-        "run@tinicli/src/cli_entry.rs",
-        "run_single_turn",
+        "run_tui@tinicli/src/run_tui.rs",
         "run_input_guardrails_with_text",
         "run_input_guardrails",
         "check@tinicore/src/sensitive/guardrail.rs",
@@ -487,7 +558,7 @@
       },
       {
        "elide": true,
-       "indent": 8
+       "indent": 16
       }
      ]
     },

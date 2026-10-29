@@ -25,9 +25,10 @@ Checks, per box line (elided lines skipped):
                  calls the target box) holding no changed definition and no
                  `via` function; and an unchanged function box is drawn only
                  when it is the entry, a `via` function, the direct caller of
-                 a new or changed box, or a branch box (two or more call
-                 targets) — any other unchanged function is folded into
-                 `hops`.
+                 a new or changed box, a branch box (two or more call
+                 targets, counting a line whose note points at another
+                 figure), or a box with a `defer` edge — any other unchanged
+                 function is folded into `hops`.
 Exit 1 with a list on any failure.
 """
 import json
@@ -71,6 +72,7 @@ EXIT_RE = re.compile(r"\breturn\b|\bErr\(|\?;?\s*$|\bexit\(|\bpanic!|\bthrow\b|\
                      r"\bbreak\b|\bcontinue\b|=>\s*Ok\(|=>\s*Err")
 
 
+FIG_REF = re.compile(r"→\s*그림\s*\d+|그림\s*\d+\s*에서")
 MOD_DECL_RE = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?mod\s+\w+\s*;")
 
 
@@ -170,6 +172,58 @@ def moved_definitions(repo, before, after):
         for name, a, b in spans:
             if any(a < n <= b + 1 for n in raw):
                 out[(name, path, a + 1)] = True
+    return out
+
+
+def _test_from(lines):
+    """Index of the `#[cfg(test)]` line that opens an inline test module, or
+    None. Everything from there on is test code."""
+    for i, l in enumerate(lines):
+        if re.match(r"\s*#\[cfg\(test\)\]", l) and i + 1 < len(lines) and \
+                re.match(r"\s*(pub(\([^)]*\))?\s+)?mod\s+\w+\s*\{", lines[i + 1]):
+            return i
+    return None
+
+
+def _placed_definitions(lines, path):
+    """{(name, enclosing header)} of a file's non-test definitions."""
+    out, stop = set(), _test_from(lines)
+    for i in range(len(lines) if stop is None else stop):
+        d = definition(lines, i, path)
+        if not d or (d[1] and lines[i][:1].isspace()):
+            continue  # a const/static inside a body is not a definition of its own
+        out.add((d[0], enclosing_header(lines, i)))
+    return out
+
+
+def removed_definitions(repo, before, after):
+    """[(name, path, line)] (line at `before`) of the non-test definitions
+    the range deleted: a definition of a file the range touched whose name,
+    in the same enclosing block (`impl … {`, class, or the top level), no
+    touched file defines at `after`. One that moved to another touched file
+    is not deleted. The page lists them, since a box can only show what
+    exists at `after`."""
+    paths = [p for p in git(repo, "diff", "--name-only", "--no-renames", before, after).splitlines()
+             if p.endswith(SOURCE_EXT) and not TEST_PATH.search(p)]  # both sides of a move
+    now = set()
+    for path in paths:
+        try:
+            now |= _placed_definitions(git(repo, "show", f"{after}:{path}").splitlines(), path)
+        except subprocess.CalledProcessError:
+            pass  # deleted file
+    out = []
+    for path in paths:
+        try:
+            old = git(repo, "show", f"{before}:{path}").splitlines()
+        except subprocess.CalledProcessError:
+            continue  # added file
+        stop = _test_from(old)
+        for i in range(len(old) if stop is None else stop):
+            d = definition(old, i, path)
+            if not d or (d[1] and old[i][:1].isspace()):
+                continue
+            if (d[0], enclosing_header(old, i)) not in now:
+                out.append((d[0], path, i + 1))
     return out
 
 
@@ -450,7 +504,8 @@ def main():
                     allowed = (ln.get("to") or (nxt.get("to") and not nxt.get("note")) or ln.get("mark")
                                or EXIT_RE.search(ln.get("code", ""))           # an early exit
                                or EXIT_RE.search(nxt.get("code", ""))          # the condition of one
-                               or re.search(r"→ 그림 \d+$", ln["note"]))      # continues in a later figure
+                               or re.search(r"→ 그림 \d+$", ln["note"])       # continues in a later figure
+                               or re.match(r"그림 \d+ 에서", ln["note"]))       # context from an earlier one
                     if not allowed:
                         problems.append(f"fig{fi+1} {n['id']}: note on a line that is not a call, a `+` line "
                                         f"or an early exit: {ln.get('code', '')!r}")
@@ -585,7 +640,13 @@ def main():
                 continue
             calls = {t for ln in n.get("lines", []) for t, k in zip(*_targets(ln)) if k != "use" and t in by_id}
             hands_off = any(by_id[t].get("status") in ("new", "changed") for t in calls)
-            if not hands_off and len(calls) < 2:
+            # A box that registers a closure or callback run later stays: its
+            # `defer` edge is what a folded arrow would hide.
+            defers = any(k == "defer" for ln in n.get("lines", []) for _, k in zip(*_targets(ln)))
+            # A branch box a split cut through (Step 2) keeps, in each figure,
+            # the lines that continue in or come from another figure.
+            cross = sum(1 for ln in n.get("lines", []) if not ln.get("to") and FIG_REF.search(ln.get("note") or ""))
+            if not hands_off and not defers and len(calls) + cross < 2:
                 problems.append(f"fig{fi+1} {n['id']}: unchanged `{n['name']}` only passes the path on — fold it "
                                 "into the `hops` of the line that calls it (Step 1.3)")
     if len(group["figures"]) > 1 and len(unique) <= 18:

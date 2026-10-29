@@ -170,6 +170,13 @@ def page(group, figures):
              + "".join(f'<li><code>{escape(name)}</code><span>{escape(path)}:{line}</span></li>'
                        for name, path, line in mv)
              + '</ul></section>')
+    rm = verify_spec.removed_definitions(group["repo"], group["before"], group["after"])
+    removed = ("" if not rm else
+               '<section class="not-drawn" id="removed"><h2>삭제된 정의</h2>'
+               '<p>이 범위에서 지운 정의입니다. after 에는 없으므로 박스로 그릴 수 없습니다. 위치는 before 기준입니다.</p><ul>'
+               + "".join(f'<li><code>{escape(name)}</code><span>{escape(path)}:{line}</span></li>'
+                         for name, path, line in rm)
+               + '</ul></section>')
     figures_html = "".join(f'''
 <section class="fig" id="fig{i+1}">
   <header class="fig-head">
@@ -291,6 +298,7 @@ body.has-max {{ overflow: hidden; }}
   {via}
   {not_drawn}
   {moved}
+  {removed}
 </main>
 
 <script>

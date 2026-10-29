@@ -254,6 +254,13 @@ def hop_short(h):
     return re.split(r"::|\.", h.partition("@")[0].strip())[-1]
 
 
+def edge_label_width(ln):
+    """Width of the label an edge from this line carries (hops or label)."""
+    if ln.get("hops"):
+        return text_width("⋯ " + hops_label(ln["hops"]), 11) + 12
+    return text_width(ln.get("label", ""), 11) + 10
+
+
 def hops_label(hops):
     """The folded functions on an arrow: all of them up to three, else the
     first two, a count, and the last."""
@@ -416,15 +423,15 @@ def layout(nodes):
     for c in cols:
         col_x[c] = x
         widest = max(n["w"] for n in order if n["col"] == c)
-        # A folded call between two boxes of one column puts its label right of
-        # the vertical run (render_edges); keep the next column clear of it.
+        # An edge label between two boxes of one column sits right of the
+        # vertical run (render_edges); keep the next column clear of it.
         reach = widest
         for n in order:
             if n["col"] != c:
                 continue
             for ln, t, kind in edges_of(n):
-                if ln.get("hops") and kind != "use" and t in by_id and by_id[t]["col"] == c:
-                    tw = text_width("⋯ " + hops_label(ln["hops"]), 11) + 12
+                if kind != "use" and t in by_id and by_id[t]["col"] == c and (ln.get("hops") or ln.get("label")):
+                    tw = edge_label_width(ln)
                     reach = max(reach, max(n["w"], by_id[t]["w"]) + 36 + tw)
         right = max(right, x + reach + 12)
         x += max(widest + COL_GAP, reach + 24)
@@ -626,8 +633,11 @@ def render_edges(nodes, by_id, out):
                            f'<text x="{lx}" y="{ly+1}" text-anchor="middle" font-family="{CODE_FONT}" '
                            f'font-size="11" fill="#79a8ff">{escape(text)}</text></g>')
             if ln.get("label"):
-                lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6
                 tw = text_width(ln["label"], 11) + 10
+                if tgt["col"] == n["col"]:
+                    lx, ly = xm + 8 + tw / 2, (y1 + y2) / 2 + 2  # clear of both boxes, as above
+                else:
+                    lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6
                 col = "#c297ff" if kind == "defer" else "#79a8ff"
                 out.append(f'<rect x="{lx-tw/2}" y="{ly-12}" width="{tw}" height="17" rx="4" fill="{BOX}" '
                            f'stroke="{col}" stroke-width="0.8"/>')
