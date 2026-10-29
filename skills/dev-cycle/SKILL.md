@@ -70,7 +70,10 @@ down commit by commit. At one moment, run the checks that share a build
 back to back, narrower before wider (the profile lists the groups).
 
 A large plan can be split into milestones: intermediate points, each ending
-in settled commits. The review loop runs once per milestone. Step 9 runs
+in settled commits. The review loop runs once per milestone, over the
+range from the plan's start commit to HEAD; each milestone's loop starts at
+round 1 (high), with the earlier milestones' decisions marked "do not
+re-argue". Step 9 runs
 per milestone when each milestone gets its own PR, and once at the end when
 the milestones go into one PR; in the latter case the slow checks may also
 be run at the end of a milestone, to find a problem earlier. "The phase" in
