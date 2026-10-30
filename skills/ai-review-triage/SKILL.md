@@ -1,18 +1,20 @@
 ---
 name: ai-review-triage
-description: Triage a Z.ai (or any GitHub-Actions bot) code-review comment on a pull request — fetch the bot's latest comment, verify every finding against the actual code, classify each one (a defect to fix / true but no behavioural effect / not applicable or already handled), and report a table plus a stop/continue verdict using those plain labels, not bare letters; code changes happen only for defects to fix and only after the user approves. Response comments cover every finding, in the PR description's language. Use this whenever the user says a Z.ai review (or "bot review", "자동 리뷰", "Z.ai 리뷰") has been posted or updated on a PR, asks to "check the review", "review the review", or "respond to the review" — even if they do not name the bot. Do NOT use it for a human reviewer's comments or for reviewing the PR's own code from scratch.
+description: "Triage an automated (AI or bot) code-review comment on a pull request — Z.ai, Copilot, CodeRabbit, Gemini, Claude or any other review bot — fetch the bot's latest review, verify every finding against the actual code, classify each one (a defect to fix / true but no behavioural effect / not applicable or already handled), and report a table plus a stop/continue verdict using those plain labels, not bare letters; code changes happen only for defects to fix and only after the user approves. Response comments cover every finding, in the PR description's language. Use this whenever the user says an AI or bot review (\"AI 리뷰\", \"bot review\", \"자동 리뷰\", \"Z.ai 리뷰\", \"Copilot 리뷰\") has been posted or updated on a PR, asks to \"check the review\", \"review the review\", or \"respond to the review\" — even if they do not name the bot. Do NOT use it for a human reviewer's comments or for reviewing the PR's own code from scratch."
 ---
 
-# Z.ai review triage
+# AI review triage
 
-A review bot re-reads the WHOLE pull request on every push and is built to
-always find something. So the question is never "are there findings" — there
-always are — but "is any finding worth a commit". This skill answers that
-question the same way every round, so a PR does not spend three rounds fixing
-comment wording while the human reviewer waits.
+An AI review bot typically re-reads the WHOLE pull request on every push and
+is built to always find something. So the question is never "are there
+findings" — there always are — but "is any finding worth a commit". This
+skill answers that question the same way every round, whichever bot wrote the
+review, so a PR does not spend three rounds fixing comment wording while the
+human reviewer waits.
 
-The user's standing decisions, learned from PR AGENTIC/ARGO#3392 (three rounds,
-two real defects found, ~25 findings total):
+The user's standing decisions, learned from PR AGENTIC/ARGO#3392 (a Z.ai
+review, three rounds, two real defects found, ~25 findings total). They apply
+to every review bot:
 
 - Only **A-grade** findings (real runtime defects, security fail-opens) get
   fixed. Doc nits and defensive code for unreachable paths do not — they are
@@ -22,16 +24,38 @@ two real defects found, ~25 findings total):
 - Nothing is pushed, committed, or commented without an explicit instruction.
   The user decides each of those separately.
 
-## Step 1 — Fetch the bot's comment (it is overwritten, not appended)
+## Step 1 — Fetch the bot's latest review
+
+Bots publish in different places, so first find where this one writes:
 
 ```bash
-gh pr view <PR> --json comments --jq '[.comments[] | select(.author.login=="github-actions")] | last | .body'
+gh pr view <PR> --json comments,reviews \
+  --jq '{comments: [.comments[] | {author: .author.login, at: .createdAt, len: (.body|length)}],
+         reviews:  [.reviews[]  | {author: .author.login, at: .submittedAt, state: .state, len: (.body|length)}]}'
+gh api "repos/{owner}/{repo}/pulls/<PR>/comments" --jq '[.[] | {author: .user.login, path, line, at: .created_at}]'
 ```
 
-The bot **edits its single comment in place** on every push. Looking for a
-"new" comment finds nothing; the comment count does not change. Always read the
-CURRENT body of the bot's comment. Count the round from how many response
-comments the user has already posted on the PR.
+The first command lists the PR's conversation comments and review summaries;
+the second lists inline (per-line) review comments. Pick the bot's author
+login from them (`github-actions`, `copilot-pull-request-reviewer`,
+`coderabbitai`, `gemini-code-assist`, …).
+
+Then read the bot's latest review in the shape it uses:
+
+- **One comment edited in place** (Z.ai posts as `github-actions` and
+  overwrites its single comment on every push). A "new" comment never
+  appears and the comment count does not change, so always read the CURRENT
+  body:
+  `gh pr view <PR> --json comments --jq '[.comments[] | select(.author.login=="<login>")] | last | .body'`
+- **A new review or comment per push** (most other bots). Read the newest
+  one, and only treat as this round's findings what it raised after the
+  last response comment.
+- **Inline comments** (Copilot and others). Read the review summary AND the
+  inline comments of the latest review; number the inline ones in file and
+  line order so the report and the response comment can refer to them.
+
+Count the round from how many response comments the user has already posted
+on the PR.
 
 If no PR number is given, use the open PR for the current branch:
 `gh pr list --head "$(git branch --show-current)" --json number`.
@@ -52,11 +76,12 @@ claim. Typical checks:
   looked unlikely and was real; a later "turn identity" race looked similar
   and was not, because an aborted task cannot send after its next `.await`.
 
-**The bot's tone is not evidence.** "Blocking", "must-verify", "likely bug"
-carry no weight; only what the code does. In #3392 round 3 both "blocking"
-items were wrong, and a "minor note" in round 2 was the round's only real fix.
+**The bot's tone is not evidence.** "Blocking", "must-verify", "likely bug",
+a severity badge or a "critical" label carry no weight; only what the code
+does. In #3392 round 3 both "blocking" items were wrong, and a "minor note"
+in round 2 was the round's only real fix.
 
-Keep a list of findings already answered in earlier rounds. The bot does not
+Keep a list of findings already answered in earlier rounds. A bot does not
 read its own history and repeats them; a repeat is graded C with "answered in
 round N" and no further work.
 
@@ -67,7 +92,7 @@ only. **Never show a bare letter to the user or on the PR** — always use the
 plain label (column 2), or, if a letter appears anywhere, a legend next to it.
 
 | Grade | Plain label (what the user sees) | Definition | Action |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | **A** | 고칠 결함 (defect to fix) | A runtime defect you can reproduce from the code, or a security fail-open (a path where a guard is silently skipped). | Fix — after approval. |
 | **B** | 사실이지만 동작 영향 없음 (true, no behavioural effect) | True, but no behavioural effect: doc accuracy, log level, test consistency, defensive checks on paths no current caller can reach, boot-time one-off costs. | Do not fix. List it. |
 | **C** | 해당 없음·이미 처리됨 (not applicable / already handled) | The code already handles it; the premise is wrong; it is outside the PR's scope (a `tinicore-traits` type change, another crate, a CI workflow); or it was answered in an earlier round (say which). | List it with the one-line reason. |
@@ -101,13 +126,15 @@ from Step 3 — not bare A / B / C:
 | 2 | … | 동작 영향 없음 | … |
 ```
 
-Every finding gets a row — numbered items, "minor" notes and questions alike.
+Every finding gets a row — numbered items, inline comments, "minor" notes and
+questions alike.
 
 Then:
 
 - **A = 0** → say the round can end. If the bot labelled any C item
-  "blocking", recommend a short rebuttal comment so the human reviewer does not
-  stop at that word — and offer it, do not post it.
+  "blocking" (or gave it a high severity), recommend a short rebuttal comment
+  so the human reviewer does not stop at that word — and offer it, do not
+  post it.
 - **A > 0** → show each fix as pseudo-code (a diff sketch, file and line),
   and ask for approval. Do not edit files yet.
 - **Round > 3 with A still appearing** → say so: that is a PR-size signal, not
@@ -119,9 +146,9 @@ Do not fold B items into the plan on your own. If the user picks one, fine.
 
 - Fix the approved items in **one commit** (the bot re-reviews on every push,
   so one push per round). Message in English:
-  `review(<scope>): address the Z.ai review on PR #<N>` with one paragraph
-  per finding: what the bot said, what the code did, what changed. Name the
-  findings that were NOT changed and why.
+  `review(<scope>): address the <bot> review on PR #<N>` (e.g. `the Z.ai
+  review`) with one paragraph per finding: what the bot said, what the code
+  did, what changed. Name the findings that were NOT changed and why.
 - Verify with the repository's own pre-PR checks (in ARGO: `cargo fmt --check`,
   `cargo clippy --workspace --all-targets -- -D warnings`, the feature-gated
   test suites for the touched crates, the Core-layer audit scripts).
@@ -131,17 +158,21 @@ Do not fold B items into the plan on your own. If the user picks one, fine.
 ## Step 6 — Comment, only when told
 
 Use `references/comment-template.md`. One comment per round, one table, one
-line per finding — **every** finding the bot raised (numbered items, minor
-notes, questions), including the ones not changed, each with what was done
-or why not. Write the comment **in the same language as the PR description**
-(check `gh pr view <PR> --json body`), whatever language the conversation
-with the user is in. Rounds 1–2 of #3392 were paragraphs and the user called
-that too long; round 3's table was right. For follow-ups split out of the PR,
-cite an issue number if one exists — the bot will raise them again.
+line per finding — **every** finding the bot raised (numbered items, inline
+comments, minor notes, questions), including the ones not changed, each with
+what was done or why not. Write the comment **in the same language as the PR
+description** (check `gh pr view <PR> --json body`), whatever language the
+conversation with the user is in. Rounds 1–2 of #3392 were paragraphs and the
+user called that too long; round 3's table was right. For follow-ups split
+out of the PR, cite an issue number if one exists — the bot will raise them
+again.
+
+A bot that posts inline comments still gets the one summary comment. Reply
+inside its comment threads, or resolve them, only when the user asks.
 
 ## What this skill never does on its own
 
 - edit code before the user approves the A list
-- push, comment, or edit the PR body
+- push, comment, reply in review threads, or edit the PR body
 - triage a human reviewer's comments (different process: those get answered)
 - expand scope to "while I'm here" fixes

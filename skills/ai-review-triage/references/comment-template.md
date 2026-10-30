@@ -18,6 +18,9 @@ prose responses become input to the next round and generate more findings
 about themselves. The human reviewer wants the verdict, not the reasoning —
 so one line per row, but no row missing.
 
+`<Bot>` is the bot's name as the PR shows it (`Z.ai`, `Copilot`, `CodeRabbit`, …).
+Inline comments get rows of their own, numbered as in the triage report.
+
 Use plain response words, never the internal A / B / C grades: **Fixed** /
 **No change** / **Answered in round N** / **Accepted** (a documented
 limitation) / **Follow-up** (#issue).
@@ -25,7 +28,7 @@ limitation) / **Follow-up** (#issue).
 ## Variant 1 — fixes were made
 
 ```markdown
-## Z.ai review round <N> — response (commit <short-sha>)
+## <Bot> review round <N> — response (commit <short-sha>)
 
 | # | Finding | Response |
 | --- | --- | --- |
@@ -41,7 +44,7 @@ Verification: fmt · clippy `-D warnings` · <suites and counts> · <gates>.
 ## Variant 2 — no code change (round ends)
 
 ```markdown
-## Z.ai review round <N> — response (no code change)
+## <Bot> review round <N> — response (no code change)
 
 No finding in this round needs a code change, so the bot review ends here
 and the PR goes to human review.

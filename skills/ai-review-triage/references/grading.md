@@ -1,6 +1,7 @@
 # Grading reference — worked examples from AGENTIC/ARGO#3392
 
-Three rounds of Z.ai review on a 15-commit guardrails PR. Every finding below
+Three rounds of Z.ai review on a 15-commit guardrails PR. The bot there was
+Z.ai, but the grading is the same for any review bot. Every finding below
 was verified against the code before it was graded; the bot's own severity
 label is shown so the gap between label and grade is visible.
 
