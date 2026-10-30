@@ -1,0 +1,117 @@
+%% Component / package view of the guardrails (ARGO multilingual branch 65395de87f)
+flowchart LR
+  classDef host fill:#fff3e0,stroke:#e08a00
+  classDef traits fill:#ede7f6,stroke:#5e35b1
+  classDef gr fill:#e3f2fd,stroke:#1e6fd9
+  classDef sens fill:#e8f5e9,stroke:#2e7d32
+  classDef agent fill:#fce4ec,stroke:#c2185b
+  classDef other fill:#f5f5f5,stroke:#757575
+
+  subgraph HOST["Hosts"]
+    CLI["tinicli cli_entry::run<br/>install_guardrails_from_env → install_guardrails_from_config<br/>prompt_guard::compile_cached (boot)"]:::host
+    GATE["tinicli repl / run_tui<br/>pre-persist gate"]:::host
+    GW["tinicore gateway::handler<br/>handle_message_core"]:::host
+  end
+
+  subgraph TT["tinicore-traits"]
+    TTS["sensitive<br/>SensitiveDetector · SensitiveSpan · SensitiveKind · PiiLabel"]:::traits
+    TTG["guardrail<br/>Input/Output/ToolInput/ToolOutputGuardrail · run_*_guardrails"]:::traits
+    TTP["prompt_guard<br/>PromptGuardConfig · PromptGuardRule · GuardAction"]:::traits
+  end
+
+  subgraph GR["tinicore::guardrails"]
+    INST["install  [guardrails + sensitive]<br/>install_guardrails_from_config · GuardrailsConfig"]:::gr
+    subgraph PII["pii  [guardrails]"]
+      PIIINST["install::build_pii · PiiConfig · PiiMode<br/>[guardrails + sensitive]"]:::gr
+      PIIDET["detector::PiiSpanDetector"]:::gr
+      PIISH["shared: shared_slot 'guardrails:pii:embedded'<br/>select_countries · shared_layer_filter"]:::gr
+      PIIRULES["rules · country · countries/*<br/>(rules.yaml, validators, anchored, shaped)<br/>handwritten · uuid · labels"]:::gr
+    end
+    subgraph PI["prompt_injection  [guardrails]"]
+      PIINST["install::build · PromptInjectionConfig<br/>[guardrails + sensitive]"]:::gr
+      PIDET["detector::PromptInjectionDetector<br/>tool_output_guardrail [guardrails + sensitive]"]:::gr
+      PISH["shared: slot 'guardrails:prompt_injection'<br/>tool_output::ToolOutputEngine"]:::gr
+      PIRULES["config/rules.yaml · handwritten<br/>builtin_user_input_prompt_injection_rules"]:::gr
+    end
+    ENG["engine  [always compiled]<br/>PatternEngine · MatchEngine · PatternFilter<br/>EngineConfig · Validator · EngineExtensions"]:::gr
+  end
+
+  subgraph SE["tinicore::sensitive"]
+    TS["turn_scope<br/>TurnSlot · TurnGuard · pin_for_process"]:::sens
+    CH["chain  [sensitive]<br/>DetectorChain"]:::sens
+    SG["guardrail  [sensitive]<br/>SensitiveGuardrail"]:::sens
+    RED["redaction<br/>PiiVault · apply_*_redactions · demask · audit_text"]:::sens
+  end
+
+  subgraph AG["tinicore::agent"]
+    AGG["guardrails<br/>GuardrailSet · GLOBAL slot · resolve<br/>run_input_guardrails_with_text · install_guardrails_from_env"]:::agent
+    PG["prompt_guard<br/>CompiledGuard · compile_cached · admit · evaluate"]:::agent
+    PM["pii_masking  [sensitive]<br/>SensitiveMasking (GLOBAL_MASKING) · TurnMaskingState<br/>mask_* · demask_* · EgressMask"]:::agent
+    GSC["guardrail_scan_cache<br/>(input pass checkpoints)"]:::agent
+    MSC["masking_scan_cache  [sensitive]<br/>(masking checkpoints, slots)"]:::agent
+    LOOP["loop_::agent_loop"]:::agent
+    PACKS["guardrails_builtin · guardrails_exfil<br/>guardrails_tool_input · guardrails_classifier"]:::agent
+  end
+
+  ORCH["tools::tool_orchestrator<br/>pre_execute · finalize_call_raw"]:::other
+  EGR["llm::egress::EgressGuard<br/>(client-layer masking)"]:::other
+
+  CLI --> INST
+  CLI --> PG
+  CLI --> AGG
+  GATE --> AGG
+  GATE --> PG
+  GW --> AGG
+  GW --> PG
+  GATE --> LOOP
+  GW --> LOOP
+
+  INST --> PIIINST
+  INST --> PIINST
+  INST -- "install_guardrails(set)" --> AGG
+  INST -- "install_sensitive_masking" --> PM
+  INST -- "pin_engines → pin_for_process" --> TS
+  INST -- "select_countries · engine_guard" --> PIISH
+  GATE -- "turn_guard" --> TS
+  GW -- "turn_guard" --> TS
+
+  PIIINST --> PIIDET
+  PIIINST -- "pii.input guardrail" --> SG
+  PIIINST -- "masking chains" --> PM
+  PIIDET --> PIISH
+  PIISH --> PIIRULES
+  PIISH --> ENG
+  PIIDET -. implements .-> TTS
+
+  PIINST --> PIDET
+  PIDET -- "prompt_injection.tool_output" --> SG
+  PIDET --> PISH
+  PISH --> PIRULES
+  PISH --> ENG
+  PIDET -. implements .-> TTS
+
+  ENG -- "PatternFilter holds Arc&lt;TurnSlot&gt;" --> TS
+  PISH --> TS
+  PIISH --> TS
+
+  SG --> CH
+  CH --> TTS
+  SG -. implements .-> TTG
+  PG --> ENG
+  PG -- "shared slot (guardrails)" --> PISH
+  PG --> TTP
+
+  LOOP --> PG
+  LOOP --> AGG
+  LOOP --> GSC
+  LOOP --> PM
+  LOOP --> TS
+  PM --> MSC
+  PM --> CH
+  PM --> RED
+  AGG --> TTG
+  PACKS -. implements .-> TTG
+  AGG --> PACKS
+  LOOP --> ORCH
+  ORCH -- "tool_input / tool_output chains" --> AGG
+  EGR --> PM

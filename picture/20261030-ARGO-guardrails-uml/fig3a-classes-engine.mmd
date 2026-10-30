@@ -1,0 +1,156 @@
+%% Class view (1/2): engine, PII and prompt-injection rule sets
+classDiagram
+  direction LR
+  class PatternEngine {
+    engines: Vec~Box~dyn MatchEngine~~
+    pattern_meta: Vec~Arc~PatternMeta~~
+    reject_match: Option~RejectMatch~
+    from_config(EngineConfig, EngineExtensions)
+    scan(text) Vec~PatternMatch~
+    scan_keep_nested(text)
+  }
+  class MatchEngine {
+    <<trait>>
+    scan_raw(text) Vec~(pid, start, end)~
+    min_cache_info()
+    chunk_count()
+  }
+  class DfaChunkEngine {
+    chunks: Vec~DfaChunk~
+  }
+  class DfaChunk {
+    fwd / rev hybrid DFA
+    cache_fwd / cache_rev: Mutex~dfa::Cache~
+    base_pid
+  }
+  class AhoCorasickDetector
+  class FixedShapeDetector
+  class CardDetector
+  class Base64ShellDetector
+  class CommentDirectiveDetector
+  class PatternMeta {
+    entity_type
+    label
+    context_words: Vec~ContextWord~
+    score
+    validators: Vec~&dyn Validator~
+    boundary_check, reject_before/after
+    layers
+  }
+  class Validator {
+    <<trait>>
+    validate(&str) bool
+  }
+  class EngineConfig {
+    recognizers: HashMap~String, RecognizerConfig~
+    from_yamls()
+  }
+  class RecognizerConfig {
+    recognizer_type, entity_type, label
+    patterns, pattern_templates
+    context_words, score
+    validation_methods, boundary_check, layers
+  }
+  class EngineExtensions {
+    keyword_lookup
+    handwritten: Option~HandwrittenBuilder~
+    validators: Option~ValidatorLookup~
+    reject_match: Option~RejectMatch~
+  }
+  class PatternFilter {
+    engine: Arc~TurnSlot~PatternEngine~~
+    active: ActiveFilter
+    audit_tag
+    analyze(text)
+    analyze_keep_nested(text)
+    analyze_with_meta(text, f)
+  }
+  class ActiveFilter {
+    <<enum>>
+    All
+    Layer(String)
+    PiiTypes(Vec~String~)
+  }
+  class PatternMatch {
+    start, end, entity_type
+    text, score, pid
+  }
+  class TurnSlot~T,E~ {
+    build: Fn() Result~T,E~
+    state: Mutex~SlotState~
+    acquire() Arc~T~
+    put(T) · invalidate()
+  }
+
+  class PiiSpanDetector {
+    filter: PatternFilter
+    name, kinds
+    try_for_layer(layer)
+    detect(text) [spawn_blocking]
+  }
+  class PiiCountry {
+    <<enum>>
+    Br De Es Fr Gb In It Kr Mx Pl Th Us Vn
+    rules() CountryRules
+  }
+  class CountryRules {
+    yaml, validators
+    anchored, shaped, scans, keywords
+  }
+  class PiiTables {
+    merged common + selected countries
+  }
+  class ToolOutputEngine {
+    slot: Arc~TurnSlot~PatternEngine~~
+    rules: id → (GuardAction, label, layers)
+    new(&[ToolOutputRule])
+  }
+  class ToolOutputRule {
+    id, pattern
+    label: PromptInjectionLabel
+    action: GuardAction
+  }
+  class PromptInjectionDetector {
+    filter: PatternFilter
+    active: id → (label, action)
+    detect(text) [spawn_blocking]
+  }
+  class CompiledGuard {
+    rules: Vec~(id, GuardAction)~
+    filter: Option~PatternFilter~
+  }
+  class SensitiveDetector {
+    <<trait>>
+    name() · kinds()
+    detect(text) Result~Vec~SensitiveSpan~~
+    cost() · is_memoizable()
+  }
+
+  PatternEngine "1" *-- "1..*" MatchEngine
+  PatternEngine "1" *-- "*" PatternMeta
+  MatchEngine <|.. DfaChunkEngine
+  MatchEngine <|.. AhoCorasickDetector
+  MatchEngine <|.. FixedShapeDetector
+  MatchEngine <|.. CardDetector
+  MatchEngine <|.. Base64ShellDetector
+  MatchEngine <|.. CommentDirectiveDetector
+  DfaChunkEngine *-- DfaChunk
+  PatternMeta --> Validator
+  EngineConfig *-- RecognizerConfig
+  PatternEngine ..> EngineConfig : built from
+  PatternEngine ..> EngineExtensions : built with
+  PatternFilter --> TurnSlot : shared engine slot
+  TurnSlot ..> PatternEngine : builds per turn
+  PatternFilter *-- ActiveFilter
+  PatternFilter ..> PatternMatch : returns
+
+  SensitiveDetector <|.. PiiSpanDetector
+  SensitiveDetector <|.. PromptInjectionDetector
+  PiiSpanDetector *-- PatternFilter
+  PromptInjectionDetector *-- PatternFilter
+  CompiledGuard o-- PatternFilter
+  ToolOutputEngine --> TurnSlot
+  ToolOutputEngine ..> ToolOutputRule
+  PiiCountry ..> CountryRules
+  PiiTables ..> CountryRules : built from
+  EngineExtensions ..> PiiTables : built by pii extensions

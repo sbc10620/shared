@@ -1,0 +1,141 @@
+%% Class view (2/2): guardrail framework, masking, caches, install
+classDiagram
+  direction LR
+  class GuardrailSet {
+    input: Arc~InputGuardrailChain~
+    output: Arc~OutputGuardrailChain~
+    tool_input: Arc~ToolInputGuardrailChain~
+    tool_output: Arc~ToolOutputGuardrailChain~
+    with_input() · with_tool_output() …
+  }
+  class InputGuardrail {
+    <<trait>>
+    check(GuardrailInput) GuardrailResult
+    is_memoizable()
+  }
+  class OutputGuardrail {
+    <<trait>>
+    check(GuardrailOutput)
+  }
+  class ToolInputGuardrail {
+    <<trait>>
+    check(ToolGuardrailInput)
+  }
+  class ToolOutputGuardrail {
+    <<trait>>
+    check(ToolGuardrailOutput)
+  }
+  class SensitiveGuardrail {
+    name
+    chain: DetectorChain
+    block: Vec~SensitiveKind~
+    on_incomplete: OnIncomplete
+  }
+  class DeniedPatternGuardrail
+  class ToolInputPack
+  class ClassifierGuardrail
+  class OutputExfilGuardrail
+  class ToolOutputExfilGuardrail
+  class DetectorChain {
+    members: Vec~Arc~dyn SensitiveDetector~~
+    detect_all(text)
+    detect_any_of(text, kinds)
+    cache_key() · is_memoizable()
+  }
+  class SensitiveDetector {
+    <<trait>>
+  }
+  class SensitiveMasking {
+    detectors: DetectorChain
+    outbound: MaskSite
+    llm_output: Option~MaskSite~
+    on_error: RedactionPolicy
+    reveal: RevealTo
+    tool_args: DemaskToolArgs
+    timing: PiiDemaskTiming
+  }
+  class MaskSite {
+    detectors: Option~DetectorChain~
+    roles: MaskRoles
+  }
+  class TurnMaskingState {
+    vault: PiiVault
+    visible: BTreeSet~String~
+    demask_completed
+  }
+  class PiiVault {
+    forward / reverse maps
+    counters
+    placeholder_for()
+  }
+  class EgressMask {
+    masking: &'static SensitiveMasking
+    state: TurnMaskingState
+    _turn_scope: TurnGuard
+  }
+  class GuardrailScanCheckpoint {
+    <<guardrail_scan_cache::Checkpoint>>
+    verified_len
+    verified_digest
+  }
+  class MaskingScanCheckpoint {
+    <<masking_scan_cache::Checkpoint>>
+    verified_len_x / digest_x
+    verified_len_w / digest_w
+    slots: Vec~Option~Arc~[SensitiveSpan]~~~
+  }
+  class TurnGuard {
+    held: Vec~Arc~dyn TurnScoped~~
+    Drop: unpin
+  }
+  class TurnScoped {
+    <<trait>>
+    pin() · unpin() · is_built()
+  }
+  class TurnSlot~T,E~
+  class GuardrailsConfig {
+    pii: PiiConfig
+    prompt_injection: PromptInjectionConfig
+    pin_engines: bool
+  }
+  class PiiConfig {
+    mode: PiiMode
+    tool_args, filter_labels
+    countries: Option~Vec~PiiCountry~~
+  }
+  class PromptInjectionConfig {
+    tool_output: enabled, labels, rules
+  }
+
+  InputGuardrail <|.. SensitiveGuardrail
+  OutputGuardrail <|.. SensitiveGuardrail
+  ToolInputGuardrail <|.. SensitiveGuardrail
+  ToolOutputGuardrail <|.. SensitiveGuardrail
+  InputGuardrail <|.. DeniedPatternGuardrail
+  OutputGuardrail <|.. DeniedPatternGuardrail
+  ToolInputGuardrail <|.. DeniedPatternGuardrail
+  ToolOutputGuardrail <|.. DeniedPatternGuardrail
+  ToolInputGuardrail <|.. ToolInputPack
+  ToolInputGuardrail <|.. ClassifierGuardrail
+  OutputGuardrail <|.. OutputExfilGuardrail
+  ToolOutputGuardrail <|.. ToolOutputExfilGuardrail
+  GuardrailSet o-- InputGuardrail
+  GuardrailSet o-- OutputGuardrail
+  GuardrailSet o-- ToolInputGuardrail
+  GuardrailSet o-- ToolOutputGuardrail
+  SensitiveGuardrail *-- DetectorChain
+  DetectorChain o-- SensitiveDetector
+  SensitiveMasking *-- DetectorChain
+  SensitiveMasking *-- MaskSite
+  TurnMaskingState *-- PiiVault
+  EgressMask --> SensitiveMasking
+  EgressMask *-- TurnMaskingState
+  EgressMask *-- TurnGuard
+  GuardrailScanCheckpoint ..> InputGuardrail : keyed by the input chain (Arc ptr) + session
+  MaskingScanCheckpoint ..> DetectorChain : keyed by chain cache_key + session
+  TurnScoped <|.. TurnSlot
+  TurnGuard o-- TurnScoped
+  GuardrailsConfig *-- PiiConfig
+  GuardrailsConfig *-- PromptInjectionConfig
+  GuardrailsConfig ..> GuardrailSet : install → input + tool_output
+  GuardrailsConfig ..> SensitiveMasking : install → global masking

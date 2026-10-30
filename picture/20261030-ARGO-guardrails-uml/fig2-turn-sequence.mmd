@@ -1,0 +1,65 @@
+%% One turn: PII full, tool-output guard on, prompt guard on, pin_engines off (tinicli default)
+sequenceDiagram
+  autonumber
+  participant H as Host (REPL / TUI / gateway)
+  participant IG as Input chain<br/>SensitiveGuardrail "pii.input"
+  participant PG as Prompt guard<br/>CompiledGuard
+  participant DB as Session store
+  participant L as agent_loop_inner
+  participant M as pii_masking<br/>(SensitiveMasking + vault)
+  participant LLM as LLM provider
+  participant O as ToolOrchestrator
+  participant TO as Tool-output chain<br/>SensitiveGuardrail "prompt_injection.tool_output"
+  participant E as Engines (TurnSlot)<br/>PII · prompt injection
+
+  H->>H: turn_guard() — pins every registered TurnSlot for this turn
+  H->>IG: run_input_guardrails_with_text(user text)
+  IG->>E: PiiSpanDetector("input").detect → spawn_blocking analyze_with_meta<br/>PatternFilter::scan_narrowed → slot.acquire() (build or reuse)
+  E-->>IG: spans
+  alt PII found (input chain blocks)
+    IG-->>H: Refuse — nothing is stored, admit is not called
+  else clean
+    H->>PG: prompt_guard::admit → compile_cached → evaluate_off_thread
+    PG->>E: spawn_blocking: analyze_keep_nested on the prompt-injection slot<br/>(ActiveFilter::PiiTypes = the guard's rule ids)
+    alt prompt-guard Block
+      PG-->>H: Refuse — nothing is stored
+    else proceed (or Sanitize rewrite)
+      H->>DB: save_message
+      H->>L: agent_loop
+    end
+  end
+
+  L->>L: resolve_sensitive · turn_guard() (_turn_scope)
+  L->>PG: apply_inbound_prompt_guard (latest user message, again)
+  L->>L: resolve guardrails (per-run else global)
+  L->>IG: input pass over every user message<br/>guardrail_scan_cache: checkpoint_for · verify_prefix<br/>scan only the messages past the checkpoint · record_checkpoint
+  L->>M: TurnMaskingState::new() — per-turn PiiVault
+
+  loop each LLM call (tool round, then final answer)
+    L->>M: mask_messages_for_cloud_in_session (roles ALL)<br/>masking_scan_cache: verify_records → detect_all only the unverified messages
+    M->>E: PiiSpanDetector("default").detect → spawn_blocking
+    M-->>L: masked messages ([SENS:PII:…] placeholders kept in the vault)
+    L->>LLM: run_with_egress_scope(AlreadyMasked, call_llm)<br/>(client-layer EgressMask stays off)
+    LLM-->>L: tool call (args may hold placeholders) / final answer
+    opt tool call
+      L->>O: orchestrator.run(…, pii_demask_rewriter)
+      O->>O: tool_input chain on MASKED args (empty unless env/packs installed one)
+      opt the pii.demask_tool_args setting lists this tool
+        O->>M: approved-args rewriter built by agent_loop → demask_request_args (timing AfterApproval)
+      end
+      O->>O: execute tool (listed args demasked, everything else keeps placeholders)
+      O->>TO: finalize_call_raw → run_tool_output_guardrails on the RAW output
+      TO->>E: PromptInjectionDetector.detect → spawn_blocking analyze_keep_nested
+      TO-->>O: pass, or tripwire → result replaced in place
+      O-->>L: tool result (masked on the next LLM call)
+    end
+  end
+
+  L->>M: mask_llm_output_in_session (output layer, ASSISTANT_ONLY, one-way)
+  M->>E: PiiSpanDetector("output").detect → spawn_blocking
+  L->>M: demask_assistant_messages (vault) → final answer with real values
+  L->>L: output chain on the demasked answer (empty unless env/packs)
+  L->>L: loop's _turn_scope drops → its pin released (the host's pin remains)
+  L-->>H: AgentLoopResult
+  H->>H: host TurnGuard drops → engines released (kept when pin_engines)
+  Note over LLM,M: Background LLM calls (compaction, titles, …) carry no egress scope,<br/>so EgressGuard → EgressMask masks them at the client layer with its own vault.

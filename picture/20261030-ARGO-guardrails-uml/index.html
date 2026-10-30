@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARGO guardrails UML</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1f2328; --muted:#59636e; --line:#d1d9e0; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --line:#3d444d; } }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:15px/1.6 -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  main { max-width:1200px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  h2 { font-size:19px; margin:40px 0 8px; border-top:1px solid var(--line); padding-top:24px; }
+  p, li { color:var(--fg); }
+  .meta { color:var(--muted); font-size:13px; }
+  figure { margin:12px 0; }
+  figure img { width:100%; height:auto; background:#fff; border:1px solid var(--line); border-radius:6px; }
+  figcaption { color:var(--muted); font-size:13px; margin-top:4px; }
+  code { font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+<h1>ARGO guardrails 구조 (UML)</h1>
+<p class="meta">기준: ARGO 다국어 브랜치 <code>dev/byungchul.so/multilingual-support</code> 65395de87f · 작성 2026-10-30 · 각 그림의 Mermaid 원본(<code>.mmd</code>)과 SVG·PNG가 같은 디렉터리에 있습니다. 코드와 대조하는 리뷰를 거쳐 8건을 고친 판입니다.</p>
+
+<h2>1. 컴포넌트 / 패키지</h2>
+<p>모듈이 어디에 있고 무엇에 의존하는지 보여 줍니다. 대괄호는 그 모듈을 켜는 Cargo feature입니다.</p>
+<ul>
+  <li><code>guardrails::engine</code>은 도메인을 모르는 엔진이고 항상 컴파일됩니다. 밖으로는 <code>sensitive::turn_scope</code>(TurnSlot)에만 의존합니다.</li>
+  <li><code>pii</code>와 <code>prompt_injection</code>은 그 엔진 위에 얹은 규칙 묶음이고, 각자 프로세스 공용 TurnSlot을 하나씩 둡니다.</li>
+  <li>호스트는 <code>install_guardrails_from_config</code> 하나로 들어옵니다. 이 함수는 전역 GuardrailSet의 input(PII)·tool_output(prompt injection) chain과 전역 SensitiveMasking을 채웁니다. 입력 prompt guard는 여기서 설치하지 않고 <code>CoreConfig.prompt_guard</code>로 들어옵니다.</li>
+  <li><code>agent::loop_</code>는 <code>crate::guardrails</code>를 직접 부르지 않고, <code>agent</code>와 <code>sensitive</code>의 모듈을 거쳐서만 씁니다.</li>
+</ul>
+<figure><img src="fig1-components.svg" alt="guardrails component diagram"><figcaption>fig1-components (.svg · .png · .mmd)</figcaption></figure>
+
+<h2>2. 한 턴의 시퀀스</h2>
+<p>PII <code>full</code>, tool output 검사와 prompt guard를 켜고 <code>pin_engines</code>는 끈 상태(tinicli 기본값)에서, 사용자 메시지 하나·도구 호출 하나·최종 답 하나로 이루어진 턴입니다.</p>
+<ul>
+  <li>호스트의 pre-persist gate는 PII 입력 검사를 먼저 하고, 통과하면 prompt guard <code>admit</code>을 부릅니다. 어느 쪽이든 막히면 아무것도 저장하지 않습니다.</li>
+  <li>모든 스캔은 <code>spawn_blocking</code>에서 돌고, 엔진은 그때 TurnSlot에서 얻습니다(턴 안에서는 한 번 빌드해 재사용).</li>
+  <li>LLM 입력은 매 호출마다 마스킹하되, masking_scan_cache가 확인된 메시지는 다시 스캔하지 않습니다. tool_input chain은 마스킹된 인자를, tool_output chain은 원본 출력을 봅니다.</li>
+  <li>도구 인자는 <code>pii.demask_tool_args</code>에 적힌 것만 실제 값으로 되돌립니다. 최종 답은 vault로 되돌립니다.</li>
+  <li>엔진은 호스트의 TurnGuard가 놓일 때 해제됩니다. <code>pin_engines</code>가 켜져 있으면 상주합니다.</li>
+</ul>
+<figure><img src="fig2-turn-sequence.svg" alt="one turn sequence diagram"><figcaption>fig2-turn-sequence (.svg · .png · .mmd)</figcaption></figure>
+
+<h2>3. 클래스 (타입과 trait)</h2>
+<p>Rust에는 상속이 없으므로 struct와 trait 구현 관계로 그렸습니다. 필드와 메서드는 구조를 이해하는 데 필요한 것만 적었습니다.</p>
+<h3>3a. 엔진과 규칙 묶음</h3>
+<p><code>PatternEngine</code>은 DFA chunk 엔진과 hand-written detector들(<code>MatchEngine</code> 구현체)을 담고, <code>PatternFilter</code>는 TurnSlot을 통해 그 엔진을 얻어 layer나 rule id로 결과를 좁힙니다. PII와 prompt injection의 detector는 tinicore-traits의 <code>SensitiveDetector</code>를 구현합니다.</p>
+<figure><img src="fig3a-classes-engine.svg" alt="engine class diagram"><figcaption>fig3a-classes-engine (.svg · .png · .mmd)</figcaption></figure>
+<h3>3b. 가드레일 틀, 마스킹, 캐시, 설치</h3>
+<p><code>GuardrailSet</code>의 네 chain은 tinicore-traits의 guardrail trait 목록이고, <code>SensitiveGuardrail</code>이 detector chain을 네 trait 모두에 맞춰 줍니다. 마스킹은 <code>SensitiveMasking</code> 정책과 턴마다 생기는 <code>TurnMaskingState</code>(vault)로 나뉩니다.</p>
+<figure><img src="fig3b-classes-runtime.svg" alt="runtime class diagram"><figcaption>fig3b-classes-runtime (.svg · .png · .mmd)</figcaption></figure>
+</main>
+</body>
+</html>
