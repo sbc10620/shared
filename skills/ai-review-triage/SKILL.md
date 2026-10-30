@@ -1,5 +1,5 @@
 ---
-name: zai-review-triage
+name: ai-review-triage
 description: Triage a Z.ai (or any GitHub-Actions bot) code-review comment on a pull request — fetch the bot's latest comment, verify every finding against the actual code, classify each one (a defect to fix / true but no behavioural effect / not applicable or already handled), and report a table plus a stop/continue verdict using those plain labels, not bare letters; code changes happen only for defects to fix and only after the user approves. Response comments cover every finding, in the PR description's language. Use this whenever the user says a Z.ai review (or "bot review", "자동 리뷰", "Z.ai 리뷰") has been posted or updated on a PR, asks to "check the review", "review the review", or "respond to the review" — even if they do not name the bot. Do NOT use it for a human reviewer's comments or for reviewing the PR's own code from scratch.
 ---
 
