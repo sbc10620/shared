@@ -1,6 +1,6 @@
 ---
 name: dev-cycle
-description: "Run a code change through the development cycle that ends in a PR: the first plan reviewed once by a read-only subagent before user feedback; for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range (the code-review skill at high effort for the first round, medium after that), fix, and repeat until a round's fixes touch only docs and tests or there is nothing to fix; then, once before the PR, the slow checks, the full suites and the full e2e. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
+description: "Run a code change through the development cycle that ends in a PR: the first plan reviewed once by a read-only subagent before user feedback; for each planned commit, tests for new behaviour written first from the spec by a separate agent, implement, verify only what the change affects; once every commit exists, review the whole range (the agent's own built-in code review skill if it has one, otherwise the dev-cycle-code-review skill; high effort for the first round, medium after that), fix, and repeat until a round's fixes touch only docs and tests or there is nothing to fix; then, once before the PR, the slow checks, the full suites and the full e2e. Project-specific commands come from profiles/<repo>.md; a step the project has no way to run is skipped and reported. Use when implementing a planned change in a repository, when the user asks to verify, review or 'run the cycle' on a change ('개발 사이클', '리뷰 반복', 'PR 전 검증'), or before opening a PR."
 user-invocable: true
 ---
 
@@ -16,7 +16,7 @@ for each planned commit:
 
 once every planned commit exists:
   review the whole range in a read-only subagent ─► report, wait for decisions
-  (code-review skill: high in round 1, medium from round 2; no skill: by hand)
+  (built-in review skill, else dev-cycle-code-review: high in round 1, medium from round 2)
         ▲                                         │
         └── verify what the fix affects ◄── fix the chosen findings (amend into their commits)
   ends after a round whose fixes touch only docs and tests, or that has nothing to fix
@@ -46,9 +46,11 @@ agent definitions.
 | Test agent | 3 | The spec for this commit, the user's decisions that override it, the test conventions | The implementation; test cases the orchestrator picked |
 | Reviewer | 6 | The range, this round's changes, earlier findings and decisions ("do not re-argue"), what was verified, the design principles | Edits |
 
-- The orchestrator picks the review method from its skill list and names it
-  in the reviewer prompt. A manual review in place of an available skill is
-  allowed only when the skill fails to run (step 6).
+- The orchestrator picks the review method from its skill list (step 6:
+  its own built-in code review skill first, otherwise
+  `dev-cycle-code-review`) and names it in the reviewer prompt. A manual
+  review in place of an available skill is allowed only when every
+  available skill fails to run (step 6).
 - When reporting a helper's result, say in a line or two what it was given.
   Show the full prompt only when the user asks.
 
@@ -208,36 +210,65 @@ The review covers the whole change (`<base>..HEAD`), never each commit on
 its own, unless the user asks: a later commit often changes what an earlier
 finding was about. Run it in a read-only subagent.
 
-- **With the `code-review` skill** (decide by the skill list, not by which
-  model or agent you are): the subagent MUST run it, at **high** effort in
-  the first round and **medium** from the second round on, including a
-  round reopened by a fix from step 9. Every round covers the whole
-  range; from the second, the prompt points it at what
-  changed this round. (High runs several finder angles for recall; medium
-  makes one careful correctness pass and reports only what it believes is
-  real.) Pass the focus in the skill's arguments, in one call:
-  `<level> <base>..HEAD — Report findings only, no edits.` then one line per
-  item of `references/design-principles.md` (the principle and its "Look
-  for" cell), the earlier rounds' findings and decisions, and the user's
-  guiding rules; the skill does not know the list otherwise. If the skill
-  fails to run, the subagent reviews the range by hand in the same pass and
-  says so on its first line ("manual review — code-review skill failed:
-  <reason>"); the orchestrator passes that on in its report. A fixup that
-  looks small is no reason to skip the skill.
-- **Without the skill:** review the range by hand for correctness, edge
-  cases, regressions, consistency between code, config, tests and docs, the
-  repository's own rules, and the design principles, in the same pass.
+- **Which skill** (decide by your skill list, not by which model or agent
+  you are):
+  1. your own built-in code review skill, if you have one;
+  2. otherwise the `dev-cycle-code-review` skill (installed beside this
+     one), which any agent can run.
+- The subagent MUST run the chosen skill, at **high** effort in the first
+  round and **medium** from the second round on, including a round reopened
+  by a fix from step 9. Every round covers the whole range; from the second,
+  the prompt points it at what changed this round. (High runs several
+  finder angles for recall; medium makes one careful correctness pass and
+  reports only what it believes is real.) Pass the focus in the skill's
+  arguments, in one call: `<level> <base>..HEAD — Report findings only, no
+  edits.` then one line per item of `references/design-principles.md` (the
+  principle and its "Look for" cell), the earlier rounds' findings and
+  decisions, and the user's guiding rules; the skill does not know the list
+  otherwise. A fixup that looks small is no reason to skip the skill.
+- **If the chosen skill fails to run:** a built-in skill falls back to
+  `dev-cycle-code-review` in the same subagent, which then puts one line
+  before that skill's report: `built-in review skill failed: <reason>`
+  (the method line that follows counts as the required method, with its
+  reason given). If that fails too (or is not
+  installed), the subagent reviews the range by hand in the same pass —
+  correctness, edge cases, regressions, consistency between code, config,
+  tests and docs, the repository's own rules, and the design principles —
+  and says so on its first line ("manual review — <skill> failed:
+  <reason>"); the orchestrator passes that on in its report.
 
 Design principles are never checked by a separate agent or a second review
 (that doubles the tokens for one range). The report's first line states the
-method actually used ("code-review skill, high", "code-review skill,
-medium" or "manual review"); a report without it, or with another method
-than required and no reason given, is rerun, not used.
+method actually used (the skill's name and level, e.g.
+"dev-cycle-code-review, high", or "manual review — …"); a report without
+it, or with another method than required and no reason given, is rerun,
+not used.
 
 From the second round on, the prompt carries the earlier rounds' findings
 with their decisions, and the decisions already made, marked "do not
-re-argue". A fix that changes behaviour the spec covers gets its expected
-values from the test agent (step 3), not from the implementer.
+re-argue". The orchestrator writes them in this block, after the design
+principles, one line per finding of every earlier round:
+
+```
+Earlier rounds (do not re-argue):
+- R<round>#<n> <path>:<line> — <the finding, one line> — <decision>
+User decisions (do not re-argue):
+- <a decision the user made, one line>
+Changed this round: <commits or files>
+```
+
+- `<decision>` is one of: `fixed in <commit>` (the reviewer may check that
+  the fix holds, not raise the finding again), `not fixed: <reason>` (the
+  user chose not to fix it), `not applicable: <reason>` (the finding did not
+  hold against the code).
+- "User decisions" are choices that are not tied to one finding: a design
+  principle the user decided against, a scope limit, a rule from an earlier
+  milestone.
+- Keep every line to one line; the block is the reviewer's whole memory of
+  earlier rounds.
+
+A fix that changes behaviour the spec covers gets its expected values from
+the test agent (step 3), not from the implementer.
 
 Then check every finding against the code before reporting it:
 
@@ -251,7 +282,7 @@ Then check every finding against the code before reporting it:
 ## 7. Report, then wait
 
 ```
-방법: <the reviewer's first line, e.g. code-review skill, medium>
+방법: <the reviewer's first line, e.g. dev-cycle-code-review, medium>
 결론: 고칠 결함 <n>건 / 사실이지만 동작 영향 없음 <n>건 / 해당 없음·이미 처리됨 <n>건
 
 | # | 지적 | 판정 | 확인 결과 (한 줄) | 수정안 |
@@ -328,11 +359,14 @@ HEAD:
 - A test that passed on the base and now fails is a failure: find the cause
   and fix it (a failure that also happens on the base, or a flaky test that
   passes on a rerun, is reported, not fixed).
-- A difference the plan does not allow (a regression comparison, a
-  performance measurement, a test that disappeared or appeared) stops the
-  cycle: report it and let the user decide whether it is a defect to fix or
-  a behaviour to allow. An allowed difference is written into the plan's
-  allowed differences, so it is not raised again.
+- A difference the plan does not allow (a regression comparison, a test
+  that disappeared or appeared) stops the cycle: report it and let the user
+  decide whether it is a defect to fix or a behaviour to allow. A
+  performance or memory measurement follows its profile: where the profile
+  says it does not stop the cycle, finish the other checks and report it
+  next to the base, but do not move on to the PR until the user has
+  decided. An allowed difference is written into the plan's allowed
+  differences, so it is not raised again.
 - A failure, or a difference the user calls a defect, is fixed and
   re-checked here (only the affected part), goes through the review loop
   (steps 6 to 8), and then this whole step runs again on the new HEAD.
@@ -343,7 +377,10 @@ instructions; wait for each.
 
 After a history rewrite (squash, rebase, reword), verify the final HEAD
 only, not each commit. A rewrite that leaves the tree identical
-(`git diff --quiet <old> <new>`) needs no re-run.
+(`git diff --quiet <old> <new>`) needs no re-run; otherwise rerun, on the
+final HEAD, the checks that the changed files call for
+(`git diff --name-only <old> <new>` through the profile's path table, at
+the moment the cycle is in).
 
 ## 10. Grow the profile
 

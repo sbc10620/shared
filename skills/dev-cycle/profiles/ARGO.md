@@ -294,9 +294,10 @@ it. It does not stop the cycle.
 The Z.ai review job runs only on the self-hosted `zai-review` runner. When
 that runner is down every review job sits queued and fails after 24 h
 (check `gh api repos/AGENTIC/ARGO/actions/workflows/code-review.yml/runs`:
-no recent success, jobs with no runner). Then a subagent runs
-`/code-review` high over the PR range, and the result is posted only on
-instruction, as a "Claude Review" comment.
+no recent success, jobs with no runner). Then a subagent reviews the PR
+range at high effort, with its own built-in code review skill or else
+`dev-cycle-code-review`, and the result is posted only on instruction, as a
+"Claude Review" comment.
 
 ## Pitfalls
 
