@@ -1,0 +1,29 @@
+%%{init: {"themeVariables": {"fontSize": "20px", "messageFontSize": "19px", "noteFontSize": "18px", "actorFontSize": "20px"}, "sequence": {"messageMargin": 45, "actorMargin": 80, "wrap": true}}}%%
+%% Part 1 of a turn: the host's pre-persist gate (tinicli REPL/TUI, gateway)
+sequenceDiagram
+  autonumber
+  participant H as Host
+  participant IG as PII input check
+  participant PG as Prompt guard
+  participant E as Engines (TurnSlot)
+  participant DB as Session store
+  participant L as agent_loop
+
+  H->>H: turn_guard() — hold the engines for this turn
+  H->>IG: run_input_guardrails_with_text
+  IG->>E: PII scan (spawn_blocking)
+  E-->>IG: spans
+  alt PII found
+    IG-->>H: refuse — nothing stored
+  else clean
+    H->>PG: admit
+    PG->>E: prompt-injection scan (spawn_blocking)
+    alt Block rule matched
+      PG-->>H: refuse — nothing stored
+    else pass (or Sanitize rewrite)
+      H->>DB: save_message
+      H->>L: agent_loop (part 2)
+      L-->>H: result
+    end
+  end
+  H->>H: TurnGuard drops — engines released (kept if pin_engines)

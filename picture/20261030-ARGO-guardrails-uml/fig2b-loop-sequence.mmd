@@ -1,0 +1,37 @@
+%%{init: {"themeVariables": {"fontSize": "20px", "messageFontSize": "19px", "noteFontSize": "18px", "actorFontSize": "20px"}, "sequence": {"messageMargin": 45, "actorMargin": 70, "wrap": true}}}%%
+%% Part 2 of a turn: inside agent_loop (PII full, tool-output guard on, prompt guard on)
+sequenceDiagram
+  autonumber
+  participant L as agent_loop
+  participant G as Guards<br/>(prompt guard, PII input)
+  participant M as Masking<br/>(+ vault)
+  participant LLM as LLM
+  participant O as Tool orchestrator
+  participant TO as Tool-output check
+
+  L->>G: prompt guard on the new user message
+  L->>G: PII input check on every user message
+  Note right of G: scan cache: only messages<br/>after the last checkpoint
+  L->>M: new per-turn vault
+
+  loop each LLM call
+    L->>M: mask the request (user, tool, assistant)
+    Note right of M: scan cache: only new messages<br/>PII → [SENS:PII:…] placeholders
+    L->>LLM: masked request
+    LLM-->>L: tool call or final answer
+    opt tool call
+      L->>O: run the tool call
+      O->>O: tool_input chain (sees placeholders)
+      opt tool listed in pii.demask_tool_args
+        O->>M: demask the listed args
+      end
+      O->>O: execute the tool
+      O->>TO: check the RAW tool output
+      TO-->>O: pass, or replace the result
+      O-->>L: tool result
+    end
+  end
+
+  L->>M: mask PII in the model's answer (output layer, one-way)
+  L->>M: demask the answer from the vault
+  L->>L: output chain on the final answer
