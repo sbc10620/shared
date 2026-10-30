@@ -35,7 +35,7 @@ import subprocess
 import sys
 
 import decl
-from verify_spec import DEF_RE, SOURCE_EXT, TEST_PATH, block_end, enclosing_header
+from verify_spec import DEF_RE, SOURCE_EXT, TEST_PATH, block_end, enclosing_header, header_key
 
 FN_GROUPS = (1, 2, 3, 4, 5)  # DEF_RE groups that declare a function
 GREP_CHUNK = 200  # names per `git grep`: one huge alternation makes git grep fail
@@ -43,6 +43,9 @@ ANY_QUAL = {"self", "Self", "super", "crate", "this"}
 # `Q::name(` / `name(` / `name::<T>(`, or a path `Q::name` used as a value.
 CALL_FORMS = re.compile(r"(?:\b(\w+)\s*::\s*)?\b(\w+)\s*(?:::<[^>]*>)?\s*\(|"
                         r"\b(\w+)::(\w+)\b(?!\s*(?:::|\())")
+# Comments and char literals (`'"'`) first, so a quote inside one opens no
+# string; then raw and plain strings, which may span lines.
+LITERALS = re.compile(r'//[^\n]*|/\*[\s\S]*?\*/|\'(?:\\.|[^\'\\\n])\'|r(#*)"[\s\S]*?"\1|"(?:\\[\s\S]|[^"\\])*"')
 STRINGS = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'|//.*$')
 COMMENT = ("//", "*", "/*", "#")
 IMPORT = re.compile(r"\s*(pub(\([^)]*\))?\s+)?(use|import|from|#include)\b")
@@ -67,8 +70,11 @@ def calls_in(text):
     `name(` / `Q::name(` / a path `Q::name`; "self" for `self.name(`;
     "blind" for a method on any other receiver (`x.name(`,
     `self.field.name(`), whose target a name cannot tell — the search
-    follows those only into the next waypoint. arity: the number of
-    arguments of a method call, or None."""
+    follows those only into the next waypoint. A function passed as a
+    value (`.and_then(kind_of_label)`) is not a call here: a bare name in
+    parentheses reads the same as a pattern binding (`Some(slot)`), so such
+    a step needs a waypoint. arity: the number of arguments of a method
+    call, or None."""
     text = STRINGS.sub('""', text)
     out = []
     for m in CALL_FORMS.finditer(text):
@@ -127,7 +133,7 @@ def split_name(s):
 class Repo:
     def __init__(self, path, rev, paths):
         self.path, self.rev, self.paths = path, rev, paths or ["."]
-        self.files, self.defs = {}, {}
+        self.files, self.defs, self.strings, self.alias_cache = {}, {}, {}, {}
         # One `git cat-file --batch` for every file: a `git show` per file
         # costs a process each, and a common name hits thousands of files.
         self.batch = subprocess.Popen(["git", "-C", path, "cat-file", "--batch"],
@@ -163,6 +169,12 @@ class Repo:
                 text = self.batch.stdout.read(int(header[2])).decode("utf-8", "replace")
                 self.batch.stdout.read(1)
             lines = text.splitlines()
+            for m in LITERALS.finditer(text):
+                a, b = text.count("\n", 0, m.start()), text.count("\n", 0, m.end())
+                imports_in_string = range(a + 1, b + 1)  # lines inside a string that spans lines
+                self.strings.setdefault(path, set()).update(imports_in_string)
+            if len(self.strings.get(path, ())) > 0.3 * max(len(lines), 1):
+                self.strings[path] = set()  # quotes out of step: trust no string span here
             spans, tests, imports, in_use = [], [], set(), False
             for i, l in enumerate(lines):
                 if in_use or IMPORT.match(l):
@@ -182,7 +194,7 @@ class Repo:
     def enclosing(self, path, i):
         """The definition (path, decl index, name) innermost around line i."""
         lines, spans, tests, imports = self.file(path)
-        if i in imports or any(a <= i <= b for a, b in tests):
+        if i in imports or i in self.strings.get(path, ()) or any(a <= i <= b for a, b in tests):
             return None
         best = None
         for a, b, name in spans:
@@ -206,6 +218,27 @@ class Repo:
                 d = (p, i, name)
                 if d not in self.defs[name]:
                     self.defs[name].append(d)
+        # `use a::orig as alias;`: a call to the alias reaches orig.
+        missing = [n for n in todo if not self.defs[n]]
+        if missing:
+            alt = "|".join(re.escape(n) for n in missing)
+            for p, i, text in self.grep(lambda ns: rf"\b\w+\s+as\s+(?:{alt})\b", missing):
+                for orig, alias in re.findall(r"\b(\w+)\s+as\s+(\w+)\b", text):
+                    if alias in missing and orig != alias:
+                        self.load_defs([orig])
+                        self.defs[alias] = [d for d in self.defs[orig] if d not in self.defs[alias]] + self.defs[alias]
+
+    def aliases(self, name):
+        """The names `use … name as alias;` gives a definition."""
+        if name not in self.alias_cache:
+            found = set()
+            for p, i, text in self.grep(lambda ns: rf"\b{re.escape(name)}\s+as\s+\w+", [name]):
+                found |= {a for o, a in re.findall(r"\b(\w+)\s+as\s+(\w+)\b", text) if o == name}
+            self.alias_cache[name] = sorted(found)
+            for a in found:
+                self.defs.setdefault(a, [])
+                self.defs[a] += [d for d in self.defs.get(name, []) if d not in self.defs[a]]
+        return self.alias_cache[name]
 
     def matches(self, d, qual):
         if not qual or qual in ANY_QUAL:
@@ -227,20 +260,32 @@ class Repo:
         return re.match(r"(pub(\([^)]*\))?\s+)?(unsafe\s+)?(impl|trait|class|interface|extension|object)\b|"
                         r".*\b(class|interface|struct)\b", header) is not None
 
-    def resolve(self, qual, name, kind, arity, from_path):
+    def resolve(self, qual, name, kind, arity, from_path, from_decl=None):
         """The definitions a call may reach (see the module doc): same
         language; a method call only methods (a Rust one only with as many
-        parameters as arguments); a bare call free functions first; `Q::name`
-        only definitions under Q, and none when Q is outside the repository."""
+        parameters as arguments); a bare call the free functions nearest
+        the caller; `Self::name` the
+        caller's own block, `self::name` the caller's file; `Q::name` only
+        definitions under Q, and none when Q is outside the repository."""
         defs = [d for d in self.defs.get(name, []) if lang(d[0]) == lang(from_path)]
-        if kind != "plain":
+        if kind in ("self", "blind"):
             defs = [d for d in defs if self.is_method(d)]
             if arity is not None and lang(from_path) == "rs":
                 defs = [d for d in defs if self.arity(d) in (None, arity)]
             return defs
         if qual is None:
-            free = [d for d in defs if not self.is_method(d)]
-            return free or defs
+            # A bare call reaches what is in scope: of the free functions,
+            # those nearest the caller (the longest shared directory path).
+            free = [d for d in defs if not self.is_method(d)] or defs
+            near = lambda d: len(os.path.commonpath([d[0], from_path])) if d[0].split("/")[0] == from_path.split("/")[0] else -1
+            best = max((near(d) for d in free), default=None)
+            return [d for d in free if near(d) == best]
+        if qual == "Self" and from_decl is not None:
+            own = header_key(enclosing_header(self.lines(from_path), from_decl))
+            return [d for d in defs if d[0] == from_path
+                    and header_key(enclosing_header(self.lines(d[0]), d[1])) == own]
+        if qual == "self":
+            return [d for d in defs if d[0] == from_path]
         hit = [d for d in defs if self.matches(d, qual)]
         if qual not in ANY_QUAL:
             return hit  # `Q::name` with no definition under Q names an outside item
@@ -290,7 +335,7 @@ def cfg_above(repo, path, decl_i, call_i):
 
 def call_pattern(names):
     alt = "|".join(re.escape(n) for n in names)
-    return rf"\b(?:{alt})\s*(?:::<[^>]*>)?\s*\(|::(?:{alt})\b|[(,]\s*(?:{alt})\s*[),]"
+    return rf"\b(?:{alt})\s*(?:::<[^>]*>)?\s*\(|::(?:{alt})\b"
 
 
 def expand_down(repo, frontier, parent, goal):
@@ -301,7 +346,7 @@ def expand_down(repo, frontier, parent, goal):
     nxt = []
     for d in frontier:
         for q, n, k, a, j in calls[d]:
-            for c in repo.resolve(q, n, k, a, d[0]):
+            for c in repo.resolve(q, n, k, a, d[0], d[1]):
                 if c == d or c in parent or (k == "blind" and c not in goal):
                     continue
                 parent[c] = (d, j)
@@ -314,6 +359,7 @@ def expand_up(repo, frontier, parent, allow, goal):
     call line index). A blind method call counts only into `goal`."""
     names = list(dict.fromkeys(n for _, _, n in frontier))
     repo.load_defs(names)
+    names += [a for n in list(names) for a in repo.aliases(n) if a not in names]
     want = set(frontier)
     nxt = []
     for p, i, text in repo.grep(call_pattern, names):
@@ -323,7 +369,7 @@ def expand_up(repo, frontier, parent, allow, goal):
         for q, n, k, a in calls_in(text):
             if n not in repo.defs:
                 continue
-            hit = [c for c in repo.resolve(q, n, k, a, p)
+            hit = [c for c in repo.resolve(q, n, k, a, p, caller[1])
                    if c in want and c != caller and (k != "blind" or c in goal)]
             if hit and caller not in parent:
                 parent[caller] = (hit[0], i)
@@ -331,7 +377,7 @@ def expand_up(repo, frontier, parent, allow, goal):
     return nxt
 
 
-def search(repo, tops, targets, max_depth):
+def search(repo, tops, targets, max_depth, receiver_ok=True):
     """Shortest chain from one of `tops` down to one of `targets` (lists of
     definitions). Returns [(definition, call line index or None)] or None."""
     down = {t: None for t in tops}
@@ -339,7 +385,8 @@ def search(repo, tops, targets, max_depth):
     dist_down = {t: 0 for t in tops}
     dist_up = {t: 0 for t in targets}
     f_down, f_up = list(tops), list(targets)
-    top_set, goal = set(tops), set(targets)
+    # A method call on another receiver may land only on an explicit stop.
+    top_set, goal = set(tops), (set(targets) if receiver_ok else set())
     allow = lambda d: d[2] != tops[0][2] or d in top_set  # another binary's main never ends a chain
     meet = next((t for t in tops if t in up), None)
     for _ in range(max_depth):
@@ -376,6 +423,39 @@ def search(repo, tops, targets, max_depth):
     return chain
 
 
+def cargo_paths(repo, rev, main_path):
+    """The directories of the Cargo crate that holds `main_path` and of
+    every crate it reaches through `path = "…"` dependencies, or None when
+    `main_path` is in no Cargo crate. A call cannot reach a crate the
+    binary does not link, so the search stays inside these."""
+    def show(p):
+        r = subprocess.run(["git", "-C", repo, "show", f"{rev}:{p}"], capture_output=True, text=True)
+        return r.stdout if r.returncode == 0 else None
+    d = os.path.dirname(main_path)
+    while d and show(f"{d}/Cargo.toml") is None:
+        d = os.path.dirname(d)
+    if not d:
+        return None
+    seen, todo = [], [d]
+    while todo:
+        c = os.path.normpath(todo.pop(0))
+        if c in seen:
+            continue
+        seen.append(c)
+        section = ""
+        for line in (show(f"{c}/Cargo.toml") or "").splitlines():
+            line = line.split("#")[0].strip()
+            if line.startswith("["):
+                section = line
+                continue
+            if "dependencies" not in section:
+                continue  # `[lib]` / `[[bin]]` paths are not crates
+            m = re.search(r'\bpath\s*=\s*"([^"]+)"', line)
+            if m:
+                todo.append(os.path.join(c, m.group(1)))
+    return seen
+
+
 def definitions_of(repo, spec):
     qual, name = split_name(spec)
     repo.load_defs([name])
@@ -395,9 +475,19 @@ def main():
     ap.add_argument("--via", action="append",
                     help="a waypoint, in order (repeatable): a `via` function, or a hint where a call "
                          "goes through a method on another receiver (trait dispatch)")
-    ap.add_argument("--paths", nargs="*", help="limit the search to these directories")
+    ap.add_argument("--paths", nargs="*",
+                    help="limit the search to these directories (default: for a Cargo binary, its crate "
+                         "and the crates it reaches through path dependencies)")
+    ap.add_argument("--receiver-call", action="store_true",
+                    help="let a method call on a receiver other than `self` reach <function> too (a "
+                         "`--via` waypoint always may); without it such a call reaches only waypoints, "
+                         "since `status.code()` would otherwise reach any method named `code`")
     ap.add_argument("--max-depth", type=int, default=60)
     a = ap.parse_args()
+    if not a.paths:
+        a.paths = cargo_paths(a.repo, a.rev, a.main_path)
+        if a.paths:
+            print(f"  searching the crates {a.main_path} links: {' '.join(a.paths)}", file=sys.stderr)
     repo = Repo(a.repo, a.rev, a.paths)
     repo.load_defs(["main"])
     mains = [d for d in repo.defs["main"] if d[0].endswith(a.main_path)]
@@ -405,8 +495,10 @@ def main():
         sys.exit(f"no `main` in {a.main_path} at {a.rev}")
     stops = [definitions_of(repo, w) for w in a.via or []] + [definitions_of(repo, a.function)]
     chain, tops = [], mains
-    for spec, stop in zip((a.via or []) + [a.function], stops):
-        part = search(repo, tops, stop, a.max_depth)
+    specs = (a.via or []) + [a.function]
+    for k, (spec, stop) in enumerate(zip(specs, stops)):
+        last = k == len(specs) - 1
+        part = search(repo, tops, stop, a.max_depth, receiver_ok=not last or a.receiver_call)
         if not part:
             sys.exit(f"no chain down to {spec} from {chain[-1][0][2] if chain else 'main'}")
         chain = chain[:-1] + part

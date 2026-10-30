@@ -430,9 +430,15 @@ def layout(nodes):
             if n["col"] != c:
                 continue
             for ln, t, kind in edges_of(n):
-                if kind != "use" and t in by_id and by_id[t]["col"] == c and (ln.get("hops") or ln.get("label")):
-                    tw = edge_label_width(ln)
+                if kind == "use" or t not in by_id or not (ln.get("hops") or ln.get("label")):
+                    continue
+                tw = edge_label_width(ln)
+                if by_id[t]["col"] == c:
                     reach = max(reach, max(n["w"], by_id[t]["w"]) + 36 + tw)
+                elif by_id[t]["col"] == c + 1:
+                    # Centred between the two boxes: the gap after this box
+                    # (reach + 24 below) must hold it.
+                    reach = max(reach, n["w"] + tw)
         right = max(right, x + reach + 12)
         x += max(widest + COL_GAP, reach + 24)
     total_w = max(x - COL_GAP, right) + MARGIN
@@ -590,7 +596,7 @@ def render_node(n, by_id, out):
     out.append('</g>')
 
 
-def render_edges(nodes, by_id, out):
+def render_edges(nodes, by_id, out, labels):
     for n in nodes:
         for ln, t, kind in edges_of(n):
             tgt = by_id[t]
@@ -608,7 +614,7 @@ def render_edges(nodes, by_id, out):
                 d = f"M{x1},{y1} C{x1+dx},{y1} {x2-dx},{y2} {x2-2},{y2}"
             if kind == "use":
                 attrs = 'stroke="#7d8590" stroke-width="1.4" stroke-dasharray="2 4" fill="none"'
-            elif ln.get("hops"):
+            elif ln.get("hops") and kind != "defer":
                 attrs = ('stroke="#79a8ff" stroke-width="1.5" stroke-dasharray="10 4 2 4" fill="none" '
                          'marker-end="url(#arrow)"')
             elif kind == "defer":
@@ -627,22 +633,23 @@ def render_edges(nodes, by_id, out):
                     lx, ly = xm + 8 + tw / 2, (y1 + y2) / 2 + 2
                 else:
                     lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6
-                out.append(f'<g class="hops"><title>{escape("거친 함수: " + full)}</title>'
+                labels.append(f'<g class="hops"><title>{escape("거친 함수: " + full)}</title>'
                            f'<rect x="{lx-tw/2}" y="{ly-12}" width="{tw}" height="17" rx="8" fill="{BOX}" '
                            f'stroke="#79a8ff" stroke-width="0.9" stroke-dasharray="3 2"/>'
                            f'<text x="{lx}" y="{ly+1}" text-anchor="middle" font-family="{CODE_FONT}" '
                            f'font-size="11" fill="#79a8ff">{escape(text)}</text></g>')
             if ln.get("label"):
                 tw = text_width(ln["label"], 11) + 10
+                below = 21 if ln.get("hops") else 0  # under the hops label, never on it
                 if tgt["col"] == n["col"]:
-                    lx, ly = xm + 8 + tw / 2, (y1 + y2) / 2 + 2  # clear of both boxes, as above
+                    lx, ly = xm + 8 + tw / 2, (y1 + y2) / 2 + 2 + below  # clear of both boxes, as above
                 else:
-                    lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6
+                    lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 6 + below
                 col = "#c297ff" if kind == "defer" else "#79a8ff"
-                out.append(f'<rect x="{lx-tw/2}" y="{ly-12}" width="{tw}" height="17" rx="4" fill="{BOX}" '
-                           f'stroke="{col}" stroke-width="0.8"/>')
-                out.append(f'<text x="{lx}" y="{ly+1}" text-anchor="middle" font-family="{TEXT_FONT}" '
-                           f'font-size="11" fill="{col}">{escape(ln["label"])}</text>')
+                labels.append(f'<rect x="{lx-tw/2}" y="{ly-12}" width="{tw}" height="17" rx="4" fill="{BOX}" '
+                              f'stroke="{col}" stroke-width="0.8"/>')
+                labels.append(f'<text x="{lx}" y="{ly+1}" text-anchor="middle" font-family="{TEXT_FONT}" '
+                              f'font-size="11" fill="{col}">{escape(ln["label"])}</text>')
 
 
 def render_legend(x, y, out):
@@ -693,10 +700,11 @@ def render(group, fig):
     nodes = sorted(nodes, key=lambda n: (n["col"], n["y"], n["id"]))
     total_w = max(total_w, 1400)
     total_h += 20
-    body, edges, head = [], [], []
+    body, edges, head, labels = [], [], [], []
     for n in nodes:
         render_node(n, by_id, body)
-    render_edges(nodes, by_id, edges)
+    # Edge labels go on top of the boxes, so a box never hides one.
+    render_edges(nodes, by_id, edges, labels)
     head.append(f'<text x="{MARGIN}" y="{MARGIN+4}" font-family="{TEXT_FONT}" font-size="18" font-weight="700" '
                 f'fill="#e6edf3">{escape(fig["title"])}</text>')
     sub = "  ·  ".join(s for s in (group.get("range"), fig.get("caption")) if s)
@@ -713,7 +721,7 @@ def render(group, fig):
         'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c297ff"/></marker>'
         '</defs>',
         f'<rect width="100%" height="100%" fill="{CANVAS}"/>',
-        *head, *edges, *body, '</svg>',
+        *head, *edges, *body, *labels, '</svg>',
     ])
 
 

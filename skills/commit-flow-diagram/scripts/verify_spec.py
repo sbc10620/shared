@@ -169,7 +169,10 @@ def moved_definitions(repo, before, after):
         if TEST_PATH.search(path):
             continue  # tests are never drawn, moved or not
         raw = all_added_lines(repo, before, after, path)
+        stop = _test_from(git(repo, "show", f"{after}:{path}").splitlines())
         for name, a, b in spans:
+            if stop is not None and a >= stop:
+                continue  # inside the inline test module
             if any(a < n <= b + 1 for n in raw):
                 out[(name, path, a + 1)] = True
     return out
@@ -185,6 +188,18 @@ def _test_from(lines):
     return None
 
 
+def header_key(h):
+    """A block header without paths, generics, lifetimes, braces or
+    spacing, so `impl a::F for X<'_> {` and `impl F for X {` are one block."""
+    if h is None:
+        return None
+    prev = None
+    while prev != h:
+        prev, h = h, re.sub(r"<[^<>]*>", "", h)
+    h = re.sub(r"\b\w+::", "", h)  # `crate::a::Trait` and `super::Trait` are one trait
+    return re.sub(r"\s+|[{:]$", "", h.replace("{", ""))
+
+
 def _placed_definitions(lines, path):
     """{(name, enclosing header)} of a file's non-test definitions."""
     out, stop = set(), _test_from(lines)
@@ -192,7 +207,7 @@ def _placed_definitions(lines, path):
         d = definition(lines, i, path)
         if not d or (d[1] and lines[i][:1].isspace()):
             continue  # a const/static inside a body is not a definition of its own
-        out.add((d[0], enclosing_header(lines, i)))
+        out.add((d[0], header_key(enclosing_header(lines, i))))
     return out
 
 
@@ -205,12 +220,14 @@ def removed_definitions(repo, before, after):
     exists at `after`."""
     paths = [p for p in git(repo, "diff", "--name-only", "--no-renames", before, after).splitlines()
              if p.endswith(SOURCE_EXT) and not TEST_PATH.search(p)]  # both sides of a move
-    now = set()
+    now, bodies = set(), set()
     for path in paths:
         try:
-            now |= _placed_definitions(git(repo, "show", f"{after}:{path}").splitlines(), path)
+            lines = git(repo, "show", f"{after}:{path}").splitlines()
         except subprocess.CalledProcessError:
-            pass  # deleted file
+            continue  # deleted file
+        now |= _placed_definitions(lines, path)
+        bodies |= {(name, _no_vis(body)) for name, _, _, body in _bodies(lines, path)}
     out = []
     for path in paths:
         try:
@@ -222,8 +239,11 @@ def removed_definitions(repo, before, after):
             d = definition(old, i, path)
             if not d or (d[1] and old[i][:1].isspace()):
                 continue
-            if (d[0], enclosing_header(old, i)) not in now:
-                out.append((d[0], path, i + 1))
+            if (d[0], header_key(enclosing_header(old, i))) in now:
+                continue
+            if (d[0], _no_vis(_body(old, i)[0])) in bodies:
+                continue  # the same code under another block (moved into a function, say)
+            out.append((d[0], path, i + 1))
     return out
 
 
@@ -283,11 +303,14 @@ def _definitions(repo, before, after):
                     continue
                 lj = len(l) - len(l.lstrip())
                 d = definition(lines, j, path)
-                if d and d[1] and lj > 0 and j != i:
-                    d = None  # a const/static inside a body is not a definition of its own
+                if d and d[1] and lj > 0 and j != i and \
+                        re.search(r"\b(fn|def|func|fun|function)\b", enclosing_header(lines, j) or ""):
+                    d = None  # a const/static inside a function body is not a definition of its own
                 if d and (j == i or lj <= ind):
                     out[(d[0], path, j + 1)] = True
                     break
+                if not d and lj < ind and re.match(r"\s*(pub(\([^)]*\))?\s+)?(unsafe\s+)?(impl|trait|mod)\b", l):
+                    break  # reached the block's own header: the line belongs to no definition above it
                 if lj < ind:
                     ind = lj
     return out
@@ -373,32 +396,34 @@ def enclosing_header(lines, i):
         if not l.strip() or l.lstrip().startswith(("//", "#", "*", "/*")):
             continue
         if len(l) - len(l.lstrip()) < ind:
-            return l.strip()
+            # A header split over lines (`impl Trait` / `for X<'_>` / `{`):
+            # join it up to the line that opens it.
+            parts, k, lj = [l.strip()], j, len(l) - len(l.lstrip())
+            while not HEADER_KW.search(parts[0]) and k > 0 and len(parts) < 6:
+                k -= 1
+                p = lines[k]
+                if not p.strip() or len(p) - len(p.lstrip()) < lj:
+                    break
+                parts.insert(0, p.strip())
+            return " ".join(parts) if HEADER_KW.search(" ".join(parts)) else l.strip()
     return None
+
+
+HEADER_KW = re.compile(r"\b(impl|trait|class|interface|struct|enum|object|extension|mod|fn|def|func|fun)\b")
 
 
 def existed_before(after_lines, i, name, old_lines, path):
     """Whether a definition named `name` existed at `before` in the same
-    enclosing block (the same `impl … {` / class header) as the one at
-    after_lines[i]; at the top level, among top-level definitions."""
-    header = enclosing_header(after_lines, i)
-    spans = []
-    if header is None:
-        spans = [(0, len(old_lines) - 1, 0)]
-    else:
-        for k, l in enumerate(old_lines):
-            if l.strip() == header:
-                spans.append((k + 1, block_end(old_lines, k), len(l) - len(l.lstrip()) + 1))
-    for a, b, min_ind in spans:
-        for k in range(a, b + 1):
-            l = old_lines[k]
-            if header is None and l[:1].isspace():
-                continue
-            if header is not None and len(l) - len(l.lstrip()) < min_ind:
-                continue
-            d = definition(old_lines, k, path)
-            if d and d[0] == name:
-                return True
+    enclosing block (the same `impl … {` / class header, compared by
+    header_key) as the one at after_lines[i]; at the top level, among
+    top-level definitions."""
+    key = header_key(enclosing_header(after_lines, i))
+    for k, l in enumerate(old_lines):
+        if key is None and l[:1].isspace():
+            continue
+        d = definition(old_lines, k, path)
+        if d and d[0] == name and header_key(enclosing_header(old_lines, k)) == key:
+            return True
     return False
 
 
@@ -421,6 +446,7 @@ def hop_bodies(repo, after, hop, cache):
     if hop in cache:
         return cache[hop]
     name, where = hop_name(hop)
+    name = name.split("::")[-1].split(".")[-1]  # `cli_entry::run` -> `run`
     out = subprocess.run(["git", "-C", repo, "grep", "-nwF", name, after],
                          capture_output=True, text=True).stdout.splitlines()
     bodies, files = [], {}
@@ -434,7 +460,9 @@ def hop_bodies(repo, after, hop, cache):
         i = int(line) - 1
         d = definition(lines, i, path)
         if d and d[0] == name:
-            bodies.append(lines[i + 1:block_end(lines, i) + 1])
+            # Comments do not call anything: a name only in a comment is no hop.
+            bodies.append([re.sub(r"//.*$|/\*.*?\*/|#\s.*$", "", l) for l in lines[i + 1:block_end(lines, i) + 1]
+                           if not l.lstrip().startswith(("//", "*", "/*"))])
     cache[hop] = bodies
     return bodies
 

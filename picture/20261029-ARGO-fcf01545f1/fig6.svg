@@ -1,0 +1,314 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2026" height="2170" viewBox="0 0 2026 2170">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#79a8ff"/></marker><marker id="arrow-defer" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c297ff"/></marker></defs>
+<rect width="100%" height="100%" fill="#2a2c30"/>
+<text x="30" y="34" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="18" font-weight="700" fill="#e6edf3">그림 6 · 구간 모양 표의 바이트 판정 함수</text>
+<text x="30" y="54" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="11" fill="#9da7b3">ARGO · b37fa60e46..fcf01545f1 · argo-cli main() · feature guardrails  ·  Seg 의 Run·Opt 에 담긴 판정 함수입니다. all_in 과 segment_ends 가 표에서 꺼내 바이트마다 부릅니다.</text>
+<text x="30" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" font-weight="700" fill="#e6edf3">범례</text>
+<rect x="70" y="69" width="34" height="18" rx="6" fill="#35383e" stroke="#c9d1d9" stroke-width="1.6"/>
+<text x="112" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">함수</text>
+<rect x="158.48" y="69" width="34" height="18" rx="0" fill="#35383e" stroke="#c9d1d9" stroke-width="1.6" stroke-dasharray="7 4"/>
+<text x="200.48" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">구조체 · enum</text>
+<rect x="310.44" y="69" width="34" height="18" rx="0" fill="#35383e" stroke="#c9d1d9" stroke-width="1.6" stroke-dasharray="2 3"/>
+<text x="352.44" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">static · const</text>
+<rect x="476.92" y="69" width="34" height="18" rx="6" fill="#35383e" stroke="#c9d1d9" stroke-width="1.6"/>
+<rect x="479.92" y="72" width="28" height="12" rx="3" fill="none" stroke="#c9d1d9" stroke-width="1"/>
+<text x="518.9200000000001" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">트레잇</text>
+<rect x="577.6400000000001" y="69" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="594.6400000000001" y="82" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="623.6400000000001" y="69" width="34" height="18" rx="9" fill="#f0883e"/>
+<text x="640.6400000000001" y="82" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">변경</text>
+<rect x="669.6400000000001" y="69" width="34" height="18" rx="9" fill="#8b949e"/>
+<text x="686.6400000000001" y="82" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">기존</text>
+<path d="M725.6400000000001,78 h40" stroke="#79a8ff" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="773.6400000000001" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">호출 (호출 줄은 굵은 기울임, 호출되는 함수는 밑줄)</text>
+<path d="M1113.64,78 h40" stroke="#79a8ff" stroke-width="1.5" stroke-dasharray="10 4 2 4" marker-end="url(#arrow)"/>
+<text x="1161.64" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">중간 호출 생략 (라벨: 거친 함수)</text>
+<path d="M1389.0800000000002,78 h40" stroke="#c297ff" stroke-width="1.6" stroke-dasharray="8 5" marker-end="url(#arrow-defer)"/>
+<text x="1437.0800000000002" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">나중에 실행(클로저 등록)</text>
+<path d="M1610.7600000000002,78 h40" stroke="#7d8590" stroke-width="1.4" stroke-dasharray="2 4"/>
+<text x="1658.7600000000002" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">타입 · 데이터 사용</text>
+<rect x="1795.7200000000003" y="69" width="34" height="18" fill="#4b4220" stroke="#e3b341" stroke-width="0.8"/>
+<text x="1800.7200000000003" y="82" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="1837.7200000000003" y="82" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="12" fill="#c9d1d9">이 범위에서 추가 · 수정된 줄     ...  생략한 코드</text>
+<path d="M631.0,245.5 C992.35,245.5 992.35,245.5 1351.7,245.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C992.35,245.5 992.35,380.5 1351.7,380.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,245.5 739.0,245.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,380.5 739.0,380.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,515.5 739.0,515.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,650.5 739.0,650.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C992.35,245.5 992.35,515.5 1351.7,515.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,785.5 739.0,785.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,937.5 739.0,937.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,1072.5 739.0,1072.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,1224.5 739.0,1224.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,1359.5 739.0,1359.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,1494.5 739.0,1494.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,1629.5 739.0,1629.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,1764.5 739.0,1764.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,1899.5 739.0,1899.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M631.0,245.5 C686.0,245.5 686.0,2034.5 739.0,2034.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1243.7,866.0 C1298.7,866.0 1298.7,245.5 1351.7,245.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1243.7,866.0 C1298.7,866.0 1298.7,515.5 1351.7,515.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1243.7,1153.0 C1298.7,1153.0 1298.7,380.5 1351.7,380.5" stroke="#79a8ff" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<g class="node" id="n-all_in">
+<rect x="30" y="100" width="601.0" height="171" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="31" y="101" width="599.0" height="114" rx="8" fill="#21382a" />
+<path d="M31,215 H630.0" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="42" y="118" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>all_in(</text>
+<text x="42" y="133" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">bytes</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">[</tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">]</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="42" y="148" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">from</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">usize</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="42" y="163" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">to</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">usize</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="42" y="178" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">pred</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">fn</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="42" y="193" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="42" y="208" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/mod.rs:96</text>
+<rect x="589.0" y="108" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="606.0" y="121" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<text x="56" y="234" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#8fd694" xml:space="preserve">// 구간 바이트마다 표의 판정 함수 호출</text>
+<rect x="32" y="239" width="597.0" height="17" fill="#4b4220"/>
+<text x="42" y="251" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="56" y="251" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" font-style="italic" xml:space="preserve"><tspan fill="#e6edf3">from</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">&lt;</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">to</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">to</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">&lt;</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">bytes</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">len</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">bytes</tspan><tspan fill="#e6edf3">[</tspan><tspan fill="#e6edf3">from</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#e6edf3">to</tspan><tspan fill="#e6edf3">]</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">iter</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">all</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#d2a8ff" text-decoration="underline" data-go="p_digit">pred</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3">)</tspan></text>
+<circle cx="631.0" cy="245.5" r="3.5" fill="#3fb950"/>
+</g>
+<g class="node" id="n-p_dash">
+<rect x="741.0" y="225.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="226.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,295.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="243.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>dash(</text>
+<text x="753.0" y="258.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="273.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="288.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:181</text>
+<rect x="1201.7" y="233.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="246.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="302.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="314.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="314.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'-'</tspan></text>
+</g>
+<g class="node" id="n-p_dash_or_space">
+<rect x="741.0" y="360.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="361.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,430.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="378.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>dash_or_space(</text>
+<text x="753.0" y="393.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="408.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="423.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:184</text>
+<rect x="1201.7" y="368.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="381.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="437.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="449.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="449.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'-'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">' '</tspan></text>
+</g>
+<g class="node" id="n-p_nine">
+<rect x="741.0" y="495.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="496.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,565.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="513.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>nine(</text>
+<text x="753.0" y="528.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="543.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="558.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:187</text>
+<rect x="1201.7" y="503.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="516.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="572.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="584.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="584.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'9'</tspan></text>
+</g>
+<g class="node" id="n-p_one_to_nine">
+<rect x="741.0" y="630.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="631.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,700.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="648.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>one_to_nine(</text>
+<text x="753.0" y="663.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="678.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="693.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:190</text>
+<rect x="1201.7" y="638.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="651.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="707.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="719.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="719.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'1'</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'9'</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">contains</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">)</tspan></text>
+</g>
+<g class="node" id="n-p_mbi_alnum">
+<rect x="741.0" y="765.5" width="502.7" height="126" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="766.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,835.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="783.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>mbi_alnum(</text>
+<text x="753.0" y="798.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="813.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="828.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:198</text>
+<rect x="1201.7" y="773.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="786.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<text x="767.0" y="854.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#8fd694" xml:space="preserve">// 숫자 또는 MBI 글자</text>
+<rect x="743.0" y="859.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="871.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="871.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" font-style="italic" xml:space="preserve"><tspan fill="#d2a8ff" text-decoration="underline" data-go="p_digit">digit</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#d2a8ff" text-decoration="underline" data-go="p_mbi_letter">mbi_letter</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">)</tspan></text>
+<circle cx="1243.7" cy="866.0" r="3.5" fill="#3fb950"/>
+</g>
+<g class="node" id="n-p_dea_first">
+<rect x="741.0" y="917.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="918.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,987.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="935.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>dea_first(</text>
+<text x="753.0" y="950.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="965.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="980.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:202</text>
+<rect x="1201.7" y="925.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="938.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="994.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1006.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1006.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#a5d6ff">b"ABCDEFGHJKLMPRSTUX"</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">contains</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">)</tspan></text>
+</g>
+<g class="node" id="n-p_upper_or_nine">
+<rect x="741.0" y="1052.5" width="502.7" height="126" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="1053.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,1122.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="1070.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>upper_or_nine(</text>
+<text x="753.0" y="1085.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="1100.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="1115.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:206</text>
+<rect x="1201.7" y="1060.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="1073.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<text x="767.0" y="1141.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" fill="#8fd694" xml:space="preserve">// 대문자 또는 9</text>
+<rect x="743.0" y="1146.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1158.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1158.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" font-style="italic" xml:space="preserve"><tspan fill="#d2a8ff" text-decoration="underline" data-go="p_upper">upper</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'9'</tspan></text>
+<circle cx="1243.7" cy="1153.0" r="3.5" fill="#3fb950"/>
+</g>
+<g class="node" id="n-p_letter_a">
+<rect x="741.0" y="1204.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="1205.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,1274.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="1222.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>letter_a(</text>
+<text x="753.0" y="1237.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="1252.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="1267.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:209</text>
+<rect x="1201.7" y="1212.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="1225.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="1281.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1293.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1293.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'a'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'A'</tspan></text>
+</g>
+<g class="node" id="n-p_two_to_nine">
+<rect x="741.0" y="1339.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="1340.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,1409.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="1357.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>two_to_nine(</text>
+<text x="753.0" y="1372.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="1387.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="1402.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:212</text>
+<rect x="1201.7" y="1347.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="1360.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="1416.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1428.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1428.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'2'</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'9'</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">contains</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">)</tspan></text>
+</g>
+<g class="node" id="n-p_space_dot_or_dash">
+<rect x="741.0" y="1474.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="1475.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,1544.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="1492.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>space_dot_or_dash(</text>
+<text x="753.0" y="1507.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="1522.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="1537.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:216</text>
+<rect x="1201.7" y="1482.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="1495.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="1551.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1563.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1563.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#79c0ff">matches</tspan><tspan fill="#e6edf3">!</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">,</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">' '</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'.'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'-'</tspan><tspan fill="#e6edf3">)</tspan></text>
+</g>
+<g class="node" id="n-p_plus">
+<rect x="741.0" y="1609.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="1610.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,1679.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="1627.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>plus(</text>
+<text x="753.0" y="1642.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="1657.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="1672.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:219</text>
+<rect x="1201.7" y="1617.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="1630.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="1686.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1698.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1698.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'+'</tspan></text>
+</g>
+<g class="node" id="n-p_one">
+<rect x="741.0" y="1744.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="1745.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,1814.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="1762.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>one(</text>
+<text x="753.0" y="1777.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="1792.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="1807.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:222</text>
+<rect x="1201.7" y="1752.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="1765.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="1821.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1833.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1833.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'1'</tspan></text>
+</g>
+<g class="node" id="n-p_open_paren">
+<rect x="741.0" y="1879.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="1880.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,1949.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="1897.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>open_paren(</text>
+<text x="753.0" y="1912.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="1927.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="1942.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:225</text>
+<rect x="1201.7" y="1887.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="1900.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="1956.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="1968.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="1968.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'('</tspan></text>
+</g>
+<g class="node" id="n-p_close_paren">
+<rect x="741.0" y="2014.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="742.0" y="2015.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M742.0,2084.5 H1242.7" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="753.0" y="2032.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>close_paren(</text>
+<text x="753.0" y="2047.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="753.0" y="2062.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="753.0" y="2077.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:228</text>
+<rect x="1201.7" y="2022.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1218.7" y="2035.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="743.0" y="2091.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="753.0" y="2103.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="767.0" y="2103.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3">=</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">')'</tspan></text>
+</g>
+<g class="node" id="n-p_digit">
+<rect x="1353.7" y="225.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="1354.7" y="226.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M1354.7,295.5 H1855.4" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="1365.7" y="243.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>digit(</text>
+<text x="1365.7" y="258.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="1365.7" y="273.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="1365.7" y="288.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:175</text>
+<rect x="1814.4" y="233.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1831.4" y="246.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="1355.7" y="302.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="1365.7" y="314.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="1379.7" y="314.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">is_ascii_digit</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">)</tspan></text>
+</g>
+<g class="node" id="n-p_upper">
+<rect x="1353.7" y="360.5" width="502.7" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="1354.7" y="361.5" width="500.7" height="69" rx="8" fill="#21382a" />
+<path d="M1354.7,430.5 H1855.4" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="1365.7" y="378.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>upper(</text>
+<text x="1365.7" y="393.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="1365.7" y="408.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="1365.7" y="423.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:178</text>
+<rect x="1814.4" y="368.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1831.4" y="381.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="1355.7" y="437.5" width="498.7" height="17" fill="#4b4220"/>
+<text x="1365.7" y="449.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="1379.7" y="449.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">is_ascii_uppercase</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">)</tspan></text>
+</g>
+<g class="node" id="n-p_mbi_letter">
+<rect x="1353.7" y="495.5" width="630.28" height="109" rx="10" fill="#35383e" stroke="#3fb950" stroke-width="1.8"/>
+<rect x="1354.7" y="496.5" width="628.28" height="69" rx="8" fill="#21382a" />
+<path d="M1354.7,565.5 H1982.98" stroke="#3fb950" stroke-opacity="0.35"/>
+<text x="1365.7" y="513.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="13" font-weight="700" fill="#e6edf3" xml:space="preserve"><tspan fill="#9da7b3" font-weight="400">fn </tspan>mbi_letter(</text>
+<text x="1365.7" y="528.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">    </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">:</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">u8</tspan><tspan fill="#e6edf3">,</tspan></text>
+<text x="1365.7" y="543.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">-</tspan><tspan fill="#e6edf3">&gt;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#ff7b72">bool</tspan></text>
+<text x="1365.7" y="558.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="10" fill="#9da7b3">tinicore/src/guardrails/pii/handwritten/fixed_shape_detector.rs:194</text>
+<rect x="1941.98" y="503.5" width="34" height="18" rx="9" fill="#3fb950"/>
+<text x="1958.98" y="516.5" text-anchor="middle" font-family="'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', -apple-system, sans-serif" font-size="11" font-weight="700" fill="#16181c">신규</text>
+<rect x="1355.7" y="572.5" width="626.28" height="17" fill="#4b4220"/>
+<text x="1365.7" y="584.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" font-weight="700" fill="#e3b341">+</text>
+<text x="1379.7" y="584.5" font-family="'JetBrains Mono', Menlo, 'SF Mono', Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace" font-size="12" xml:space="preserve"><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">is_ascii_uppercase</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">)</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3">&amp;</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">!</tspan><tspan fill="#79c0ff">matches</tspan><tspan fill="#e6edf3">!</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#e6edf3">,</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'B'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'I'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'L'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'O'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'S'</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">|</tspan><tspan fill="#e6edf3"> </tspan><tspan fill="#e6edf3">b</tspan><tspan fill="#a5d6ff">'Z'</tspan><tspan fill="#e6edf3">)</tspan></text>
+</g>
+</svg>
