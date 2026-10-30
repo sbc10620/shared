@@ -103,9 +103,10 @@ shares one profile. No profile → follow "Without a profile" in
 - The plan names the worktree the change is made in, and its branch. By
   default it is a new worktree at `<main checkout>/.worktrees/<repo>-<topic>`
   (`<main checkout>` is
-  `$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")`,
-  so a cycle started inside another worktree still nests under the main
-  checkout; `<repo>` as in step 1, `<topic>` a few words in kebab case).
+  `$(cd "$(git rev-parse --git-common-dir)/.." && pwd -P)`, the same from
+  any directory of any worktree, so a cycle started inside another worktree
+  still nests under the main checkout; `<repo>` as in step 1, `<topic>` a
+  few words in kebab case).
   The user may name another place, or the current worktree, instead.
   Create it once the plan is agreed and before the baselines below, which
   build that tree. If `git check-ignore -q .worktrees/x` fails in the main
