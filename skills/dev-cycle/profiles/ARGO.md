@@ -301,6 +301,10 @@ range at high effort, with its own built-in code review skill or else
 
 ## Pitfalls
 
+- A worktree under `.worktrees/` sits inside the main checkout: run the
+  audits and the VM rsync in the change's worktree, never in the main
+  checkout (`scripts/_audit_walk.py` does not skip `.worktrees`, and rsync
+  would copy every nested worktree).
 - Worktrees sharing one `CARGO_TARGET_DIR` share fingerprints for the same
   package ids: cargo may reuse another revision's build and fail or, worse,
   run stale binaries. `touch` the revision's `tinicore-traits`, `tinicore`

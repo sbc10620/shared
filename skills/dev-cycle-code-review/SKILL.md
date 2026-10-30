@@ -1,6 +1,6 @@
 ---
 name: dev-cycle-code-review
-description: "Review a commit range or a pull request for real defects and report findings only, with no edits: gather the change and its context, look for defects at medium depth (one careful correctness pass) or high depth (several separate angles), verify every candidate against the code, and report the confirmed ones in a fixed format whose first line names the method. Agent-neutral: it needs only git, a shell and file reading; it uses sub-agents when the agent can start them and sequential passes otherwise. Use it as the dev-cycle reviewer when the agent has no built-in code review skill, or whenever the user asks for a review of a range ('리뷰해줘', 'review this range', 'review the PR') and no built-in review skill is available. Do NOT use it to fix code, to triage a review bot's comment (ai-review-triage does that), or to review a plan."
+description: "Review a commit range or a pull request for real defects and report findings only, with no edits: gather the change and its context, look for defects at medium depth (one careful correctness pass) or high depth (several separate angles), verify every candidate against the code, and report the confirmed and plausible ones in a fixed format whose first line names the method. Agent-neutral: it needs only git, a shell and file reading; it uses sub-agents when the agent can start them and sequential passes otherwise. Use it as the dev-cycle reviewer when the agent has no built-in code review skill, or whenever the user asks for a review of a range ('리뷰해줘', 'review this range', 'review the PR') and no built-in review skill is available. Do NOT use it to fix code, to triage a review bot's comment (ai-review-triage does that), or to review a plan."
 ---
 
 # Code review for the development cycle
@@ -26,23 +26,28 @@ The caller passes, in one message:
 ```
 
 - `<level>` is `medium` or `high`. Missing → `medium`.
-- The range may instead be a PR number; then the range is the PR's base
-  branch merge base to its head (`gh pr view <N> --json baseRefName,headRefOid`).
+- The caller names the worktree; run every command there (`git -C <path>`).
+- The range may instead be a PR number: take `baseRefName` and `headRefOid`
+  from `gh pr view <N> --json baseRefName,headRefOid`, run
+  `git fetch origin <baseRefName> pull/<N>/head`, and review
+  `$(git merge-base origin/<baseRefName> <headRefOid>)..<headRefOid>`.
 - Everything after the first line is **focus**: it adds what to look for and
   what not to raise. It never narrows the correctness pass.
-- From the second round on, the focus ends with the caller's record of
-  earlier rounds, in this block:
+- When there are earlier rounds (or milestones), the focus ends with the
+  caller's record of them, in this block:
 
   ```
   Earlier rounds (do not re-argue):
   - R<round>#<n> <path>:<line> — <the finding, one line> — <decision>
   User decisions (do not re-argue):
   - <a decision the user made, one line>
-  Changed this round: <commits or files>
+  Changed this round: <files> (git diff <previous round's head SHA> <head SHA>)
+  Verified this round: <the checks run, one line>
   ```
 
-  `<decision>` is `fixed in <commit>`, `not fixed: <reason>` or
-  `not applicable: <reason>`. See "Later rounds" for how each is used.
+  `<line>` is as of the round the finding was raised; with milestones the id
+  is `M<milestone>R<round>#<n>`. `<decision>` is `fixed in "<commit
+  subject>"`, `not fixed: <reason>` or `not applicable: <reason>`. See "Later rounds" for how each is used.
 
 ## Step 1 — Gather the change and its context
 
@@ -55,11 +60,11 @@ git diff <base>..<head>
 - For every changed hunk, read the **whole enclosing function** (or type),
   not only the hunk, at `<head>` (`git show <head>:<path>`).
 - For every changed function, type, constant or default, find its callers
-  and readers across the repository (`rg -n '<name>'`), tests included, and
+  and readers across the repository (`git grep -n '<name>' <head>`), tests included, and
   note the ones outside the diff. A change is only as safe as its callers.
 - Read the repository's own rules that govern the touched paths:
   `AGENTS.md` / `CLAUDE.md` in the repository root and in each touched
-  directory and its parents.
+  directory and its parents up to the repository root.
 - Write down, before looking for defects, what the change is meant to do
   (from commit messages and the focus). A finding is a gap between that
   intent and what the code does.
@@ -187,13 +192,13 @@ Findings: <k>
 
 ## Later rounds
 
-From the second round on, the focus carries the earlier findings and the
+When there are earlier rounds, the focus carries the earlier findings and the
 user's decisions:
 
 - `not fixed` and `not applicable` lines, and every "User decisions" line:
   do not raise them again, unless this round's change made the problem
   worse — then say what changed and cite the line (`R1#3`).
-- `fixed in <commit>` lines: check that the fix holds and did not break
+- `fixed in` lines: check that the fix holds and did not break
   anything else; report a problem with the fix as a new finding that cites
   the line, never the original finding again.
 - Look hardest at "Changed this round", but still run the pass over the

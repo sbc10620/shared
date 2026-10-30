@@ -29,7 +29,7 @@ suite or a release e2e build is the costliest work in the cycle, and a fix
 to one module cannot break another module's tests. The full run happens
 once, on the commit that will be reviewed.
 
-This document is Claude-facing and stays in English; reports to the user
+This document is agent-facing and stays in English; reports to the user
 are in the user's language. Two files beside it are read when a step says
 so: `references/design-principles.md` and `references/profile-guide.md`.
 
@@ -51,6 +51,8 @@ agent definitions.
   `dev-cycle-code-review`) and names it in the reviewer prompt. A manual
   review in place of an available skill is allowed only when every
   available skill fails to run (step 6).
+- Every helper prompt names the worktree the change lives in (step 2), and
+  gives commits as SHAs, never `HEAD`: a helper may start elsewhere.
 - When reporting a helper's result, say in a line or two what it was given.
   Show the full prompt only when the user asks.
 
@@ -100,7 +102,8 @@ shares one profile. No profile → follow "Without a profile" in
 ## 2. Before the first edit
 
 - Agree on the plan first; this skill does not replace planning.
-- The plan names the worktree the change is made in, and its branch. By
+- The plan names the worktree the change is made in, its branch, and the
+  commit it starts from (normally a freshly fetched default branch). By
   default it is a new worktree at `<main checkout>/.worktrees/<repo>-<topic>`
   (`<main checkout>` is
   `$(cd "$(git rev-parse --git-common-dir)/.." && pwd -P)`, the same from
@@ -108,8 +111,8 @@ shares one profile. No profile → follow "Without a profile" in
   still nests under the main checkout; `<repo>` as in step 1, `<topic>` a
   few words in kebab case).
   The user may name another place, or the current worktree, instead.
-  Create it once the plan is agreed and before the baselines below, which
-  build that tree. If `git check-ignore -q .worktrees/x` fails in the main
+  Create it (`git worktree add -b <branch> <path> <start>`) once the plan
+  is agreed and before the baselines below, which build that tree. If `git check-ignore -q .worktrees/x` fails in the main
   checkout, add `.worktrees/` to its `.git/info/exclude` (local; never the
   repository's `.gitignore`).
 - Have the first complete plan reviewed once, by a read-only subagent,
@@ -224,7 +227,10 @@ finding was about. Run it in a read-only subagent.
 
 - **Which skill** (decide by your skill list, not by which model or agent
   you are):
-  1. your own built-in code review skill, if you have one;
+  1. your own built-in code review skill, if you have one: one that ships
+     with you and reviews a commit range for correctness at a chosen depth
+     (not a security-only, clean-up or working-tree-only skill); map the
+     level and range into its own arguments;
   2. otherwise the `dev-cycle-code-review` skill (installed beside this
      one), which any agent can run.
 - The subagent MUST run the chosen skill, at **high** effort in the first
@@ -233,10 +239,10 @@ finding was about. Run it in a read-only subagent.
   the prompt points it at what changed this round. (High runs several
   finder angles for recall; medium makes one careful correctness pass and
   reports only what it believes is real.) Pass the focus in the skill's
-  arguments, in one call: `<level> <base>..HEAD — Report findings only, no
-  edits.` then one line per item of `references/design-principles.md` (the
-  principle and its "Look for" cell), the earlier rounds' findings and
-  decisions, and the user's guiding rules; the skill does not know the list
+  arguments, in one call: `<level> <base>..<head SHA> — Report findings
+  only, no edits.` then one line per item of `references/design-principles.md`
+  (the principle and its "Look for" cell), the user's guiding rules, and
+  the earlier-rounds block below; the skill does not know the list
   otherwise. A fixup that looks small is no reason to skip the skill.
 - **If the chosen skill fails to run:** a built-in skill falls back to
   `dev-cycle-code-review` in the same subagent, which then puts one line
@@ -246,30 +252,34 @@ finding was about. Run it in a read-only subagent.
   installed), the subagent reviews the range by hand in the same pass —
   correctness, edge cases, regressions, consistency between code, config,
   tests and docs, the repository's own rules, and the design principles —
-  and says so on its first line ("manual review — <skill> failed:
-  <reason>"); the orchestrator passes that on in its report.
+  and says so on its first line ("manual review — <each skill tried>
+  failed: <reason>"); the orchestrator passes that on in its report.
 
-Design principles are never checked by a separate agent or a second review
-(that doubles the tokens for one range). The report's first line states the
-method actually used (the skill's name and level, e.g.
-"dev-cycle-code-review, high", or "manual review — …"); a report without
-it, or with another method than required and no reason given, is rerun,
-not used.
+Design principles are never checked by a review outside the chosen skill
+(that doubles the tokens for one range). The report's method line (its
+first line, or the line after a `built-in review skill failed:` line)
+states the method actually used (e.g. "dev-cycle-code-review, high
+(sequential passes)", or "manual review — …"); a report without it, or with
+another method than required and no reason given, is rerun, not used.
 
-From the second round on, the prompt carries the earlier rounds' findings
-with their decisions, and the decisions already made, marked "do not
-re-argue". The orchestrator writes them in this block, after the design
-principles, one line per finding of every earlier round:
+Whenever there are earlier rounds (or milestones), the prompt carries their
+findings with their decisions, and the decisions already made, marked "do
+not re-argue". The orchestrator writes them in this block, last in the
+prompt, one line per finding of every earlier round:
 
 ```
 Earlier rounds (do not re-argue):
 - R<round>#<n> <path>:<line> — <the finding, one line> — <decision>
 User decisions (do not re-argue):
 - <a decision the user made, one line>
-Changed this round: <commits or files>
+Changed this round: <files> (git diff <previous round's head SHA> <head SHA>)
+Verified this round: <the checks run, one line>
 ```
 
-- `<decision>` is one of: `fixed in <commit>` (the reviewer may check that
+- `<line>` is as of the round the finding was raised; with milestones the id
+  is `M<milestone>R<round>#<n>`.
+- `<decision>` is one of: `fixed in "<commit subject>"` (a subject, since
+  amends change SHAs; the reviewer may check that
   the fix holds, not raise the finding again), `not fixed: <reason>` (the
   user chose not to fix it), `not applicable: <reason>` (the finding did not
   hold against the code).
@@ -294,7 +304,7 @@ Then check every finding against the code before reporting it:
 ## 7. Report, then wait
 
 ```
-방법: <the reviewer's first line, e.g. dev-cycle-code-review, medium>
+방법: <the reviewer's method line, after its failure line if any>
 결론: 고칠 결함 <n>건 / 사실이지만 동작 영향 없음 <n>건 / 해당 없음·이미 처리됨 <n>건
 
 | # | 지적 | 판정 | 확인 결과 (한 줄) | 수정안 |
@@ -377,7 +387,8 @@ HEAD:
   performance or memory measurement follows its profile: where the profile
   says it does not stop the cycle, finish the other checks and report it
   next to the base, but do not move on to the PR until the user has
-  decided. An allowed difference is written into the plan's allowed
+  decided; otherwise, or without a profile, it stops the cycle like any
+  other difference. An allowed difference is written into the plan's allowed
   differences, so it is not raised again.
 - A failure, or a difference the user calls a defect, is fixed and
   re-checked here (only the affected part), goes through the review loop
@@ -392,7 +403,8 @@ only, not each commit. A rewrite that leaves the tree identical
 (`git diff --quiet <old> <new>`) needs no re-run; otherwise rerun, on the
 final HEAD, the checks that the changed files call for
 (`git diff --name-only <old> <new>` through the profile's path table, at
-the moment the cycle is in).
+the moment the cycle is in). A rebase onto a new base also moves `<base>`:
+retake the baselines there, and before the PR rerun the full suites too.
 
 ## 10. Grow the profile
 
