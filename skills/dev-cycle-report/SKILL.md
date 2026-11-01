@@ -1,6 +1,6 @@
 ---
 name: dev-cycle-report
-description: "Build a top-down HTML report that explains a PR or a commit range (typically one produced by the dev-cycle skill) for understanding the code: why it changed, how the overall structure changed (before/after package diagrams: small UML-style packages inside groups, each job in words with its functions in parentheses), then per topic the before/after call sequences and Python-flavoured pseudocode with an explanation of every function and every call. Commits are grouped by topic and only the final state is explained, never an intermediate state a later commit replaced. Every code reference, figure name and source is checked against the repository by scripts/build_report.py before anything is built. Agent-neutral: it needs only git, a shell, Python 3, a Chrome or Chromium and network access; it uses a sub-agent for the accuracy review when the agent can start one. Use when the user asks for a report, overview or structural explanation of a PR, branch or commit range ('변경 보고서', 'PR 보고서', '구조 설명 보고서', '이 PR 이 뭘 바꿨는지 보고서로'). For per-file before/after code use commit-explain; for a call-flow picture from main use commit-flow-diagram."
+description: "Build a top-down HTML report that explains a PR or a commit range (typically one produced by the dev-cycle skill) for understanding the code: why it changed, how the overall structure changed (before/after package diagrams named and nested by module, each job in words with its functions in parentheses, «use» edges checked against the code), then per topic the before/after call sequences and Python-flavoured pseudocode with an explanation of every function and every call. Commits are grouped by topic and only the final state is explained, never an intermediate state a later commit replaced. Every code reference, figure name and source is checked against the repository by scripts/build_report.py before anything is built. Agent-neutral: it needs only git, a shell, Python 3, a Chrome or Chromium and network access; it uses a sub-agent for the accuracy review when the agent can start one. Use when the user asks for a report, overview or structural explanation of a PR, branch or commit range ('변경 보고서', 'PR 보고서', '구조 설명 보고서', '이 PR 이 뭘 바꿨는지 보고서로'). For per-file before/after code use commit-explain; for a call-flow picture from main use commit-flow-diagram."
 ---
 
 # Dev-cycle report
@@ -101,23 +101,21 @@ Rules:
     {"text": "...", "inferred_from": "<path at head>:<line>"}
   ],
   "structure": {
-    "before": {"caption": "...", "groups": [...], "packages": [...], "edges": [...]},
+    "before": {"caption": "...", "packages": [...], "edges": [...]},
     "after": {
       "caption": "...",
-      "groups": [{"id": "pii", "name": "tinicore · PII 규칙", "path": "tinicore/src/guardrails/pii"}],
       "packages": [
-        {"id": "cli", "name": "tinicli", "path": "tinicli/src",
-         "nodes": [{"id": "boot", "role": "설정으로 나라를 정해 설치에 넘김",
-                    "fns": ["resolve_pii_countries"], "mark": "changed"}]},
-        {"id": "shared", "name": "공유 엔진", "path": "tinicore/src/guardrails/pii/shared.rs",
-         "group": "pii",
+        {"id": "clipii", "path": "tinicli/src/guardrails/pii.rs", "note": "PII 설정",
+         "nodes": [{"id": "rpc", "role": "설정으로 나라 목록을 정함",
+                    "fns": ["resolve_pii_countries"], "mark": "new"}]},
+        {"id": "shared", "path": "tinicore/src/guardrails/pii/shared.rs", "note": "공유 엔진",
          "nodes": [{"id": "sel", "role": "나라 목록을 프로세스에 한 번 고정함",
                     "fns": ["select_countries"], "mark": "new"}]},
-        {"id": "rules", "name": "나라별 규칙", "path": "tinicore/src/guardrails/pii/countries",
-         "group": "pii", "mark": "new",
+        {"id": "rules", "path": "tinicore/src/guardrails/pii/countries", "note": "나라별 규칙",
+         "mark": "new",
          "nodes": [{"id": "rules", "role": "공통 규칙 + 나라별 규칙", "kind": "data", "fns": ["RULES"]}]}
       ],
-      "edges": [{"from": "cli", "to": "shared"}, {"from": "rules", "to": "shared"}]
+      "edges": [{"from": "shared", "to": "rules"}]
     },
     "changes": [{"kind": "new|changed|moved|removed",
                  "text": "무엇이 바뀌었는지, 코드 이름 없이",
@@ -153,17 +151,25 @@ Writing rules:
 
 - **Top-down.** `summary` and the group `one_line`s must make sense to
   someone who reads nothing else. Details go further down.
-- **Structure figures** (the part the reader came for) show the static
-  structure as packages; the call order lives in the flows' `sequence`.
-  The script draws them; there is no raw Mermaid.
-  - A **package** is small: one file or one sub-module, drawn as a folder
-    with its `name` and `(path)` on the tab. Keep it to at most four rows;
-    the script warns past that. `path` must exist at that side. `mark` on
-    a package colours its tab.
-  - A **group** (`groups`, then `group` on a package) is a larger area such
-    as a crate's module (`tinicore · PII 규칙`), drawn as a light outline
-    around its packages; inside it a tab shows the path relative to the
-    group's. Packages with no group stand alone.
+- **Structure figures** (the part the reader came for) are package
+  diagrams of the static structure; the call order lives in the flows'
+  `sequence`. The script draws them; there is no raw Mermaid.
+  - A **package** is the language's namespace unit: a Rust module (a file,
+    or a directory with its `mod.rs`), a Java/Kotlin or Go package, a
+    Python module or package. Give its `path`; the script derives its
+    module name (`tinicore/src/guardrails/pii/shared.rs` →
+    `tinicore::guardrails::pii::shared`; the crate is the directory above
+    `src/`; `mod`, `lib`, `main`, `__init__`, `index` stand for their
+    directory; `::` in a Cargo workspace, `.` elsewhere). Set `module` only
+    when that rule names it wrongly. `path` must exist at that side.
+  - Nesting comes from the module names: each listed package is a box
+    whose tab shows its last name segment and the Korean `note`; the
+    modules above it are drawn as outlines, from the crate down, and a
+    chain of modules with one child each is merged (`guardrails::pii`). A
+    listed package that also has listed children is drawn inside its own
+    outline as "(이 모듈 자신)". `mark` on a package colours its tab.
+  - Keep each package to at most four rows; past that, list its
+    sub-modules instead (the script warns).
   - Each **node** is a row inside a package: one job, written as a Korean
     sentence in `role` ("나라 목록을 프로세스에 한 번 고정함"), never a
     function name. `fns` names at most two functions (or types, constants)
@@ -173,10 +179,12 @@ Writing rules:
     (the script cannot tell the two apart). `kind: "data"` marks a rule
     file or table («data»). `mark` (`new` / `changed` in `after`,
     `removed` in `before`) colours the row and prefixes `+` / `~` / `−`.
-  - `edges` join packages, not rows: a dashed «use» dependency (another
-    word in `label` if it fits better).
+  - `edges` join packages (by id): a dashed «use» dependency, from the
+    user to the used. The script refuses an edge unless the code under
+    `from` names `to`'s module or one of the functions in `to`'s rows.
   - Keep each figure to about 15 rows. Use the same package and node ids in
     `before` and `after` for the same thing, so the two can be compared.
+    The page explains the colours and boxes in a legend under the figures.
   - `changes` lists, in sentences, what is new, changed, moved or removed,
     each pointing at the topic group that explains it. The `text` says
     what changed without code names; `fns` (up to three) names the

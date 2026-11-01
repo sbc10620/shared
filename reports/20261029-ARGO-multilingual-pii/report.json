@@ -42,9 +42,9 @@
       "caption": "base: 모든 나라의 규칙이 YAML 하나에 있고, 검증기와 종류 판정은 엔진·탐지기 안의 전역 표입니다. CLI 는 나라를 넘기지 않습니다. 빨간 줄(−)은 head 에서 없어지는 부분입니다.",
       "packages": [
         {
-          "id": "cli",
-          "name": "tinicli",
-          "path": "tinicli/src",
+          "id": "entry",
+          "path": "tinicli/src/cli_entry.rs",
+          "note": "부팅",
           "nodes": [
             {
               "id": "boot",
@@ -57,8 +57,8 @@
         },
         {
           "id": "inst",
-          "name": "가드레일 설치",
           "path": "tinicore/src/guardrails/install.rs",
+          "note": "가드레일 설치",
           "nodes": [
             {
               "id": "inst",
@@ -70,9 +70,9 @@
           ]
         },
         {
-          "id": "conf",
-          "name": "규칙 파일",
+          "id": "pii",
           "path": "tinicore/src/guardrails/pii/mod.rs",
+          "note": "PII 규칙",
           "nodes": [
             {
               "id": "rules",
@@ -83,21 +83,13 @@
               "kind": "data",
               "mark": "removed"
             }
-          ],
-          "group": "pii"
+          ]
         },
         {
           "id": "shared",
-          "name": "공유 엔진",
           "path": "tinicore/src/guardrails/pii/shared.rs",
+          "note": "공유 엔진",
           "nodes": [
-            {
-              "id": "eg",
-              "role": "설치하는 동안 엔진을 한 번만 만들도록 붙잡아 둠",
-              "fns": [
-                "engine_guard"
-              ]
-            },
             {
               "id": "build",
               "role": "턴마다 규칙 YAML 하나로 PII 엔진을 만듦",
@@ -106,13 +98,12 @@
                 "compile_from_yaml"
               ]
             }
-          ],
-          "group": "pii"
+          ]
         },
         {
           "id": "hw",
-          "name": "손으로 짠 탐지기",
           "path": "tinicore/src/guardrails/pii/handwritten",
+          "note": "손으로 짠 탐지기",
           "nodes": [
             {
               "id": "hw",
@@ -122,13 +113,12 @@
                 "AhoCorasickDetector"
               ]
             }
-          ],
-          "group": "pii"
+          ]
         },
         {
           "id": "det",
-          "name": "탐지",
           "path": "tinicore/src/guardrails/pii/detector.rs",
+          "note": "탐지",
           "nodes": [
             {
               "id": "det",
@@ -145,13 +135,40 @@
               ],
               "mark": "removed"
             }
-          ],
-          "group": "pii"
+          ]
+        },
+        {
+          "id": "filter",
+          "path": "tinicore/src/guardrails/engine/filter.rs",
+          "note": "필터",
+          "nodes": [
+            {
+              "id": "filter",
+              "role": "턴의 엔진으로 스캔하고 layer 로 매치를 좁힘",
+              "fns": [
+                "analyze"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "rec",
+          "path": "tinicore/src/guardrails/engine/recognizer.rs",
+          "note": "엔진",
+          "nodes": [
+            {
+              "id": "eng",
+              "role": "규칙을 DFA 로 컴파일하고 텍스트를 스캔함",
+              "fns": [
+                "PatternEngine"
+              ]
+            }
+          ]
         },
         {
           "id": "val",
-          "name": "검증기",
           "path": "tinicore/src/guardrails/engine/validator.rs",
+          "note": "검증기",
           "nodes": [
             {
               "id": "val",
@@ -163,28 +180,12 @@
               "kind": "data",
               "mark": "removed"
             }
-          ],
-          "group": "eng"
-        },
-        {
-          "id": "rec",
-          "name": "엔진",
-          "path": "tinicore/src/guardrails/engine/recognizer.rs",
-          "nodes": [
-            {
-              "id": "eng",
-              "role": "규칙을 DFA 로 컴파일하고 텍스트를 스캔함",
-              "fns": [
-                "PatternEngine"
-              ]
-            }
-          ],
-          "group": "eng"
+          ]
         }
       ],
       "edges": [
         {
-          "from": "cli",
+          "from": "entry",
           "to": "inst"
         },
         {
@@ -192,36 +193,28 @@
           "to": "shared"
         },
         {
-          "from": "conf",
-          "to": "shared"
+          "from": "shared",
+          "to": "pii"
+        },
+        {
+          "from": "pii",
+          "to": "hw"
         },
         {
           "from": "shared",
           "to": "rec"
         },
         {
-          "from": "shared",
-          "to": "hw"
+          "from": "det",
+          "to": "filter"
         },
         {
-          "from": "det",
+          "from": "filter",
           "to": "rec"
         },
         {
           "from": "rec",
           "to": "val"
-        }
-      ],
-      "groups": [
-        {
-          "id": "pii",
-          "name": "tinicore · PII 규칙",
-          "path": "tinicore/src/guardrails/pii"
-        },
-        {
-          "id": "eng",
-          "name": "tinicore · 패턴 엔진",
-          "path": "tinicore/src/guardrails/engine"
         }
       ]
     },
@@ -229,24 +222,39 @@
       "caption": "head: CLI 가 나라를 정해 넘기고 설치가 목록을 고정합니다. 엔진은 공통 + 고른 나라의 규칙과 그 나라들의 표만으로 만들어집니다. 초록(+)은 새로 생긴 부분, 노랑(~)은 바뀐 부분입니다.",
       "packages": [
         {
-          "id": "cli",
-          "name": "tinicli",
-          "path": "tinicli/src",
+          "id": "entry",
+          "path": "tinicli/src/cli_entry.rs",
+          "note": "부팅",
           "nodes": [
             {
               "id": "boot",
-              "role": "설정이나 기기 locale 로 나라를 정해 설치에 넘김",
+              "role": "부팅 때 나라를 정해 설치에 넘김",
               "fns": [
-                "resolve_pii_countries"
+                "run"
               ],
               "mark": "changed"
             }
           ]
         },
         {
+          "id": "clipii",
+          "path": "tinicli/src/guardrails/pii.rs",
+          "note": "PII 설정",
+          "nodes": [
+            {
+              "id": "rpc",
+              "role": "설정이나 기기 locale 로 나라 목록을 정함",
+              "fns": [
+                "resolve_pii_countries"
+              ],
+              "mark": "new"
+            }
+          ]
+        },
+        {
           "id": "inst",
-          "name": "가드레일 설치",
           "path": "tinicore/src/guardrails/install.rs",
+          "note": "가드레일 설치",
           "nodes": [
             {
               "id": "inst",
@@ -259,9 +267,25 @@
           ]
         },
         {
+          "id": "pii",
+          "path": "tinicore/src/guardrails/pii/mod.rs",
+          "note": "PII 규칙",
+          "nodes": [
+            {
+              "id": "tables",
+              "role": "고른 나라의 검증기·탐지기·키워드 표를 합쳐 엔진에 넘김",
+              "fns": [
+                "extensions_for",
+                "PiiTables"
+              ],
+              "mark": "new"
+            }
+          ]
+        },
+        {
           "id": "country",
-          "name": "나라",
           "path": "tinicore/src/guardrails/pii/country.rs",
+          "note": "나라",
           "nodes": [
             {
               "id": "country",
@@ -273,13 +297,12 @@
               "mark": "new"
             }
           ],
-          "group": "pii",
           "mark": "new"
         },
         {
           "id": "rules",
-          "name": "나라별 규칙",
           "path": "tinicore/src/guardrails/pii/countries",
+          "note": "나라별 규칙",
           "nodes": [
             {
               "id": "rules",
@@ -291,13 +314,12 @@
               "mark": "new"
             }
           ],
-          "group": "pii",
           "mark": "new"
         },
         {
           "id": "shared",
-          "name": "공유 엔진",
           "path": "tinicore/src/guardrails/pii/shared.rs",
+          "note": "공유 엔진",
           "nodes": [
             {
               "id": "sel",
@@ -308,13 +330,6 @@
               "mark": "new"
             },
             {
-              "id": "eg",
-              "role": "설치하는 동안 엔진을 한 번만 만들도록 붙잡아 둠",
-              "fns": [
-                "engine_guard"
-              ]
-            },
-            {
               "id": "build",
               "role": "턴마다 고른 나라의 규칙만 모아 PII 엔진을 만듦",
               "fns": [
@@ -323,55 +338,29 @@
               ],
               "mark": "changed"
             }
-          ],
-          "group": "pii"
-        },
-        {
-          "id": "tables",
-          "name": "엔진 확장",
-          "path": "tinicore/src/guardrails/pii/mod.rs",
-          "nodes": [
-            {
-              "id": "tables",
-              "role": "고른 나라의 검증기·탐지기·키워드 표를 합쳐 엔진에 넘김",
-              "fns": [
-                "extensions_for",
-                "PiiTables"
-              ],
-              "mark": "new"
-            }
-          ],
-          "group": "pii"
+          ]
         },
         {
           "id": "labels",
-          "name": "종류(label)",
           "path": "tinicore/src/guardrails/pii/labels.rs",
+          "note": "종류(label)",
           "nodes": [
             {
               "id": "labels",
-              "role": "규칙마다 종류가 있는지 엔진을 만들기 전에 확인함",
+              "role": "규칙마다 종류가 있는지 엔진을 만들기 전에 확인하고, 매치의 label 을 종류로 바꿈",
               "fns": [
-                "check_labels"
-              ],
-              "mark": "new"
-            },
-            {
-              "id": "kind",
-              "role": "매치를 만든 규칙의 label 을 종류로 바꿈",
-              "fns": [
+                "check_labels",
                 "kind_of_meta"
               ],
               "mark": "new"
             }
           ],
-          "group": "pii",
           "mark": "new"
         },
         {
           "id": "uuid",
-          "name": "UUID",
           "path": "tinicore/src/guardrails/pii/uuid.rs",
+          "note": "UUID",
           "nodes": [
             {
               "id": "uuid",
@@ -382,13 +371,12 @@
               "mark": "changed"
             }
           ],
-          "group": "pii",
           "mark": "new"
         },
         {
           "id": "hw",
-          "name": "손으로 짠 탐지기",
           "path": "tinicore/src/guardrails/pii/handwritten",
+          "note": "손으로 짠 탐지기",
           "nodes": [
             {
               "id": "hw",
@@ -407,13 +395,12 @@
               ],
               "mark": "new"
             }
-          ],
-          "group": "pii"
+          ]
         },
         {
           "id": "det",
-          "name": "탐지",
           "path": "tinicore/src/guardrails/pii/detector.rs",
+          "note": "탐지",
           "nodes": [
             {
               "id": "det",
@@ -423,13 +410,27 @@
               ],
               "mark": "changed"
             }
-          ],
-          "group": "pii"
+          ]
+        },
+        {
+          "id": "filter",
+          "path": "tinicore/src/guardrails/engine/filter.rs",
+          "note": "필터",
+          "nodes": [
+            {
+              "id": "filter",
+              "role": "스캔한 매치마다 그 매치를 만든 규칙의 정보를 붙여 돌려줌",
+              "fns": [
+                "analyze_with_meta"
+              ],
+              "mark": "new"
+            }
+          ]
         },
         {
           "id": "rec",
-          "name": "엔진",
           "path": "tinicore/src/guardrails/engine/recognizer.rs",
+          "note": "엔진",
           "nodes": [
             {
               "id": "eng",
@@ -440,17 +441,20 @@
               ],
               "mark": "changed"
             }
-          ],
-          "group": "eng"
+          ]
         }
       ],
       "edges": [
         {
-          "from": "cli",
+          "from": "entry",
+          "to": "clipii"
+        },
+        {
+          "from": "entry",
           "to": "inst"
         },
         {
-          "from": "cli",
+          "from": "clipii",
           "to": "country"
         },
         {
@@ -458,23 +462,23 @@
           "to": "shared"
         },
         {
-          "from": "rules",
-          "to": "shared"
+          "from": "shared",
+          "to": "rules"
         },
         {
           "from": "shared",
-          "to": "tables"
+          "to": "pii"
         },
         {
           "from": "shared",
           "to": "labels"
         },
         {
-          "from": "tables",
+          "from": "pii",
           "to": "hw"
         },
         {
-          "from": "tables",
+          "from": "pii",
           "to": "uuid"
         },
         {
@@ -487,19 +491,11 @@
         },
         {
           "from": "det",
-          "to": "rec"
-        }
-      ],
-      "groups": [
-        {
-          "id": "pii",
-          "name": "tinicore · PII 규칙",
-          "path": "tinicore/src/guardrails/pii"
+          "to": "filter"
         },
         {
-          "id": "eng",
-          "name": "tinicore · 패턴 엔진",
-          "path": "tinicore/src/guardrails/engine"
+          "from": "filter",
+          "to": "rec"
         }
       ]
     },

@@ -1,29 +1,39 @@
 flowchart TB
-  p_cli["<div class='pk '><div class='tab'>tinicli <span class='path'>(tinicli/src)</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>설정이나 기기 locale 로 나라를 정해 설치에 넘김</div><div class='fn'>(resolve_pii_countries)</div></div></div></div></div>"]
-  p_inst["<div class='pk '><div class='tab'>가드레일 설치 <span class='path'>(tinicore/src/guardrails/install.rs)</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>나라 목록이 없으면 거부하고, 있으면 고정한 뒤 설치함</div><div class='fn'>(install_guardrails_from_config)</div></div></div></div></div>"]
-  subgraph g_pii["tinicore · PII 규칙 <span class='path'>(tinicore/src/guardrails/pii)</span>"]
-    p_country["<div class='pk new'><div class='tab'>나라 <span class='path'>(country.rs)</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>설정값이나 locale 태그를 나라로 바꿈</div><div class='fn'>(PiiCountry, from_locale_tag)</div></div></div></div></div>"]
-    p_rules["<div class='pk new'><div class='tab'>나라별 규칙 <span class='path'>(countries)</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'><span class='st'>«data»</span> 공통 규칙 + 13개국 규칙 (나라마다 규칙 파일, 검증기 표, 모양 표)</div><div class='fn'>(RULES)</div></div></div></div></div>"]
-    p_shared["<div class='pk '><div class='tab'>공유 엔진 <span class='path'>(shared.rs)</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>나라 목록을 프로세스에 한 번 고정함</div><div class='fn'>(select_countries)</div></div></div><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>설치하는 동안 엔진을 한 번만 만들도록 붙잡아 둠</div><div class='fn'>(engine_guard)</div></div></div><div class='it changed'><span class='mk'>~</span><div><div class='role'>턴마다 고른 나라의 규칙만 모아 PII 엔진을 만듦</div><div class='fn'>(compile_for_countries, compile_rules)</div></div></div></div></div>"]
-    p_tables["<div class='pk '><div class='tab'>엔진 확장 <span class='path'>(mod.rs)</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>고른 나라의 검증기·탐지기·키워드 표를 합쳐 엔진에 넘김</div><div class='fn'>(extensions_for, PiiTables)</div></div></div></div></div>"]
-    p_labels["<div class='pk new'><div class='tab'>종류(label) <span class='path'>(labels.rs)</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>규칙마다 종류가 있는지 엔진을 만들기 전에 확인함</div><div class='fn'>(check_labels)</div></div></div><div class='it new'><span class='mk'>+</span><div><div class='role'>매치를 만든 규칙의 label 을 종류로 바꿈</div><div class='fn'>(kind_of_meta)</div></div></div></div></div>"]
-    p_uuid["<div class='pk new'><div class='tab'>UUID <span class='path'>(uuid.rs)</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>UUID 안에 통째로 든 매치를 버림 (예전에는 카드·계좌 검증기에서만, 이제 모든 규칙에)</div><div class='fn'>(inside_uuid)</div></div></div></div></div>"]
-    p_hw["<div class='pk '><div class='tab'>손으로 짠 탐지기 <span class='path'>(handwritten)</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>카드 번호와 앞부분(anchor)이 정해진 번호(전화·번호판·API 키 등)를 찾음</div><div class='fn'>(CardDetector, AhoCorasickDetector)</div></div></div><div class='it new'><span class='mk'>+</span><div><div class='role'>모양이 정해진 번호를 바이트 단위로 찾음</div><div class='fn'>(FixedShapeDetector)</div></div></div></div></div>"]
-    p_det["<div class='pk '><div class='tab'>탐지 <span class='path'>(detector.rs)</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>턴의 텍스트에서 PII 를 찾고, 종류는 규칙의 label 로 정함</div><div class='fn'>(detect)</div></div></div></div></div>"]
+  subgraph m_tinicli["<span class='modname'>tinicli</span>"]
+    p_entry["<div class='pk '><div class='tab'>cli_entry <span class='note'>부팅</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>부팅 때 나라를 정해 설치에 넘김</div><div class='fn'>(run)</div></div></div></div></div>"]
+    p_clipii["<div class='pk '><div class='tab'>guardrails::pii <span class='note'>PII 설정</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>설정이나 기기 locale 로 나라 목록을 정함</div><div class='fn'>(resolve_pii_countries)</div></div></div></div></div>"]
   end
-  subgraph g_eng["tinicore · 패턴 엔진 <span class='path'>(tinicore/src/guardrails/engine)</span>"]
-    p_rec["<div class='pk '><div class='tab'>엔진 <span class='path'>(recognizer.rs)</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>규칙을 DFA 로 컴파일하고 스캔함, 검증 뒤 버릴 매치를 한 번 더 거름</div><div class='fn'>(PatternEngine, validate_and_collapse)</div></div></div></div></div>"]
+  subgraph m_tinicore["<span class='modname'>tinicore</span>"]
+    subgraph m_tinicore__guardrails["<span class='modname'>guardrails</span>"]
+      p_inst["<div class='pk '><div class='tab'>install <span class='note'>가드레일 설치</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>나라 목록이 없으면 거부하고, 있으면 고정한 뒤 설치함</div><div class='fn'>(install_guardrails_from_config)</div></div></div></div></div>"]
+      subgraph m_tinicore__guardrails__pii["<span class='modname'>pii</span>"]
+        p_pii["<div class='pk '><div class='tab'>pii <span class='st'>(이 모듈 자신)</span> <span class='note'>PII 규칙</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>고른 나라의 검증기·탐지기·키워드 표를 합쳐 엔진에 넘김</div><div class='fn'>(extensions_for, PiiTables)</div></div></div></div></div>"]
+        p_country["<div class='pk new'><div class='tab'>country <span class='note'>나라</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>설정값이나 locale 태그를 나라로 바꿈</div><div class='fn'>(PiiCountry, from_locale_tag)</div></div></div></div></div>"]
+        p_rules["<div class='pk new'><div class='tab'>countries <span class='note'>나라별 규칙</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'><span class='st'>«data»</span> 공통 규칙 + 13개국 규칙 (나라마다 규칙 파일, 검증기 표, 모양 표)</div><div class='fn'>(RULES)</div></div></div></div></div>"]
+        p_shared["<div class='pk '><div class='tab'>shared <span class='note'>공유 엔진</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>나라 목록을 프로세스에 한 번 고정함</div><div class='fn'>(select_countries)</div></div></div><div class='it changed'><span class='mk'>~</span><div><div class='role'>턴마다 고른 나라의 규칙만 모아 PII 엔진을 만듦</div><div class='fn'>(compile_for_countries, compile_rules)</div></div></div></div></div>"]
+        p_labels["<div class='pk new'><div class='tab'>labels <span class='note'>종류(label)</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>규칙마다 종류가 있는지 엔진을 만들기 전에 확인하고, 매치의 label 을 종류로 바꿈</div><div class='fn'>(check_labels, kind_of_meta)</div></div></div></div></div>"]
+        p_uuid["<div class='pk new'><div class='tab'>uuid <span class='note'>UUID</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>UUID 안에 통째로 든 매치를 버림 (예전에는 카드·계좌 검증기에서만, 이제 모든 규칙에)</div><div class='fn'>(inside_uuid)</div></div></div></div></div>"]
+        p_hw["<div class='pk '><div class='tab'>handwritten <span class='note'>손으로 짠 탐지기</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>카드 번호와 앞부분(anchor)이 정해진 번호(전화·번호판·API 키 등)를 찾음</div><div class='fn'>(CardDetector, AhoCorasickDetector)</div></div></div><div class='it new'><span class='mk'>+</span><div><div class='role'>모양이 정해진 번호를 바이트 단위로 찾음</div><div class='fn'>(FixedShapeDetector)</div></div></div></div></div>"]
+        p_det["<div class='pk '><div class='tab'>detector <span class='note'>탐지</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>턴의 텍스트에서 PII 를 찾고, 종류는 규칙의 label 로 정함</div><div class='fn'>(detect)</div></div></div></div></div>"]
+      end
+      subgraph m_tinicore__guardrails__engine["<span class='modname'>engine</span>"]
+        p_filter["<div class='pk '><div class='tab'>filter <span class='note'>필터</span></div><div class='body'><div class='it new'><span class='mk'>+</span><div><div class='role'>스캔한 매치마다 그 매치를 만든 규칙의 정보를 붙여 돌려줌</div><div class='fn'>(analyze_with_meta)</div></div></div></div></div>"]
+        p_rec["<div class='pk '><div class='tab'>recognizer <span class='note'>엔진</span></div><div class='body'><div class='it changed'><span class='mk'>~</span><div><div class='role'>규칙을 DFA 로 컴파일하고 스캔함, 검증 뒤 버릴 매치를 한 번 더 거름</div><div class='fn'>(PatternEngine, validate_and_collapse)</div></div></div></div></div>"]
+      end
+    end
   end
-  p_cli -. "«use»" .-> p_inst
-  p_cli -. "«use»" .-> p_country
+  p_entry -. "«use»" .-> p_clipii
+  p_entry -. "«use»" .-> p_inst
+  p_clipii -. "«use»" .-> p_country
   p_inst -. "«use»" .-> p_shared
-  p_rules -. "«use»" .-> p_shared
-  p_shared -. "«use»" .-> p_tables
+  p_shared -. "«use»" .-> p_rules
+  p_shared -. "«use»" .-> p_pii
   p_shared -. "«use»" .-> p_labels
-  p_tables -. "«use»" .-> p_hw
-  p_tables -. "«use»" .-> p_uuid
+  p_pii -. "«use»" .-> p_hw
+  p_pii -. "«use»" .-> p_uuid
   p_shared -. "«use»" .-> p_rec
   p_det -. "«use»" .-> p_labels
-  p_det -. "«use»" .-> p_rec
+  p_det -. "«use»" .-> p_filter
+  p_filter -. "«use»" .-> p_rec
   classDef pkg fill:none,stroke:none
-  class p_cli,p_inst,p_country,p_rules,p_shared,p_tables,p_labels,p_uuid,p_hw,p_det,p_rec pkg
+  class p_entry,p_clipii,p_inst,p_pii,p_country,p_rules,p_shared,p_labels,p_uuid,p_hw,p_det,p_filter,p_rec pkg

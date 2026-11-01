@@ -43,12 +43,11 @@ TOP_KEYS = {"repo_dir", "base", "head", "topic", "title", "summary", "why",
 TOP_REQUIRED = TOP_KEYS - {"records"}
 WHY_KEYS = {"text", "source", "inferred_from"}
 STRUCT_KEYS = {"before", "after", "changes"}
-FIG_KEYS = {"caption", "direction", "groups", "packages", "edges"}
-AREA_KEYS = {"id", "name", "path"}
-PKG_KEYS = {"id", "name", "path", "nodes", "mark", "group"}
+FIG_KEYS = {"caption", "direction", "packages", "edges"}
+PKG_KEYS = {"id", "path", "note", "nodes", "mark", "module"}
 PKG_ROWS_MAX = 4
 NODE_KEYS = {"id", "role", "fns", "kind", "mark"}
-EDGE_KEYS = {"from", "to", "label", "dashed"}
+EDGE_KEYS = {"from", "to", "label"}
 MARKS = {"new", "changed", "removed"}
 NODE_FNS_MAX = 2
 FIG_NODES_MAX = 15
@@ -349,32 +348,59 @@ def warn_code_like(p, where, text, hint):
         p.warn(where, f"code-like words {sorted(set(hits))[:4]} in prose; {hint}")
 
 
+def module_of(path, sep):
+    """The namespace a package path stands for: the crate (the directory
+    above `src/`, else the first segment), then the segments below `src/`
+    without the file extension; `mod`, `lib`, `main`, `__init__` and
+    `index` files stand for their directory."""
+    parts = [x for x in path.strip("/").split("/") if x]
+    if "src" in parts:
+        i = parts.index("src")
+        root, rest = parts[i - 1] if i > 0 else parts[0], parts[i + 1:]
+    else:
+        root, rest = parts[0], parts[1:]
+    if rest:
+        rest[-1] = os.path.splitext(rest[-1])[0]
+        if rest[-1] in ("mod", "lib", "main", "__init__", "index"):
+            rest = rest[:-1]
+    return sep.join([root] + rest)
+
+
+def module_sep(repo, sha):
+    """`::` for a Rust workspace, `.` otherwise."""
+    return "::" if git(repo, "cat-file", "-e", f"{sha}:Cargo.toml", check=False).returncode == 0 else "."
+
+
 def check_figure(p, fw, repo, sha, at, fig):
-    """A structure figure: packages (a crate or module directory) holding
-    nodes (one job each, in Korean, with at most two function names), and
-    edges between nodes."""
+    """A structure figure: packages (the language's namespace units, named
+    and nested by their module path), each holding rows (one job each, in
+    Korean, with at most two function names), and «use» edges between
+    packages, each backed by a sign of use in the code."""
     if not keys_ok(p, fw, fig, FIG_KEYS, {"packages"}):
         return
     if fig.get("direction", "TB") not in ("TB", "LR"):
         p.err(fw, "direction must be TB or LR")
-    ids, pkg_ids, count = set(), set(), 0
-    areas = {}
-    for ai, area in enumerate(fig.get("groups", [])):
-        aw = f"{fw}.groups[{ai}]"
-        if keys_ok(p, aw, area, AREA_KEYS, AREA_KEYS):
-            areas[area["id"]] = area
-            if git(repo, "cat-file", "-e", f"{sha}:{area['path']}", check=False).returncode != 0:
-                p.err(aw, f"path '{area['path']}' does not exist at {at} ({sha[:10]})")
+    sep = module_sep(repo, sha)
+    ids, pkg_ids, mods, count = set(), {}, {}, 0
     for pi, pkg in enumerate(fig.get("packages", [])):
         pw = f"{fw}.packages[{pi}]"
-        if not keys_ok(p, pw, pkg, PKG_KEYS, {"id", "name", "path", "nodes"}):
+        if not keys_ok(p, pw, pkg, PKG_KEYS, {"id", "path", "nodes"}):
             continue
         if pkg["id"] in pkg_ids:
             p.err(pw, f"duplicate package id '{pkg['id']}'")
-        pkg_ids.add(pkg["id"])
+        pkg_ids[pkg["id"]] = pkg
         if git(repo, "cat-file", "-e", f"{sha}:{pkg['path']}", check=False).returncode != 0:
             p.err(pw, f"path '{pkg['path']}' does not exist at {at} ({sha[:10]})")
             continue
+        mod = pkg.get("module") or module_of(pkg["path"], sep)
+        if mod in mods:
+            p.err(pw, f"module '{mod}' is already package '{mods[mod]}'")
+        mods[mod] = pkg["id"]
+        if pkg.get("mark") is not None and pkg["mark"] not in MARKS:
+            p.err(pw, f"mark must be one of {sorted(MARKS)}")
+        if len(pkg["nodes"]) > PKG_ROWS_MAX:
+            p.warn(pw, f"{len(pkg['nodes'])} rows; split it into its sub-modules "
+                   f"(at most {PKG_ROWS_MAX} rows a package)")
         for ni, node in enumerate(pkg["nodes"]):
             nw = f"{pw}.nodes[{ni}]"
             if not keys_ok(p, nw, node, NODE_KEYS, {"id", "role"}):
@@ -395,25 +421,25 @@ def check_figure(p, fw, repo, sha, at, fig):
             for f in fns:
                 if f not in found:
                     p.err(nw, f"function '{f}' is not in {pkg['path']} at {at} ({sha[:10]})")
-        if pkg.get("mark") is not None and pkg["mark"] not in MARKS:
-            p.err(pw, f"mark must be one of {sorted(MARKS)}")
-        if pkg.get("group") is not None:
-            area = areas.get(pkg["group"])
-            if area is None:
-                p.err(pw, f"group '{pkg['group']}' is not one of this figure's groups")
-            elif not pkg["path"].startswith(area["path"].rstrip("/") + "/") and pkg["path"] != area["path"]:
-                p.warn(pw, f"path '{pkg['path']}' is not inside its group's '{area['path']}'")
-        if len(pkg["nodes"]) > PKG_ROWS_MAX:
-            p.warn(pw, f"{len(pkg['nodes'])} rows; split it into smaller packages "
-                   f"(a file or sub-module each, at most {PKG_ROWS_MAX} rows) inside a group")
     if count > FIG_NODES_MAX:
-        p.warn(fw, f"{count} items; keep a figure to about {FIG_NODES_MAX}")
+        p.warn(fw, f"{count} rows; keep a figure to about {FIG_NODES_MAX}")
     for ei, e in enumerate(fig.get("edges", [])):
         ew = f"{fw}.edges[{ei}]"
-        if keys_ok(p, ew, e, EDGE_KEYS, {"from", "to"}):
-            for end in ("from", "to"):
-                if e[end] not in pkg_ids:
-                    p.err(ew, f"'{e[end]}' is not a package of this figure (edges join packages)")
+        if not keys_ok(p, ew, e, EDGE_KEYS, {"from", "to"}):
+            continue
+        a, b = pkg_ids.get(e["from"]), pkg_ids.get(e["to"])
+        for end, pk in (("from", a), ("to", b)):
+            if pk is None:
+                p.err(ew, f"'{e[end]}' is not a package of this figure")
+        if a is None or b is None:
+            continue
+        # A sign that `from` uses `to`: the code under `from` names `to`'s
+        # module, or one of the functions listed in `to`'s rows.
+        signs = [(b.get("module") or module_of(b["path"], sep)).split(sep)[-1]]
+        signs += [f for n in b["nodes"] for f in n.get("fns", [])]
+        if not grep_words(repo, sha, signs, [a["path"]]):
+            p.err(ew, f"no sign at {at} that '{a['path']}' uses '{b['path']}' "
+                  f"(none of {signs[:6]} occurs there)")
 
 
 def mermaid_label(text):
@@ -423,9 +449,9 @@ def mermaid_label(text):
 MARK_SIGN = {"new": "+", "changed": "~", "removed": "−"}
 
 
-def package_html(pkg, within=""):
-    """One UML package: a tab with the name and (path), a body listing the
-    jobs, each with its functions in parentheses and its change mark."""
+def package_html(pkg, name, own=False):
+    """One UML package: a tab with the module name and the note, a body
+    listing the jobs, each with its functions in parentheses and its mark."""
     rows = ""
     for node in pkg["nodes"]:
         mark = node.get("mark", "")
@@ -434,32 +460,49 @@ def package_html(pkg, within=""):
                if node.get("fns") else "")
         rows += (f"<div class='it {mark}'><span class='mk'>{MARK_SIGN.get(mark, '&nbsp;')}</span>"
                  f"<div><div class='role'>{stereo}{mermaid_label(node['role'])}</div>{fns}</div></div>")
-    pmark = pkg.get("mark", "")
-    # Inside a group, the tab shows the path relative to the group's.
-    path = pkg["path"]
-    if within and path.startswith(within.rstrip("/") + "/"):
-        path = path[len(within.rstrip("/")) + 1:]
-    return (f"<div class='pk {pmark}'><div class='tab'>{mermaid_label(pkg['name'])} "
-            f"<span class='path'>({mermaid_label(path)})</span></div>"
-            f"<div class='body'>{rows}</div></div>")
+    note = mermaid_label(pkg.get("note", ""))
+    own_tag = " <span class='st'>(이 모듈 자신)</span>" if own else ""
+    return (f"<div class='pk {pkg.get('mark', '')}'><div class='tab'>{mermaid_label(name)}{own_tag}"
+            + (f" <span class='note'>{note}</span>" if note else "")
+            + f"</div><div class='body'>{rows}</div></div>")
 
 
-def figure_mermaid(fig):
-    """The figure as a UML package diagram: one package per box, the jobs
-    listed inside, dashed «use» dependencies between packages. Mermaid only
-    lays it out; the package look comes from PACKAGE_CSS."""
+def figure_mermaid(fig, sep="::"):
+    """The figure as a UML package diagram. Each listed package is a box;
+    the modules above them are nested outlines, from the crate down, with
+    a chain of single-child modules merged into one (`tinicore::guardrails`).
+    Mermaid only lays it out; the package look comes from PACKAGE_CSS."""
+    mods = {(pkg.get("module") or module_of(pkg["path"], sep)): pkg for pkg in fig["packages"]}
+    tree = {}
+    for mod in mods:
+        node = tree
+        for seg in mod.split(sep):
+            node = node.setdefault(seg, {})
+
     lines = [f"flowchart {fig.get('direction', 'TB')}"]
-    areas = {a["id"]: a for a in fig.get("groups", [])}
-    for pkg in fig["packages"]:
-        if pkg.get("group") not in areas:
-            lines.append(f'  p_{pkg["id"]}["{package_html(pkg)}"]')
-    for aid, area in areas.items():
-        lines.append(f'  subgraph g_{aid}["{mermaid_label(area["name"])} '
-                     f'<span class=\'path\'>({mermaid_label(area["path"])})</span>"]')
-        for pkg in fig["packages"]:
-            if pkg.get("group") == aid:
-                lines.append(f'    p_{pkg["id"]}["{package_html(pkg, area["path"])}"]')
-        lines.append("  end")
+
+    def emit(prefix, name, children, depth):
+        full = sep.join(prefix + [name])
+        pkg = mods.get(full)
+        # Merge a module with one child and no box of its own into its child,
+        # but keep the crate (depth 0) as its own outline.
+        if depth > 0 and pkg is None and len(children) == 1:
+            (cname, cchildren), = children.items()
+            return emit(prefix, f"{name}{sep}{cname}", cchildren, depth)
+        pad = "  " * (depth + 1)
+        if not children:
+            lines.append(f'{pad}p_{pkg["id"]}["{package_html(pkg, name)}"]')
+            return
+        sid = "m_" + re.sub(r"\W", "_", full)
+        lines.append(f'{pad}subgraph {sid}["<span class=\'modname\'>{mermaid_label(name)}</span>"]')
+        if pkg is not None:
+            lines.append(f'{pad}  p_{pkg["id"]}["{package_html(pkg, name, own=True)}"]')
+        for cname, cchildren in children.items():
+            emit(prefix + name.split(sep), cname, cchildren, depth + 1)
+        lines.append(f"{pad}end")
+
+    for root, children in tree.items():
+        emit([], root, children, 0)
     for e in fig.get("edges", []):
         label = mermaid_label(e.get("label") or "«use»")
         lines.append(f'  p_{e["from"]} -. "{label}" .-> p_{e["to"]}')
@@ -478,6 +521,8 @@ PACKAGE_CSS = (
     " .it.changed{background:#fff1a8} .it.removed{background:#ffd7d5;text-decoration:line-through}"
     " .it .mk{font-family:ui-monospace,Menlo,monospace;width:10px;color:#57606a;flex:none}"
     " .role{word-break:keep-all} .st{color:#57606a;font-size:11px}"
+    " .tab .note{font-weight:normal;color:#57606a;font-size:12px}"
+    " .modname{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:600}"
 )
 
 
@@ -772,6 +817,16 @@ out.dataset.done = '1';
     return svgs
 
 
+def natural_size(svg):
+    """Mermaid sizes an SVG to its container (width 100%, max-width = its
+    real width). Give it its real width instead, so a wide figure keeps
+    readable text and its box scrolls."""
+    m = re.search(r'max-width:\s*([\d.]+)px', svg)
+    if not m:
+        return svg
+    return re.sub(r'width="100%"', f'width="{m.group(1)}"', svg, count=1)
+
+
 def inline(text):
     """Escape, then allow `code` and **bold** only."""
     t = html.escape(text)
@@ -810,6 +865,16 @@ def code_block(side_label, s, sha):
         for r in s["refs"])
     return (f'<div class="code"><div class="code-h">{side_label} <span class="muted">@ {sha[:10]}</span></div>'
             f'<pre>{"".join(rows)}</pre><div class="refs">실제 코드: {refs}</div></div>')
+
+
+FIG_LEGEND = """<div class="legend"><b>그림 읽는 법</b>
+<ul>
+<li>상자 하나는 패키지(그 언어의 이름공간 단위, Rust 에서는 모듈) 하나입니다. 탭에는 모듈 이름과 짧은 설명이 있고, 큰 테두리는 그 모듈들을 담은 상위 모듈입니다(맨 바깥은 crate). 하위 모듈이 하나뿐인 모듈은 <code>a::b</code> 처럼 이어 적었습니다.</li>
+<li>상자 안의 줄은 그 모듈이 맡은 일이고, 괄호 안은 그 일을 하는 함수입니다.</li>
+<li>줄 색: <span class="ln add" style="display:inline;padding:0 4px">+ 초록</span> 새로 생김 · <span style="background:#fff1a8;color:#1f2328;padding:0 4px">~ 노랑</span> 바뀜 · <span class="ln del" style="display:inline;padding:0 4px">− 빨강·취소선</span> 없어짐 · 흰색은 그대로입니다.</li>
+<li>탭 색: 초록은 모듈 자체가 새로 생김, 회색은 원래 있던 모듈입니다.</li>
+<li>점선 «use» 화살표는 한 모듈이 다른 모듈을 쓴다는 뜻이며, 스크립트가 코드에서 그 흔적(모듈 이름이나 함수)을 확인했습니다. 호출 순서는 아래 "호출 순서" 그림이 보여 줍니다.</li>
+</ul></div>"""
 
 
 LEGEND = """<div class="legend"><b>유사 코드 읽는 법</b>
@@ -941,7 +1006,8 @@ code {{ font:13px ui-monospace, SFMono-Regular, Menlo, monospace; background:var
 figure {{ margin:0; }} .fig-h, .code-h {{ font-weight:600; margin-bottom:4px; }}
 .svg {{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:8px; overflow:auto; }}
 .svg foreignObject {{ overflow:visible; }}
-.svg svg {{ display:block; margin:0 auto; max-width:100%; max-height:90vh; height:auto; }}
+.svg svg {{ display:block; margin:0 auto; max-width:100%; height:auto; }}
+.figs .svg svg {{ max-width:none; }}
 figcaption {{ color:var(--muted); font-size:13px; margin-top:4px; }}
 .kind {{ display:inline-block; font-size:12px; padding:0 6px; border-radius:10px; border:1px solid var(--line); margin-right:4px; }}
 .k-new {{ background:var(--add); }} .k-removed {{ background:var(--del); }}
@@ -986,6 +1052,7 @@ td.num {{ text-align:right; }}
 
 <h2 id="structure">전체 구조: 전 → 후</h2>
 <div class="figs">{figs}</div>
+{FIG_LEGEND}
 <h4>무엇이 달라졌나</h4><ul>{changes}</ul>
 
 <h2 id="groups">주제별 상세</h2>
@@ -1027,7 +1094,9 @@ def main(argv):
         return 0
     st = spec["structure"]
     try:
-        sources = [figure_mermaid(st[k]) for k in ("before", "after")]
+        seps = {"before": module_sep(facts["repo"], facts["base"]),
+                "after": module_sep(facts["repo"], facts["head"])}
+        sources = [figure_mermaid(st[k], seps[k]) for k in ("before", "after")]
         seq_keys = []
         for g in spec["groups"]:
             for fi, fl in enumerate(g.get("flows", [])):
@@ -1036,7 +1105,8 @@ def main(argv):
                         seq_keys.append((g["id"], fi, side))
                         sources.append(sequence_mermaid(fl["sequence"][side]))
         rendered = render_mermaid(sources)
-        svgs, seq_svgs = rendered[:2], dict(zip(seq_keys, rendered[2:]))
+        svgs = [natural_size(x) for x in rendered[:2]]
+        seq_svgs = dict(zip(seq_keys, rendered[2:]))
     except Exception as e:  # noqa: BLE001 - report any render failure as one line
         print("error:", e, file=sys.stderr)
         return 1
@@ -1051,7 +1121,7 @@ def main(argv):
     os.makedirs(dest, exist_ok=True)
     for n, key, svg in ((1, "before", svgs[0]), (2, "after", svgs[1])):
         with open(os.path.join(dest, f"fig{n}-{key}.mmd"), "w", encoding="utf-8") as f:
-            f.write(figure_mermaid(st[key]) + "\n")
+            f.write(figure_mermaid(st[key], seps[key]) + "\n")
         with open(os.path.join(dest, f"fig{n}-{key}.svg"), "w", encoding="utf-8") as f:
             f.write(svg)
     with open(os.path.join(dest, "index.html"), "w", encoding="utf-8") as f:
