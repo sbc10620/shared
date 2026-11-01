@@ -1,6 +1,6 @@
 ---
 name: dev-cycle-report
-description: "Build a top-down HTML report that explains a PR or a commit range (typically one produced by the dev-cycle skill) for understanding the code: why it changed, how the overall structure changed (before/after Mermaid figures), then per-topic annotated pseudocode of each flow before and after. Commits are grouped by topic and only the final state is explained, never an intermediate state a later commit replaced. Every code reference, figure identifier and source is checked against the repository by scripts/build_report.py before anything is built. Use when the user asks for a report, overview or structural explanation of a PR, branch or commit range ('변경 보고서', 'PR 보고서', '구조 설명 보고서', '이 PR 이 뭘 바꿨는지 보고서로'). For per-file before/after code use commit-explain; for a call-flow picture from main use commit-flow-diagram."
+description: "Build a top-down HTML report that explains a PR or a commit range (typically one produced by the dev-cycle skill) for understanding the code: why it changed, how the overall structure changed (before/after UML package diagrams, each job in words with its functions in parentheses, plus before/after call sequences), then per-topic Python-flavoured pseudocode with explanation rows of each flow before and after. Commits are grouped by topic and only the final state is explained, never an intermediate state a later commit replaced. Every code reference, figure identifier and source is checked against the repository by scripts/build_report.py before anything is built. Use when the user asks for a report, overview or structural explanation of a PR, branch or commit range ('변경 보고서', 'PR 보고서', '구조 설명 보고서', '이 PR 이 뭘 바꿨는지 보고서로'). For per-file before/after code use commit-explain; for a call-flow picture from main use commit-flow-diagram."
 user-invocable: true
 ---
 
@@ -92,9 +92,21 @@ Rules:
     {"text": "...", "inferred_from": "<path at head>:<line>"}
   ],
   "structure": {
-    "before": {"mermaid": "flowchart TB ...", "identifiers": ["RealName"], "caption": "..."},
-    "after":  {"mermaid": "flowchart TB ...", "identifiers": ["RealName", "NewName"], "caption": "..."},
-    "changes": [{"kind": "new|changed|moved|removed", "text": "...", "group": "<group id>"}]
+    "before": {"caption": "...", "direction": "TB", "packages": [...], "edges": [...]},
+    "after": {
+      "caption": "...",
+      "packages": [{
+        "id": "pii", "name": "tinicore · PII 규칙", "path": "tinicore/src/guardrails/pii",
+        "nodes": [
+          {"id": "sel", "role": "나라 목록을 프로세스에 한 번 고정함",
+           "fns": ["select_countries"], "mark": "new"},
+          {"id": "rules", "role": "공통 규칙 + 나라별 규칙", "kind": "data", "fns": ["RULES"]}
+        ]}],
+      "edges": [{"from": "cli", "to": "pii"}]
+    },
+    "changes": [{"kind": "new|changed|moved|removed",
+                 "text": "무엇이 바뀌었는지, 코드 이름 없이",
+                 "fns": ["select_countries"], "group": "<group id>"}]
   },
   "groups": [{
     "id": "kebab-id", "title": "주제", "one_line": "한 문장 요약",
@@ -105,6 +117,14 @@ Rules:
       "title": "흐름 이름 (예: 부팅 때 언어를 고르는 흐름)",
       "before": {"code": "pseudocode", "refs": [{"path": "...", "lines": "120-160", "must_contain": ["fn_name"]}]},
       "after":  {"code": "pseudocode", "refs": [{"path": "...", "lines": "88-140", "must_contain": ["fn_name"]}]},
+      "calls": {"called_fn": "그 함수가 하는 일, 한 줄"},
+      "sequence": {
+        "before": {"layers": [{"name": "tinicli", "path": "tinicli/src",
+                               "participants": [{"id": "run", "name": "run"}]}],
+                   "steps": [{"from": "run", "to": "inst", "call": "install(config)", "reply": "결과"},
+                             {"from": "inst", "to": "run", "call": "설치 결과", "dashed": true}]},
+        "after": {"layers": [...], "steps": [...]}
+      },
       "explain": ["이 흐름에서 읽어야 할 점, 한 문장씩"]
     }],
     "points": ["핵심 포인트"],
@@ -118,34 +138,70 @@ Writing rules:
 
 - **Top-down.** `summary` and the group `one_line`s must make sense to
   someone who reads nothing else. Details go further down.
-- **Structure figures** (the part the reader came for):
-  - Draw components (modules, types, config, entry points) and how they
-    connect, not every function. Keep each figure to about 15 nodes.
-  - Draw `before` at base and `after` at head with the same node ids for
-    the same things, so the eye can compare them. Mark nodes with
-    `class <ids> new` or `class <ids> changed` in `after`, and
-    `class <ids> removed` in `before`. The script defines those three
-    classes; a spec with its own `classDef` or `style` is refused.
-  - Every real code name in a node goes in `identifiers`: the script checks
-    each one is in the Mermaid text and exists in the tree at that side.
-    Plain descriptive labels (Korean words) need no entry.
-  - Label an edge with its order ("1 먼저", "2 설치 뒤") when the order is
-    what the change is about.
+- **Structure figures** (the part the reader came for) are UML package
+  diagrams. The script draws them from `packages` and `edges`; there is no
+  raw Mermaid. They show the static structure only; the call order lives
+  in the flows' `sequence`.
+  - A package is a crate or module directory (or one file), drawn as a
+    folder with its `name` and `(path)` on the tab; `path` must exist at
+    that side. `mark` on a package colours its tab.
+  - Each node is a row inside the package: one job, written as a Korean
+    sentence in `role` ("나라 목록을 프로세스에 한 번 고정함"), never a
+    function name. `fns` names at most two functions (or types, constants)
+    that do the job, shown under the role in parentheses; they must be
+    found inside the package's `path` at that side (where they are
+    defined, not merely called). `kind: "data"` marks a rule file or table
+    («data»). `mark` (`new` / `changed` in `after`, `removed` in `before`)
+    colours the row and prefixes `+` / `~` / `−`.
+  - `edges` join packages, not rows: a dashed «use» dependency (another
+    word in `label` if it fits better).
+  - Keep each figure to about 15 rows. Use the same node ids in `before`
+    and `after` for the same job, so the two can be compared.
   - `changes` lists, in sentences, what is new, changed, moved or removed,
-    each pointing at the group that explains it.
-- **Pseudocode** (`flows`):
-  - One flow per behaviour a reader would ask about ("a turn scans the
-    input", "boot picks the languages"). Show the path from its entry
-    point down to the changed part.
-  - Use the real names of functions, types and config keys; write control
-    flow language-neutrally; elide unrelated parts with `...`. Never drop
-    an early return or branch that changes the result.
-  - Comments are Korean, after `//`. Put `+` in column 0, before the
-    indent, on a line that is new at head, and `-` on a line in `before`
-    that is gone at head.
-  - Keep each line within 80 columns (a Korean character counts two); the
-    script warns otherwise. Put a long comment on its own line above the
-    code it explains, with the same prefix and indent.
+    each pointing at the group that explains it. The `text` says what
+    changed without code names; `fns` (up to three) names the functions
+    that carry it, shown after the sentence as "담당: …". Removed items'
+    `fns` are looked up at base. Code-like words in `text` or `role` draw
+    a warning. The page sorts the list: 새로 생김, 바뀜, 옮겨짐, 없어짐.
+- **Pseudocode** (`flows`), Python-flavoured for a reader who may not know
+  Python:
+  - Keywords: `def`, `if` / `elif` / `else`, `for … in`, `while`,
+    `return`, `raise`, `and` / `or` / `not`. Blocks by indentation. Write
+    anything else in plain Korean ("if requested 가 없으면:"). The page
+    shows a legend of these.
+  - Refused (they read as noise to someone who knows neither language):
+    `//` comments, Rust (`fn`, `let`, `match`, `impl`, `pub`), `lambda`,
+    `yield`, `self.`, `with`, `is None`, list comprehensions, slicing
+    `a[i:j]`.
+  - Explanations between the lines: a `## ` row is drawn as a full-width
+    explanation box, not code. Right above every `def` (the script refuses
+    it otherwise) put at least three `## ` rows:
+    - `## <function name>: what it does`, in one sentence;
+    - `## 입력: name — what it holds, …` (`없음` when it takes nothing);
+    - `## 출력: what it returns, and the errors it raises` (`없음` when
+      nothing).
+    Add more `## ` rows before a step a reader would not follow. A `# `
+    note at the end of a line says what a variable holds
+    ("# 호스트가 넘긴 나라 목록").
+  - One flow per behaviour a reader would ask about ("boot picks the
+    countries"), from its entry point down to the changed part. Use the
+    real names of functions, types and config keys; elide unrelated parts
+    with `...`. Never drop an early return or branch that changes the
+    result.
+  - `calls` explains, in one line each, every name the pseudocode calls
+    (`name(` or `obj.name(`) that is not a `def` of the same flow; the
+    script refuses a flow with an unexplained call. The page lists them
+    under the code as "이 흐름에서 부르는 함수".
+  - `sequence` (for a flow that crosses packages): the call order before
+    and after, as boxes per layer (a package, as in the structure figure)
+    holding the functions that take part, and the calls in order. `reply`
+    draws the answer right after a call; a step with `dashed: true` is a
+    later return. Participants must be found in their layer's `path`.
+    Omit `before` when the flow is new.
+  - Put `+` in column 0, before the indent, on a line that is new at head,
+    and `-` on a line in `before` that is gone at head.
+  - Keep code lines within 80 columns (a Korean character counts two);
+    move a long note to a `## ` row above.
   - Each side has at least one `refs` entry; every `must_contain` name
     must appear in the pseudocode and in that file at that side. `lines`
     is a hint; a miss prints a warning with the real line numbers — fix the
@@ -179,8 +235,8 @@ Give a subagent the repository path, the two SHAs and the built
 `report.json` (an agent that cannot start one does this pass itself, and
 says so), and have it check, against the code and the sources:
 
-- every node and arrow of both figures (exists, connects as drawn, at the
-  right side);
+- every node and arrow of both figures: the role says what its functions
+  really do, the arrows connect as drawn, at the right side;
 - every `why` source exists and still says what the report claims;
 - each flow describes head, not a state a later commit replaced;
 - no major change of the range is missing, and nothing outside it is

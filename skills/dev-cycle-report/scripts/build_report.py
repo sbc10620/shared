@@ -30,10 +30,6 @@ import unicodedata
 
 sys.dont_write_bytecode = True
 
-# Appended to every flowchart, so every report marks changes the same way.
-CLASS_DEFS = ("\n  classDef new fill:#d3f5d3,stroke:#2f8132"
-              "\n  classDef changed fill:#fff1a8,stroke:#9a6700"
-              "\n  classDef removed fill:#ffd7d5,stroke:#b42318,stroke-dasharray:4 3")
 MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@12.2.0/dist/mermaid.esm.min.mjs"
 CHROMES = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -47,13 +43,26 @@ TOP_KEYS = {"repo_dir", "base", "head", "topic", "title", "summary", "why",
 TOP_REQUIRED = TOP_KEYS - {"records"}
 WHY_KEYS = {"text", "source", "inferred_from"}
 STRUCT_KEYS = {"before", "after", "changes"}
-FIG_KEYS = {"mermaid", "identifiers", "caption"}
-CHANGE_KEYS = {"kind", "text", "group"}
+FIG_KEYS = {"caption", "direction", "packages", "edges"}
+PKG_KEYS = {"id", "name", "path", "nodes", "mark"}
+NODE_KEYS = {"id", "role", "fns", "kind", "mark"}
+EDGE_KEYS = {"from", "to", "label", "dashed"}
+MARKS = {"new", "changed", "removed"}
+NODE_FNS_MAX = 2
+FIG_NODES_MAX = 15
+CHANGE_KEYS = {"kind", "text", "fns", "group"}
+CHANGE_FNS_MAX = 3
 CHANGE_KINDS = {"new": "새로 생김", "changed": "바뀜", "moved": "옮겨짐", "removed": "없어짐"}
 GROUP_KEYS = {"id", "title", "one_line", "why", "commits", "commit_notes",
               "flows", "points", "tests"}
 GROUP_REQUIRED = {"id", "title", "one_line", "commits"}
-FLOW_KEYS = {"title", "before", "after", "explain"}
+FLOW_KEYS = {"title", "before", "after", "explain", "calls", "sequence"}
+SEQ_SIDES = {"before", "after"}
+SEQ_KEYS = {"layers", "steps"}
+LAYER_KEYS = {"name", "path", "participants"}
+PART_KEYS = {"id", "name"}
+STEP_KEYS = {"from", "to", "call", "reply", "dashed"}
+CHANGE_ORDER = ["new", "changed", "moved", "removed"]
 SIDE_KEYS = {"code", "refs"}
 REF_KEYS = {"path", "lines", "must_contain"}
 TEST_KEYS = {"path", "must_contain", "text"}
@@ -61,6 +70,25 @@ NOTE_KEYS = {"replaced_by", "note"}
 RECORD_KEYS = {"text", "applies_to", "source"}
 
 CODE_COLUMNS = 80  # a pseudocode line wider than this scrolls inside its box
+# Prose that should name what changed, not the code: backticked code,
+# snake_case, CamelCase types, paths with ::, calls with ().
+CODE_LIKE_RE = re.compile(r"`[^`]+`|\b[a-z][a-z0-9]*_[a-z0-9_]+\b|::|\b[A-Z][a-z0-9]+[A-Z]\w*\b|\b\w+\(\)")
+# The pseudocode is Python-flavoured with a small keyword set; these are
+# Python-only idioms (or Rust) a reader who knows neither cannot follow.
+PSEUDO_KEYWORDS = r"def|if|elif|else|for|in|while|return|raise|and|or|not"
+# A call in pseudocode: a (dotted) ASCII name right before `(`.
+CALL_RE = re.compile(r"(?<![\w.])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*\(")
+PSEUDO_BANNED = [
+    (re.compile(r"//"), "use `#` for a comment, not `//`"),
+    (re.compile(r"^\s*(fn|let|pub|impl|match)\b"), "Rust syntax; use `def`, `=`, `if`"),
+    (re.compile(r"\blambda\b"), "`lambda`; describe the function in words"),
+    (re.compile(r"\byield\b"), "`yield`; say what is produced"),
+    (re.compile(r"\bself\."), "`self.`; name the object instead"),
+    (re.compile(r"^\s*with\b"), "`with`; say what is held and when it is released"),
+    (re.compile(r"\bis\s+(not\s+)?None\b"), "`is None`; write `if X 가 없으면`"),
+    (re.compile(r"\[[^\]]*\bfor\b[^\]]*\bin\b[^\]]*\]"), "a list comprehension; use a plain `for`"),
+    (re.compile(r"\w\[[^\[\]]*:[^\[\]]*\]"), "slicing `a[i:j]`; write `text 의 i..j 부분`"),
+]
 TOPIC_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 UNCHECKED_SOURCE_RE = re.compile(r"^(PR|issue|이슈)?\s*[\w./-]*#\d+$|^https?://", re.I)
@@ -272,37 +300,33 @@ def check(spec, p):
                 p.err(f"group '{owner[c]}'", f"commit {c[:10]} has no line left at head; "
                       "add commit_notes with replaced_by (a later commit) or note (e.g. deletions only)")
 
-    # Where figure identifiers are looked up: the first two path components
-    # of every file the range changes.
+    # Where changed-feature functions are looked up first: the first two
+    # path components of every file the range changes.
     changed = out(repo, "diff", "--no-renames", "-z", "--name-only", base, head).split("\0")
     dirs = {"/".join(os.path.dirname(f).split("/")[:2]) for f in changed if f}
     scope = [] if "" in dirs else sorted(dirs)  # a changed root file: the whole tree
     st = spec.get("structure", {})
     if keys_ok(p, "structure", st, STRUCT_KEYS, STRUCT_KEYS):
         for side, sha in (("before", base), ("after", head)):
-            fw = f"structure.{side}"
-            fig = st.get(side)
-            if not keys_ok(p, fw, fig, FIG_KEYS, {"mermaid", "identifiers"}):
-                continue
-            if re.search(r"^\s*(classDef|style)\b", fig["mermaid"], re.M):
-                p.err(fw, "do not style nodes; use `class <ids> new|changed|removed` "
-                      "(the script defines those three)")
-            toks = str_list(p, f"{fw}.identifiers", fig.get("identifiers", []), 1)
-            found = grep_words(repo, sha, toks, scope)
-            if scope and len(found) < len(toks):  # not near the change: the whole tree
-                found |= grep_words(repo, sha, [t for t in toks if t not in found], [])
-            for tok in toks:
-                if tok not in fig.get("mermaid", ""):
-                    p.err(fw, f"identifier '{tok}' is not in the Mermaid text")
-                if tok not in found:
-                    p.err(fw, f"identifier '{tok}' is not found at {'base' if side == 'before' else 'head'} ({sha[:10]})")
+            check_figure(p, f"structure.{side}", repo, sha, "base" if side == "before" else "head",
+                         st.get(side))
         for ci, ch in enumerate(st.get("changes", [])):
             cw = f"structure.changes[{ci}]"
-            if keys_ok(p, cw, ch, CHANGE_KEYS, CHANGE_KEYS):
+            if keys_ok(p, cw, ch, CHANGE_KEYS, {"kind", "text", "group"}):
                 if ch["kind"] not in CHANGE_KINDS:
                     p.err(cw, f"kind must be one of {sorted(CHANGE_KINDS)}")
                 if ch["group"] not in group_ids:
                     p.err(cw, f"group '{ch['group']}' is not a group id")
+                warn_code_like(p, cw, ch["text"], "name the function in `fns`, not in the text")
+                fns = str_list(p, f"{cw}.fns", ch.get("fns", []), 0, CHANGE_FNS_MAX)
+                sha = base if ch["kind"] == "removed" else head
+                found = grep_words(repo, sha, fns, scope)
+                if scope and len(found) < len(fns):
+                    found |= grep_words(repo, sha, [f for f in fns if f not in found], [])
+                for f in fns:
+                    if f not in found:
+                        p.err(cw, f"function '{f}' is not found at "
+                              f"{'base' if sha == base else 'head'} ({sha[:10]})")
 
     for ri, r in enumerate(spec.get("records", [])):
         rw = f"records[{ri}]"
@@ -317,6 +341,243 @@ def check(spec, p):
             "surviving": surviving, "owner": owner, "stat": stat, "nums": nums}
 
 
+def warn_code_like(p, where, text, hint):
+    hits = CODE_LIKE_RE.findall(text)
+    if hits:
+        p.warn(where, f"code-like words {sorted(set(hits))[:4]} in prose; {hint}")
+
+
+def check_figure(p, fw, repo, sha, at, fig):
+    """A structure figure: packages (a crate or module directory) holding
+    nodes (one job each, in Korean, with at most two function names), and
+    edges between nodes."""
+    if not keys_ok(p, fw, fig, FIG_KEYS, {"packages"}):
+        return
+    if fig.get("direction", "TB") not in ("TB", "LR"):
+        p.err(fw, "direction must be TB or LR")
+    ids, pkg_ids, count = set(), set(), 0
+    for pi, pkg in enumerate(fig.get("packages", [])):
+        pw = f"{fw}.packages[{pi}]"
+        if not keys_ok(p, pw, pkg, PKG_KEYS, PKG_KEYS - {"mark"}):
+            continue
+        if pkg["id"] in pkg_ids:
+            p.err(pw, f"duplicate package id '{pkg['id']}'")
+        pkg_ids.add(pkg["id"])
+        if git(repo, "cat-file", "-e", f"{sha}:{pkg['path']}", check=False).returncode != 0:
+            p.err(pw, f"path '{pkg['path']}' does not exist at {at} ({sha[:10]})")
+            continue
+        for ni, node in enumerate(pkg["nodes"]):
+            nw = f"{pw}.nodes[{ni}]"
+            if not keys_ok(p, nw, node, NODE_KEYS, {"id", "role"}):
+                continue
+            count += 1
+            if node["id"] in ids:
+                p.err(nw, f"duplicate node id '{node['id']}'")
+            ids.add(node["id"])
+            if node.get("kind", "step") not in ("step", "data"):
+                p.err(nw, "kind must be step or data")
+            if node.get("mark") is not None and node["mark"] not in MARKS:
+                p.err(nw, f"mark must be one of {sorted(MARKS)}")
+            warn_code_like(p, nw, node["role"], "say what happens; put the function in `fns`")
+            fns = str_list(p, f"{nw}.fns", node.get("fns", []))
+            if len(fns) > NODE_FNS_MAX:
+                p.warn(nw, f"{len(fns)} functions; keep at most {NODE_FNS_MAX} per node")
+            found = grep_words(repo, sha, fns, [pkg["path"]])
+            for f in fns:
+                if f not in found:
+                    p.err(nw, f"function '{f}' is not in {pkg['path']} at {at} ({sha[:10]})")
+        if pkg.get("mark") is not None and pkg["mark"] not in MARKS:
+            p.err(pw, f"mark must be one of {sorted(MARKS)}")
+    if count > FIG_NODES_MAX:
+        p.warn(fw, f"{count} items; keep a figure to about {FIG_NODES_MAX}")
+    for ei, e in enumerate(fig.get("edges", [])):
+        ew = f"{fw}.edges[{ei}]"
+        if keys_ok(p, ew, e, EDGE_KEYS, {"from", "to"}):
+            for end in ("from", "to"):
+                if e[end] not in pkg_ids:
+                    p.err(ew, f"'{e[end]}' is not a package of this figure (edges join packages)")
+
+
+def mermaid_label(text):
+    return html.escape(text, quote=False).replace('"', "#quot;")
+
+
+MARK_SIGN = {"new": "+", "changed": "~", "removed": "−"}
+
+
+def package_html(pkg):
+    """One UML package: a tab with the name and (path), a body listing the
+    jobs, each with its functions in parentheses and its change mark."""
+    rows = ""
+    for node in pkg["nodes"]:
+        mark = node.get("mark", "")
+        stereo = "<span class='st'>«data»</span> " if node.get("kind") == "data" else ""
+        fns = (f"<div class='fn'>({', '.join(mermaid_label(f) for f in node['fns'])})</div>"
+               if node.get("fns") else "")
+        rows += (f"<div class='it {mark}'><span class='mk'>{MARK_SIGN.get(mark, '&nbsp;')}</span>"
+                 f"<div><div class='role'>{stereo}{mermaid_label(node['role'])}</div>{fns}</div></div>")
+    pmark = pkg.get("mark", "")
+    return (f"<div class='pk {pmark}'><div class='tab'>{mermaid_label(pkg['name'])} "
+            f"<span class='path'>({mermaid_label(pkg['path'])})</span></div>"
+            f"<div class='body'>{rows}</div></div>")
+
+
+def figure_mermaid(fig):
+    """The figure as a UML package diagram: one package per box, the jobs
+    listed inside, dashed «use» dependencies between packages. Mermaid only
+    lays it out; the package look comes from PACKAGE_CSS."""
+    lines = [f"flowchart {fig.get('direction', 'TB')}"]
+    for pkg in fig["packages"]:
+        lines.append(f'  p_{pkg["id"]}["{package_html(pkg)}"]')
+    for e in fig.get("edges", []):
+        label = mermaid_label(e.get("label") or "«use»")
+        lines.append(f'  p_{e["from"]} -. "{label}" .-> p_{e["to"]}')
+    lines.append("  classDef pkg fill:none,stroke:none")
+    lines.append("  class " + ",".join(f"p_{pkg['id']}" for pkg in fig["packages"]) + " pkg")
+    return "\n".join(lines)
+
+
+PACKAGE_CSS = (
+    ".pk{text-align:left;font-size:13px;line-height:1.45}"
+    " .tab{display:inline-block;border:1.5px solid #57606a;border-bottom:none;background:#eaeef2;"
+    "padding:2px 8px;border-radius:3px 3px 0 0;font-weight:600}"
+    " .body{border:1.5px solid #57606a;background:#fff;padding:4px 0;min-width:240px}"
+    " .pk.new .tab{background:#d3f5d3} .pk.changed .tab{background:#fff1a8} .pk.removed .tab{background:#ffd7d5}"
+    " .it{display:flex;gap:6px;padding:3px 10px} .it.new{background:#d3f5d3}"
+    " .it.changed{background:#fff1a8} .it.removed{background:#ffd7d5;text-decoration:line-through}"
+    " .it .mk{font-family:ui-monospace,Menlo,monospace;width:10px;color:#57606a;flex:none}"
+    " .role{word-break:keep-all} .st{color:#57606a;font-size:11px}"
+)
+
+
+DEF_NOTE_PARTS = (("입력:", "a `## 입력: …` row (the parameters and what they hold)"),
+                  ("출력:", "a `## 출력: …` row (what it returns, or 없음, and what it raises)"))
+
+
+def note_text(line):
+    """The text of a `## ` row (marker and indent removed), else None."""
+    body = line[1:] if line[:1] in "+-" else line
+    stripped = body.lstrip()
+    return stripped[3:].strip() if stripped.startswith("## ") else None
+
+
+def missing_def_notes(above, name):
+    """What the `## ` block right above `def name` lacks: a sentence that
+    starts with `name:` and says what it does, its 입력 and its 출력."""
+    block = []
+    for line in reversed(above):
+        text = note_text(line)
+        if text is None:
+            break
+        block.append(text)
+    missing = []
+    if not any(t.startswith(f"{name}:") for t in block):
+        missing.append(f"a `## {name}: <what it does>` row")
+    for key, why in DEF_NOTE_PARTS:
+        if not any(t.startswith(key) for t in block):
+            missing.append(why)
+    return missing
+
+
+def check_pseudocode(p, sw, code):
+    """Python-flavoured pseudocode: a small keyword set, `## ` explanation
+    rows, `# ` notes; no Python-only idioms, no Rust."""
+    lines = code.split("\n")
+    has_note = False
+    has_assign = False
+    for n, raw in enumerate(lines, 1):
+        body = raw[1:] if raw[:1] in "+-" else raw
+        if body.lstrip().startswith("## "):
+            continue
+        if columns(raw) > CODE_COLUMNS:
+            p.warn(sw, f"code line {n} is {columns(raw)} columns wide (over {CODE_COLUMNS}); "
+                   "shorten it or move the note to a `## ` row above")
+        code_part = re.split(r"(?:^|\s)#\s", body, maxsplit=1)[0]
+        if code_part != body:
+            has_note = True
+        for rx, why in PSEUDO_BANNED:
+            if rx.search(code_part):
+                p.err(sw, f"code line {n}: {why}")
+        m = re.match(r"^\s*def\s+(\w+)", code_part)
+        if m:
+            missing = missing_def_notes(lines[:n - 1], m.group(1))
+            if missing:
+                p.err(sw, f"code line {n}: the `## ` rows right above `def` need {', '.join(missing)}")
+        if re.match(r"^\s*[A-Za-z_][\w.]*\s*=\s", code_part):
+            has_assign = True
+    if has_assign and not has_note:
+        p.warn(sw, "no `# ` note on any line; say what the key variables hold")
+
+
+def code_calls(code):
+    """Names called in pseudocode (outside `## ` rows and `# ` notes), in
+    order, and the names it defines with `def`."""
+    calls, defs = [], set()
+    for raw in code.split("\n"):
+        if note_text(raw) is not None:
+            continue
+        body = raw[1:] if raw[:1] in "+-" else raw
+        code_part = re.split(r"(?:^|\s)#\s", body, maxsplit=1)[0]
+        m = re.match(r"^\s*def\s+(\w+)", code_part)
+        if m:
+            defs.add(m.group(1))
+            code_part = code_part[m.end():]
+        for c in CALL_RE.findall(code_part):
+            if not re.fullmatch(PSEUDO_KEYWORDS, c) and c not in calls:
+                calls.append(c)
+    return calls, defs
+
+
+def check_sequence(p, sw, repo, sha, at, seq):
+    """A call sequence: layers (a package, like a structure figure's) holding
+    participants (functions), and the calls between them in order."""
+    if not keys_ok(p, sw, seq, SEQ_KEYS, SEQ_KEYS):
+        return
+    ids = set()
+    for li, layer in enumerate(seq["layers"]):
+        lw = f"{sw}.layers[{li}]"
+        if not keys_ok(p, lw, layer, LAYER_KEYS, LAYER_KEYS):
+            continue
+        if git(repo, "cat-file", "-e", f"{sha}:{layer['path']}", check=False).returncode != 0:
+            p.err(lw, f"path '{layer['path']}' does not exist at {at} ({sha[:10]})")
+            continue
+        names = []
+        for pi, part in enumerate(layer["participants"]):
+            pw = f"{lw}.participants[{pi}]"
+            if keys_ok(p, pw, part, PART_KEYS, PART_KEYS):
+                if part["id"] in ids:
+                    p.err(pw, f"duplicate participant id '{part['id']}'")
+                ids.add(part["id"])
+                names.append(part["name"])
+        found = grep_words(repo, sha, names, [layer["path"]])
+        for n in names:
+            if n not in found:
+                p.err(lw, f"'{n}' is not in {layer['path']} at {at} ({sha[:10]})")
+    for si, step in enumerate(seq["steps"]):
+        stw = f"{sw}.steps[{si}]"
+        if keys_ok(p, stw, step, STEP_KEYS, {"from", "to", "call"}):
+            for end in ("from", "to"):
+                if step[end] not in ids:
+                    p.err(stw, f"'{step[end]}' is not a participant")
+
+
+def sequence_mermaid(seq):
+    """A sequence diagram: one box per layer, a solid arrow per call and a
+    dashed one per reply."""
+    lines = ["sequenceDiagram"]
+    for layer in seq["layers"]:
+        lines.append(f"  box {layer['name']} · {layer['path']}")
+        for part in layer["participants"]:
+            lines.append(f"    participant s_{part['id']} as {part['name']}")
+        lines.append("  end")
+    for step in seq["steps"]:
+        a, b = f"s_{step['from']}", f"s_{step['to']}"
+        lines.append(f"  {a}{'-->>' if step.get('dashed') else '->>'}{b}: {step['call']}")
+        if step.get("reply"):
+            lines.append(f"  {b}-->>{a}: {step['reply']}")
+    return "\n".join(lines)
+
+
 def check_flow(p, where, repo, base, head, fl):
     if not keys_ok(p, where, fl, FLOW_KEYS, {"title", "after", "explain"}):
         return
@@ -329,10 +590,7 @@ def check_flow(p, where, repo, base, head, fl):
         sw = f"{where}.{side}"
         if not keys_ok(p, sw, s, SIDE_KEYS, SIDE_KEYS):
             continue
-        for n, line in enumerate(s["code"].split("\n"), 1):
-            if columns(line) > CODE_COLUMNS:
-                p.warn(sw, f"code line {n} is {columns(line)} columns wide (over {CODE_COLUMNS}); "
-                       "shorten it or move the comment to its own line")
+        check_pseudocode(p, sw, s["code"])
         for ri, r in enumerate(s["refs"]):
             rw = f"{sw}.refs[{ri}]"
             if not keys_ok(p, rw, r, REF_KEYS, {"path", "must_contain"}):
@@ -353,6 +611,28 @@ def check_flow(p, where, repo, base, head, fl):
                     p.err(rw, f"'{tok}' is not in {r['path']} at {at} ({sha[:10]})")
                 elif rng and not any(rng[0] <= h <= rng[1] for h in hits):
                     p.warn(rw, f"'{tok}' is outside lines {r['lines']}; found at {hits[:8]}")
+    called, defined = [], set()
+    for side in ("before", "after"):
+        if isinstance(fl.get(side), dict) and isinstance(fl[side].get("code"), str):
+            c, d = code_calls(fl[side]["code"])
+            called += [x for x in c if x not in called]
+            defined |= d
+    calls = fl.get("calls", {})
+    if not isinstance(calls, dict):
+        p.err(f"{where}.calls", "must map each called name to a one-line description")
+        calls = {}
+    for name in called:
+        if name not in defined and not str(calls.get(name, "")).strip():
+            p.err(f"{where}.calls", f"'{name}' is called in the pseudocode; say what it does in `calls`")
+    for name in calls:
+        if name not in called:
+            p.warn(f"{where}.calls", f"'{name}' is not called in the pseudocode")
+    seq = fl.get("sequence")
+    if seq is not None and keys_ok(p, f"{where}.sequence", seq, SEQ_SIDES, {"after"}):
+        for side, sha in (("before", base), ("after", head)):
+            if seq.get(side) is not None:
+                check_sequence(p, f"{where}.sequence.{side}", repo, sha,
+                               "base" if side == "before" else "head", seq[side])
 
 
 def columns(line):
@@ -423,7 +703,9 @@ try {{
   const mermaid = (await import('{MERMAID_URL}')).default;
   mermaid.initialize({{startOnLoad:false, theme:'default', securityLevel:'strict',
     themeVariables:{{clusterBkg:'#f6f8fa', clusterBorder:'#d0d7de'}},
-    flowchart:{{htmlLabels:false}}, fontFamily:'-apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'}});
+    htmlLabels:true, flowchart:{{htmlLabels:true, wrappingWidth:420, padding:2}},
+    themeCSS:{json.dumps('foreignObject{overflow:visible} .nodeLabel,.cluster-label{word-break:keep-all} .fn,.path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#57606a;font-weight:normal} ' + PACKAGE_CSS)},
+    fontFamily:'-apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'}});
   const srcs = JSON.parse(document.getElementById('src').textContent);
   for (let i = 0; i < srcs.length; i++) {{
     const pre = document.createElement('pre'); pre.id = 'fig' + i;
@@ -466,17 +748,32 @@ def inline(text):
     return re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
 
 
+def pseudo_line(line):
+    """One pseudocode line as HTML: a `## ` row becomes an explanation box,
+    a code line gets its keywords and `# ` note styled."""
+    mark = line[:1] if line[:1] in "+-" else ""
+    body = line[len(mark):]
+    cls = {"+": "add", "-": "del"}.get(mark, "")
+    stripped = body.lstrip()
+    if stripped.startswith("## "):
+        indent = len(body) - len(stripped)
+        text = inline(stripped[3:])
+        text = re.sub(r"^(입력|출력):", r"<b>\1</b>:", text)
+        text = re.sub(r"^([A-Za-z_]\w*):", r'<code class="fnname">\1</code>:', text)
+        return (f'<span class="ln note {cls}" style="padding-left:calc(12px + {indent + 1}ch)">'
+                f'{text}</span>')
+    parts = re.split(r"((?:^|\s)#\s.*)$", body, maxsplit=1)
+    code = html.escape(parts[0])
+    code = re.sub(rf"\b({PSEUDO_KEYWORDS})\b", r'<span class="kw">\1</span>', code)
+    note = f'<span class="cm">{html.escape(parts[1])}</span>' if len(parts) > 1 else ""
+    return f'<span class="ln {cls}"><span class="mk">{mark or " "}</span>{code}{note or ""}</span>'
+
+
 def code_block(side_label, s, sha):
     if s is None:
         return (f'<div class="code"><div class="code-h">{side_label}</div>'
                 '<div class="code-empty">이 범위 전에는 없었습니다.</div></div>')
-    rows = []
-    for line in s["code"].rstrip("\n").split("\n"):
-        cls = "add" if line.startswith("+") else "del" if line.startswith("-") else ""
-        m = re.match(r"^(.*?)(\s*//.*)$", line)
-        body = (html.escape(m.group(1)) + f'<span class="cm">{html.escape(m.group(2))}</span>'
-                if m else html.escape(line))
-        rows.append(f'<span class="ln {cls}">{body or " "}</span>')
+    rows = [pseudo_line(line) for line in s["code"].rstrip("\n").split("\n")]
     refs = " · ".join(
         f"<code>{html.escape(r['path'])}{':' + html.escape(str(r['lines'])) if r.get('lines') else ''}</code>"
         for r in s["refs"])
@@ -484,7 +781,19 @@ def code_block(side_label, s, sha):
             f'<pre>{"".join(rows)}</pre><div class="refs">실제 코드: {refs}</div></div>')
 
 
-def page(spec, facts, svgs, name):
+LEGEND = """<div class="legend"><b>유사 코드 읽는 법</b>
+<ul>
+<li><span class="kw">def</span> 함수 · <span class="kw">if</span>/<span class="kw">elif</span>/<span class="kw">else</span> 조건 ·
+<span class="kw">for</span> … <span class="kw">in</span> 반복 · <span class="kw">while</span> 반복 ·
+<span class="kw">return</span> 결과를 돌려줌 · <span class="kw">raise</span> 오류를 내고 멈춤.
+블록은 들여쓰기로 나눕니다. <code>...</code> 은 이 설명과 상관없는 부분을 생략한 것입니다.</li>
+<li><span class="ln note" style="display:inline-block;padding:0 6px">이런 상자</span> 는 코드가 아니라 바로 아래 함수나 단계의 설명입니다. 함수 위의 상자에는 하는 일, <b>입력</b>(매개변수와 담는 값), <b>출력</b>(돌려주는 값과 내는 오류)이 늘 있습니다.</li>
+<li><span class="cm"># …</span> 는 그 줄의 변수가 담는 내용이나 짧은 설명입니다.</li>
+<li><span class="ln add" style="display:inline;padding:0 4px">+</span> 줄은 새로 생긴 줄, <span class="ln del" style="display:inline;padding:0 4px">-</span> 줄은 없어진 줄입니다. 설명은 범위 전체를 적용한 뒤의 최종 상태 기준입니다.</li>
+</ul></div>"""
+
+
+def page(spec, facts, svgs, name, seq_svgs):
     repo, base, head = facts["repo"], facts["base"], facts["head"]
     groups = spec["groups"]
     gtitle = {g["id"]: g["title"] for g in groups}
@@ -508,15 +817,39 @@ def page(spec, facts, svgs, name):
         figs += (f'<figure><div class="fig-h">{label} <span class="muted">@ {sha[:10]}</span></div>'
                  f'<div class="svg">{svg}</div><figcaption>{cap} <a href="fig{n}-{key}.svg" target="_blank">크게 보기</a> <span class="muted">(fig{n}-{key}.mmd · .svg)</span></figcaption></figure>')
     changes = "".join(
-        f'<li><span class="kind k-{c["kind"]}">{CHANGE_KINDS[c["kind"]]}</span> {inline(c["text"])} '
-        f'<a class="muted" href="#g-{c["group"]}">→ {inline(gtitle[c["group"]])}</a></li>' for c in st.get("changes", []))
+        f'<li><span class="kind k-{c["kind"]}">{CHANGE_KINDS[c["kind"]]}</span> {inline(c["text"])}'
+        + (' <span class="fnref">담당: ' + ", ".join(f"<code>{html.escape(f)}</code>" for f in c["fns"]) + "</span>"
+           if c.get("fns") else "")
+        + f' <a class="muted" href="#g-{c["group"]}">→ {inline(gtitle[c["group"]])}</a></li>'
+        for c in sorted(st.get("changes", []),
+                        key=lambda c: CHANGE_ORDER.index(c["kind"]) if c["kind"] in CHANGE_ORDER else 9))
 
     gsec = ""
     for g in groups:
         flows = ""
-        for fl in g.get("flows", []):
-            flows += (f'<details class="flow" open><summary>{inline(fl["title"])}</summary>'
+        for fi, fl in enumerate(g.get("flows", [])):
+            seq = ""
+            if fl.get("sequence"):
+                cells = ""
+                for side, label, sha in (("before", "전", base), ("after", "후", head)):
+                    svg = seq_svgs.get((g["id"], fi, side))
+                    cells += (f'<div class="code"><div class="code-h">{label} <span class="muted">@ {sha[:10]}</span></div>'
+                              + (f'<div class="svg seq">{svg}</div>' if svg else
+                                 '<div class="code-empty">이 범위 전에는 없었습니다.</div>') + '</div>')
+                seq = f'<div class="sub-h">호출 순서</div><div class="stack">{cells}</div>'
+            called = []
+            for side in ("before", "after"):
+                if fl.get(side):
+                    called += [c for c in code_calls(fl[side]["code"])[0] if c not in called]
+            calls = fl.get("calls", {})
+            rows = "".join(f'<tr><td><code>{html.escape(c)}</code></td><td>{inline(calls[c])}</td></tr>'
+                           for c in called if c in calls)
+            calls_html = (f'<div class="sub-h">이 흐름에서 부르는 함수</div><table class="calls">{rows}</table>'
+                          if rows else "")
+            flows += (f'<details class="flow" open><summary>{inline(fl["title"])}</summary>{seq}'
+                      f'<div class="sub-h">유사 코드</div>'
                       f'<div class="pair">{code_block("전", fl.get("before"), base)}{code_block("후", fl["after"], head)}</div>'
+                      f'{calls_html}'
                       f'<ul>{"".join("<li>" + inline(e) + "</li>" for e in fl["explain"])}</ul></details>')
         points = "".join(f"<li>{inline(x)}</li>" for x in g.get("points", []))
         tests = "".join(f'<li><code>{html.escape(t["path"])}</code> — {inline(t["text"])}</li>' for t in g.get("tests", []))
@@ -553,9 +886,9 @@ def page(spec, facts, svgs, name):
 <title>{html.escape(spec['title'])}</title>
 <style>
 :root {{ --bg:#ffffff; --fg:#1f2328; --muted:#59636e; --line:#d1d9e0; --panel:#f6f8fa; --accent:#0969da;
-  --add:#dafbe1; --del:#ffebe9; --cm:#6e7781; }}
+  --add:#dafbe1; --del:#ffebe9; --cm:#6e7781; --kw:#8250df; --note:#ddf4ff; }}
 @media (prefers-color-scheme: dark) {{ :root {{ --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --line:#3d444d;
-  --panel:#161b22; --accent:#4493f8; --add:#12361f; --del:#3c1618; --cm:#8b949e; }} }}
+  --panel:#161b22; --accent:#4493f8; --add:#12361f; --del:#3c1618; --cm:#8b949e; --kw:#d2a8ff; --note:#0c2d4a; }} }}
 * {{ box-sizing:border-box; }}
 body {{ margin:0; background:var(--bg); color:var(--fg); font:15px/1.65 -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }}
 nav {{ position:fixed; top:0; left:0; bottom:0; width:240px; overflow:auto; padding:24px 16px; border-right:1px solid var(--line); font-size:14px; }}
@@ -576,6 +909,7 @@ code {{ font:13px ui-monospace, SFMono-Regular, Menlo, monospace; background:var
 .figs {{ display:grid; grid-template-columns:1fr; gap:20px; }}
 figure {{ margin:0; }} .fig-h, .code-h {{ font-weight:600; margin-bottom:4px; }}
 .svg {{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:8px; overflow:auto; }}
+.svg foreignObject {{ overflow:visible; }}
 .svg svg {{ display:block; margin:0 auto; max-width:100%; max-height:90vh; height:auto; }}
 figcaption {{ color:var(--muted); font-size:13px; margin-top:4px; }}
 .kind {{ display:inline-block; font-size:12px; padding:0 6px; border-radius:10px; border:1px solid var(--line); margin-right:4px; }}
@@ -589,7 +923,17 @@ details > summary {{ cursor:pointer; color:var(--accent); margin:6px 0; }}
   font:13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }}
 .ln {{ display:block; padding:0 12px; white-space:pre; }} .ln.add {{ background:var(--add); }} .ln.del {{ background:var(--del); }}
 .cm {{ color:var(--cm); font-style:italic; }}
+.kw {{ color:var(--kw); font-weight:600; }} .mk {{ color:var(--muted); }}
+.ln.note {{ white-space:pre-wrap; font-family:-apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-size:13px; background:var(--note); border-left:3px solid var(--accent); padding-top:2px; padding-bottom:2px; }}
+.ln:not(.note) + .ln.note, .ln.note + .ln:not(.note) {{ margin-top:6px; }}
+.legend {{ border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:10px 14px; margin:8px 0 16px; font-size:14px; }}
+.legend ul {{ margin:6px 0 0; }} .fnref {{ font-size:13px; color:var(--muted); }}
 .code-empty {{ padding:12px; border:1px dashed var(--line); border-radius:6px; color:var(--muted); }}
+.sub-h {{ font-weight:600; font-size:14px; margin:12px 0 4px; }}
+table.calls td:first-child {{ white-space:nowrap; }} table.calls {{ margin-top:2px; }}
+code.fnname {{ font-weight:600; background:transparent; padding:0; }}
+.svg.seq {{ padding:4px; }} .stack {{ display:grid; grid-template-columns:1fr; gap:10px; }}
 .refs {{ color:var(--muted); font-size:12px; margin-top:4px; }}
 .tag {{ font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:10px; padding:0 6px; }}
 ul.files {{ columns:2; font-size:13px; }}
@@ -614,7 +958,7 @@ td.num {{ text-align:right; }}
 <h4>무엇이 달라졌나</h4><ul>{changes}</ul>
 
 <h2 id="groups">주제별 상세</h2>
-<p class="muted">유사 코드에서 <span class="ln add" style="display:inline;padding:0 4px">+</span> 줄은 새로 생긴 줄이고, <span class="ln del" style="display:inline;padding:0 4px">-</span> 줄은 없어진 줄입니다. 설명은 범위 전체를 적용한 뒤의 최종 상태 기준입니다.</p>
+{LEGEND}
 {gsec}
 
 <h2 id="appendix">부록</h2>
@@ -652,7 +996,16 @@ def main(argv):
         return 0
     st = spec["structure"]
     try:
-        svgs = render_mermaid([st[k]["mermaid"].rstrip() + CLASS_DEFS for k in ("before", "after")])
+        sources = [figure_mermaid(st[k]) for k in ("before", "after")]
+        seq_keys = []
+        for g in spec["groups"]:
+            for fi, fl in enumerate(g.get("flows", [])):
+                for side in ("before", "after"):
+                    if (fl.get("sequence") or {}).get(side):
+                        seq_keys.append((g["id"], fi, side))
+                        sources.append(sequence_mermaid(fl["sequence"][side]))
+        rendered = render_mermaid(sources)
+        svgs, seq_svgs = rendered[:2], dict(zip(seq_keys, rendered[2:]))
     except Exception as e:  # noqa: BLE001 - report any render failure as one line
         print("error:", e, file=sys.stderr)
         return 1
@@ -667,11 +1020,11 @@ def main(argv):
     os.makedirs(dest, exist_ok=True)
     for n, key, svg in ((1, "before", svgs[0]), (2, "after", svgs[1])):
         with open(os.path.join(dest, f"fig{n}-{key}.mmd"), "w", encoding="utf-8") as f:
-            f.write(st[key]["mermaid"].rstrip() + CLASS_DEFS + "\n")
+            f.write(figure_mermaid(st[key]) + "\n")
         with open(os.path.join(dest, f"fig{n}-{key}.svg"), "w", encoding="utf-8") as f:
             f.write(svg)
     with open(os.path.join(dest, "index.html"), "w", encoding="utf-8") as f:
-        f.write(page(spec, facts, svgs, name))
+        f.write(page(spec, facts, svgs, name, seq_svgs))
     with open(os.path.join(dest, "report.json"), "w", encoding="utf-8") as f:
         json.dump(original, f, ensure_ascii=False, indent=2)
         f.write("\n")
