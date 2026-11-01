@@ -13,8 +13,8 @@
   ],
   "why": [
     {
-      "text": "13개국으로 늘리면 모든 규칙이 늘 켜진 구조에서는 메모리·스캔 시간과 나라 간 형식 충돌(오탐)이 커집니다. 그래서 나라별 파일로 나누고 고른 나라만 엔진에 넣기로 했습니다(계획 파일, 2026-10-02 수정).",
-      "source": "~/.claude/plans/plan-1-tidy-newell.md:6"
+      "text": "모든 규칙이 늘 켜진 구조로 나라를 더하면, 턴마다 만드는 엔진이 커지고 모양이 비슷한 나라별 형식끼리 충돌(오탐)합니다. 그래서 나라별 파일로 나누고 고른 나라만 엔진에 넣기로 했습니다.",
+      "source": "09a4c03cc3"
     },
     {
       "text": "나라마다 채택할 PII 항목·score·검증 방법은 13개국 근거 문서와 공통 문서에서 정했습니다.",
@@ -34,7 +34,7 @@
     },
     {
       "text": "사용자 결정: 런타임 설정으로 고르고(재컴파일 없음), 기존 `locale` 대신 PII 전용 설정을 두며, 엔진을 만들 때 고른 나라의 패턴만 넣습니다. 이후 기본 나라는 없애기로 했습니다.",
-      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-multilingual-support-dev-state.md"
+      "source": "agent:argo-multilingual-support-dev-state"
     }
   ],
   "structure": {
@@ -1936,12 +1936,12 @@
     {
       "text": "범위 전체 `/code-review` 13라운드로 리뷰 루프가 끝났습니다(13라운드의 수정은 테스트·문서뿐). 이 확인은 head 와 트리가 같은 리뷰 트리 T(`5ab526ea2c`)에서 했습니다: 리뷰 반영 전 head(`3e395a0ecd`) 대비 PII 비교 0 차이, 전체 테스트 기준선 대비 새 실패 0, e2e branch-multilingual-pii·guardrails-config 통과.",
       "applies_to": "65395de87f",
-      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-multilingual-support-dev-state.md"
+      "source": "agent:argo-multilingual-support-dev-state"
     },
     {
       "text": "PR 전 검사(dev-cycle 9단계): fmt·clippy 4레인·Core 감사 통과, e2e scan-caches 6/6 통과, detector_vs_regex 13묶음 중 12개 0 차이(Aho-Corasick 묶음의 379건은 origin/main 에도 있는 알려진 차이). PR 은 아직 만들지 않았습니다.",
       "applies_to": "65395de87f",
-      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-multilingual-support-dev-state.md"
+      "source": "agent:argo-multilingual-support-dev-state"
     }
   ],
   "impact": [
@@ -2002,7 +2002,7 @@
     {
       "kind": "sync",
       "text": "argo-tizen 은 이 코드를 가져갈 때 나라 목록을 설치에 넘기는 배선을 새로 해야 하고(지금은 없음), 자기 YAML 규칙을 더 엄격해진 엔진 빌드로 다시 확인해야 합니다.",
-      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-multilingual-support-dev-state.md"
+      "source": "agent:argo-multilingual-support-dev-state"
     }
   ],
   "glossary": {

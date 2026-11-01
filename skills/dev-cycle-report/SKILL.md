@@ -12,8 +12,9 @@ chains from main) answer the detailed questions; this report is the map
 above them.
 
 This document is agent-facing and works with any coding agent. It stays in
-English. The report is written in **Korean**, in full sentences: the
-script's fixed labels (전, 후, 담당, 입력, 출력, …) are Korean.
+English. The report is written in **Korean**, in full sentences of
+합니다체 (…합니다, …습니다), never the plain 다. ending (the script warns):
+the script's fixed labels (전, 후, 담당, 입력, 출력, …) are Korean.
 
 **Needs:** git, a shell, Python 3, a Chrome or Chromium (headless, found on
 the usual paths), and network access to jsdelivr for Mermaid at build time.
@@ -49,14 +50,21 @@ The "why" must come from somewhere a reader can open later:
   instructions say they keep them;
 - the agent's own plan and memory files, if the agent keeps any (for
   example Claude Code's `~/.claude/plans/*.md` and
-  `~/.claude/projects/*/memory/`).
+  `~/.claude/projects/*/memory/`). These are leads, not sources: follow
+  them to the commit, document or PR they point to and cite that. When
+  only the agent's file holds the fact (a user's decision, a review
+  record), cite it as `agent:<file name without extension>`; the page
+  shows "에이전트 기록(name)". A path into an agent's private directory
+  is refused as a source, because reports are often published.
 
 Rules:
 
 - A plan file can be overwritten by later work. Use one only when its
   content actually covers this range (it names the range's identifiers,
-  branch or commits). Cite its path in `source` and its modified time in
-  `text`.
+  branch or commits). If it is the agent's own file, cite it as
+  `agent:<name>` (above) and give its modified time in `text`
+  (`YYYY-MM-DD HH:MM`). When a document or commit and an agent file say
+  the same thing, cite the document or commit.
 - The current conversation is not a source: nobody can check it later.
   Something learned only from it is written as an inference (below) or
   left out.
@@ -64,7 +72,10 @@ Rules:
   rests on (`inferred_from`). The page labels it 추정.
 - A process record (review rounds, test or e2e results) always names the
   commit it applies to (`applies_to`): a result measured on a WIP commit is
-  not a result for head, and the page tags it "head 아님". Quote result
+  not a result for head, and the page tags it "head 아님". If that
+  commit's tree equals head's (`git diff --quiet <it> <head>` succeeds),
+  you may put head in `applies_to` and say in `text` that the check ran on
+  that same tree. Quote result
   lines as the tool printed them when the source has them; otherwise give
   the summary and its source path. No record at all → leave `records`
   empty; the page says 기록 없음.
@@ -176,6 +187,10 @@ Writing rules:
     outline as "(이 모듈 자신)". `mark` on a package colours its tab.
   - Keep each package to at most four rows; past that, list its
     sub-modules instead (the script warns).
+  - A data file (a rule YAML, a table) is not a package: show it as a
+    `kind: "data"` row in the package of the module that loads or embeds
+    it, with the constant or table that holds it in `fns` (the name must
+    occur under that package's `path`, like any `fns`).
   - Each **node** is a row inside a package: one job, written as a Korean
     sentence in `role` ("나라 목록을 프로세스에 한 번 고정함"), never a
     function name. `fns` names at most two functions (or types, constants)
@@ -183,19 +198,26 @@ Writing rules:
     that each name occurs inside the package's `path` at that side; put a
     function in the package that defines it, not one that only calls it
     (the script cannot tell the two apart). `kind: "data"` marks a rule
-    file or table («data»). `mark` (`new` / `changed` in `after`,
-    `removed` in `before`) colours the row and prefixes `+` / `~` / `−`.
+    file or table («data»). `mark` colours the row and prefixes `+` / `~` /
+    `−`: in `after`, `new` or `changed`; in `before`, `removed` for a job
+    head drops and `changed` for one head changes.
   - `edges` join packages (by id): a dashed «use» dependency, from the
     user to the used, drawn without text (the legend says what a dashed
     arrow means; give `label` only for another relation). The script
     refuses an edge unless a file under `from`'s `path`, at that side,
     contains `to`'s last module name or one of the functions in `to`'s
-    rows as a whole word.
+    rows as a whole word. A package with no edge at all draws a warning: a
+    reader takes it for unconnected. If the edge fails its check, the
+    package you drew is probably not the one that does the using (draw
+    the module that makes the call, e.g. the entry point rather than a
+    settings module).
   - Keep each figure to about 15 rows. Use the same package and node ids in
     `before` and `after` for the same thing, so the two can be compared.
     The page explains the colours and boxes in a legend under the figures.
   - `changes` lists, in sentences, what is new, changed, moved or removed,
-    each pointing at the topic group that explains it. The `text` says
+    each pointing at the topic group that explains it (for a change several
+    groups shaped, the group whose commits wrote most of what carries it
+    at head). The `text` says
     what changed without code names; `fns` (up to three) names the
     functions that carry it, shown after the sentence as "담당: …".
     Removed items' `fns` are looked up at base. Code-like words in `text`
@@ -237,14 +259,15 @@ Writing rules:
       is a hint; a miss prints a warning with the real line numbers — fix
       the hint. Omit `before` when the flow did not exist at base.
   - `calls` explains, in one line each, every name the pseudocode calls
-    (`name(` or `obj.name(`) that is not a `def` of the same flow; the
+    (`name(` or `obj.name(`) that is not a `def` of the same flow, except
+    the value wrappers `Ok(`, `Err(`, `Some(`; the
     script refuses a flow with an unexplained call. The page lists them
     under the code as "이 흐름에서 부르는 함수".
   - `example` walks one real input through the flow in 2 to 6 steps
     ("`locales = [\"ko_KR\"]` → `[Kr]` → 공통 + 한국 규칙 → 주민번호는 찾고 SSN
     은 찾지 않음"). Take the input and the outcome from a test, never
-    invent them, and name that test: the script checks it exists at head,
-    and warns about a flow with no example.
+    invent them, and name that test: a test name missing from the named
+    file at head is an error; a flow with no example draws a warning.
   - The page shows a flow in this order: pseudocode, the called functions,
     the example, the call sequence, then `explain`. The sequence has no
     explanations of its own; it relies on the parts above it.
@@ -260,7 +283,9 @@ Writing rules:
   (from its `## name:` row or its `calls` line) and clicking jumps there;
   glossary terms work the same, marked once per section. Only names that
   read as identifiers (with `_`, `.` or a capital) are linked, so give a
-  plain-word function an explanation where it matters anyway.
+  plain-word function an explanation where it matters anyway. In the call
+  sequences, each participant box and each call label is linked as a
+  whole (a participant box even when its name is a plain word).
 - **Tests**: name the tests that pin the group's behaviour, with what
   each guarantees in one sentence.
 
@@ -283,9 +308,9 @@ build goes on, but fix them unless there is a reason not to. The
 warnings are: a `lines` hint that misses, a pseudocode line over 80
 columns, a block with assignments but no `# ` note, code-like words in a
 `role` or a change's `text`, more than two `fns` in a row, more than four
-rows in a package, more than about 15 rows in a figure, a `calls` entry
-never called, a flow without `example`, and a glossary term the report
-never uses. Everything else this document calls required or refused is
+rows in a package, more than about 15 rows in a figure, a package with no
+edge, a `calls` entry never called, a flow without `example`, a glossary
+term the report never uses, and a sentence ending in a plain 다. Everything else this document calls required or refused is
 an error. A source that is a path is looked up in the repository
 at head first, then on disk; a SHA must resolve; `#n`, `repo#n` and URLs
 are not checked. Mermaid syntax is checked only by the build: the figures

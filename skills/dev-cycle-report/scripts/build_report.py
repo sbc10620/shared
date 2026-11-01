@@ -81,6 +81,8 @@ CODE_LIKE_RE = re.compile(r"`[^`]+`|\b[a-z][a-z0-9]*_[a-z0-9_]+\b|::|\b[A-Z][a-z
 # The pseudocode is Python-flavoured with a small keyword set; these are
 # Python-only idioms (or Rust) a reader who knows neither cannot follow.
 PSEUDO_KEYWORDS = r"def|if|elif|else|for|in|while|return|raise|and|or|not"
+# Wrapping a value, not calling a function: no `calls` entry needed.
+VALUE_CONSTRUCTORS = {"Ok", "Err", "Some"}
 # A call in pseudocode: a (dotted) ASCII name right before `(`.
 CALL_RE = re.compile(r"(?<![\w.])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*\(")
 PSEUDO_BANNED = [
@@ -172,12 +174,23 @@ def parse_lines(spec):
     return a, int(m.group(2) or a)
 
 
+AGENT_SOURCE_RE = re.compile(r"^agent:[\w.-]+$")
+PRIVATE_PATH_RE = re.compile(r"(^|/)\.claude/|^~/\.claude|/\.codex/|/\.gemini/")
+
+
 def check_source(p, where, repo, head, src):
     """A source is a path to an existing file (optionally :line), a commit SHA,
-    or a PR / issue number or URL (not checkable offline)."""
-    if UNCHECKED_SOURCE_RE.search(src.strip()):
-        return
+    a PR / issue number or URL (not checkable offline), or `agent:<name>` for
+    an agent's own memory or plan file (shown by name only, never by path)."""
     s = src.strip()
+    if AGENT_SOURCE_RE.match(s):
+        return
+    if PRIVATE_PATH_RE.search(s):
+        p.err(where, f"source '{s}' is an agent's private file; cite the commit or document it "
+              "points to, or write `agent:<file name>`")
+        return
+    if UNCHECKED_SOURCE_RE.search(s):
+        return
     if SHA_RE.match(s):
         if not resolve(repo, s):
             p.err(where, f"source SHA '{s}' does not resolve in {repo}")
@@ -353,6 +366,7 @@ def check(spec, p):
         p.err("glossary", "must map each term to a one-line explanation")
         glossary = {}
     rest = json.dumps({k: v for k, v in spec.items() if k != "glossary"}, ensure_ascii=False)
+    check_register(p, spec)
     for term, text in glossary.items():
         if not str(text).strip():
             p.err(f"glossary[{term}]", "is empty")
@@ -399,6 +413,31 @@ def module_of(path, sep):
 def module_sep(repo, sha):
     """`::` for a Rust workspace, `.` otherwise."""
     return "::" if git(repo, "cat-file", "-e", f"{sha}:Cargo.toml", check=False).returncode == 0 else "."
+
+
+PLAIN_ENDING_RE = re.compile(r"(?<![니])다\.(?=\s|$|\")")
+
+
+def check_register(p, spec):
+    """Report sentences are in 합니다체 (…습니다. / …ㅂ니다.); a sentence
+    ending in a plain 다. is the 해라체 a report should not mix in."""
+    texts = []
+    def walk(v, where):
+        if isinstance(v, str):
+            texts.append((where, v))
+        elif isinstance(v, list):
+            for i, x in enumerate(v):
+                walk(x, f"{where}[{i}]")
+        elif isinstance(v, dict):
+            for k, x in v.items():
+                if k not in ("code", "mermaid", "snippet", "path", "source", "must_contain", "fns"):
+                    walk(x, f"{where}.{k}")
+    for key in ("summary", "why", "impact", "glossary", "structure", "groups", "records"):
+        walk(spec.get(key), key)
+    bad = [w for w, t in texts if PLAIN_ENDING_RE.search(t)]
+    if bad:
+        p.warn("register", f"{len(bad)} sentence(s) end in a plain 다. instead of 합니다체, "
+               f"e.g. {bad[:3]}")
 
 
 def check_figure(p, fw, repo, sha, at, fig):
@@ -453,6 +492,12 @@ def check_figure(p, fw, repo, sha, at, fig):
                     p.err(nw, f"function '{f}' is not in {pkg['path']} at {at} ({sha[:10]})")
     if count > FIG_NODES_MAX:
         p.warn(fw, f"{count} rows; keep a figure to about {FIG_NODES_MAX}")
+    joined = {e.get(k) for e in fig.get("edges", []) if isinstance(e, dict) for k in ("from", "to")}
+    if len(pkg_ids) > 1:
+        for pid in pkg_ids:
+            if pid not in joined:
+                p.warn(fw, f"package '{pid}' has no «use» edge; a reader takes it for unconnected "
+                       "(draw the module that does the using, or leave the package out)")
     for ei, e in enumerate(fig.get("edges", [])):
         ew = f"{fw}.edges[{ei}]"
         if not keys_ok(p, ew, e, EDGE_KEYS, {"from", "to"}):
@@ -633,6 +678,8 @@ def code_calls(code):
             defs.add(m.group(1))
             code_part = code_part[m.end():]
         for c in CALL_RE.findall(code_part):
+            if c in VALUE_CONSTRUCTORS:
+                continue
             if not re.fullmatch(PSEUDO_KEYWORDS, c) and c not in calls:
                 calls.append(c)
     return calls, defs
@@ -883,6 +930,13 @@ def xml_safe(svg):
     return re.sub(r"<(br|hr|img)(\s[^<>]*?)?(?<!/)>", r"<\1\2/>", svg)
 
 
+def source_html(src):
+    s = src.strip()
+    if AGENT_SOURCE_RE.match(s):
+        return f"에이전트 기록(<code>{html.escape(s[6:])}</code>)"
+    return inline(s)
+
+
 def inline(text):
     """Escape, then allow `code` and **bold** only."""
     t = html.escape(text)
@@ -998,6 +1052,20 @@ TERMS_JS = r"""
   }
   // Function names: in code, in the figures' function lines, in pseudocode.
   document.querySelectorAll('main code, .fn, .ln:not(.note), .calls td:first-child').forEach(el => wrap(el, nameRe, defs));
+  // Sequence diagrams draw SVG <text>, which cannot hold a wrapping span:
+  // the whole label carries the entry. A participant box is exactly one
+  // function name, so plain words like `run` are linked there too; a call
+  // arrow's label is linked by the first known name in it (`::` read as `.`).
+  document.querySelectorAll('.svg.seq text').forEach(el => {
+    const raw = el.textContent.trim();
+    let entry = defs.get(raw);
+    if (!entry && nameRe) {
+      nameRe.lastIndex = 0;
+      const m = nameRe.exec(raw.replace(/::/g, '.'));
+      if (m) entry = defs.get(m[1]);
+    }
+    if (entry) { el.classList.add('term'); el._entry = entry; }
+  });
   // Glossary terms: in prose.
   document.querySelectorAll('main p, main li, main td, main dd, .role, .ln.note').forEach(el => wrap(el, termRe, terms));
   document.addEventListener('mouseover', e => {
@@ -1064,7 +1132,7 @@ def page(spec, facts, svgs, name, seq_svgs):
         f'<li><span class="kind">{IMPACT_KINDS[i["kind"]]}</span> {inline(i["text"])}'
         + (' <span class="fnref">담당: ' + ", ".join(f"<code>{html.escape(f)}</code>" for f in i["fns"]) + "</span>"
            if i.get("fns") else "")
-        + (f' <span class="src">— 출처: {inline(i["source"])}</span>' if i.get("source") else "")
+        + (f' <span class="src">— 출처: {source_html(i["source"])}</span>' if i.get("source") else "")
         + (f'<pre class="snippet">{html.escape(i["snippet"])}</pre>' if i.get("snippet") else "")
         + "</li>"
         for i in spec.get("impact", []))
@@ -1081,7 +1149,7 @@ def page(spec, facts, svgs, name, seq_svgs):
         f'<a class="card" href="#g-{g["id"]}"><b>{inline(g["title"])}</b><span>{inline(g["one_line"])}</span>'
         f'<span class="muted">커밋 {len(g["_commits"])}개</span></a>' for g in groups)
     why = "".join(
-        f'<li>{inline(w["text"])} <span class="src">— {"출처: " + inline(w["source"]) if w.get("source") else "추정, 근거: <code>" + html.escape(w["inferred_from"]) + "</code>"}</span></li>'
+        f'<li>{inline(w["text"])} <span class="src">— {"출처: " + source_html(w["source"]) if w.get("source") else "추정, 근거: <code>" + html.escape(w["inferred_from"]) + "</code>"}</span></li>'
         for w in spec["why"])
     st = spec["structure"]
     figs = ""
@@ -1155,7 +1223,7 @@ def page(spec, facts, svgs, name, seq_svgs):
     records = spec.get("records") or []
     rec = ("<ul>" + "".join(
         f'<li>{inline(r["text"])} <span class="src">— 대상 <code>{html.escape(r["applies_to"][:10])}</code>'
-        f'{"" if resolve(repo, r["applies_to"]) == head else " <span class=tag>head 아님</span>"}, 출처: {inline(r["source"])}</span></li>'
+        f'{"" if resolve(repo, r["applies_to"]) == head else " <span class=tag>head 아님</span>"}, 출처: {source_html(r["source"])}</span></li>'
         for r in records) + "</ul>") if records else "<p>기록 없음.</p>"
     rows = ""
     for c in facts["commits"]:
@@ -1230,6 +1298,7 @@ ul.files {{ columns:2; font-size:13px; }}
 table {{ border-collapse:collapse; font-size:14px; }} td, th {{ border:1px solid var(--line); padding:4px 8px; text-align:left; }}
 td.num {{ text-align:right; }}
 .term {{ border-bottom:1px dotted var(--accent); cursor:help; }}
+.svg.seq text.term {{ text-decoration:underline dotted; cursor:help; }}
 #tip {{ position:fixed; z-index:10; max-width:420px; display:none; padding:6px 10px; border-radius:6px;
   background:var(--fg); color:var(--bg); font:13px/1.5 -apple-system, "Apple SD Gothic Neo", sans-serif; pointer-events:none; }}
 .flash {{ outline:2px solid var(--accent); outline-offset:2px; }}
