@@ -148,9 +148,10 @@ Writing rules:
   - Each node is a row inside the package: one job, written as a Korean
     sentence in `role` ("나라 목록을 프로세스에 한 번 고정함"), never a
     function name. `fns` names at most two functions (or types, constants)
-    that do the job, shown under the role in parentheses; they must be
-    found inside the package's `path` at that side (where they are
-    defined, not merely called). `kind: "data"` marks a rule file or table
+    that do the job, shown under the role in parentheses. The script
+    checks that each name occurs inside the package's `path` at that side;
+    put a function in the package that defines it, not one that only
+    calls it (the script cannot tell the two apart). `kind: "data"` marks a rule file or table
     («data»). `mark` (`new` / `changed` in `after`, `removed` in `before`)
     colours the row and prefixes `+` / `~` / `−`.
   - `edges` join packages, not rows: a dashed «use» dependency (another
