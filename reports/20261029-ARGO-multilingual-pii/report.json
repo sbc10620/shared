@@ -1,0 +1,854 @@
+{
+  "repo_dir": "/Users/byungchulso/Works/ARGO-multilingual-support",
+  "base": "425843d519",
+  "head": "65395de87f",
+  "topic": "multilingual-pii",
+  "title": "ARGO PII 다국어 지원: 나라별 규칙 파일과 국가 선택, 13개국 탐지",
+  "summary": [
+    "base 에서는 PII recognizer 49개가 YAML 하나(`pii_filter_config.yaml`)에 모여 있었고, 모든 나라의 규칙이 늘 켜져 있었습니다.",
+    "이 범위는 규칙을 공통(`common`)과 나라별 디렉터리 `pii/countries/<code>/` 로 나누고, 부팅 때 고른 나라의 규칙만 공통 규칙에 더해 엔진을 만듭니다. 지원하는 나라는 13개(kr us es mx gb pl it fr de in br vn th)입니다.",
+    "ARGO CLI 는 `[pii] locales`, 없으면 기기 locale 의 지역으로 나라를 정하고, 기본 나라는 없습니다. tinicore 는 설치(`install_guardrails_from_config`)가 나라 목록을 프로세스에 한 번 고정합니다.",
+    "엔진이 PII 를 몰라도 되도록, 매치의 종류(label)·검증기·hand-written detector 표·UUID 안의 매치 버리기를 모두 나라별 표와 엔진 확장점(`EngineExtensions`)으로 넘겼습니다. 빠진 등록은 조용히 지나가지 않고 빌드 오류가 됩니다.",
+    "고정된 모양의 regex 는 대부분 hand-written detector(FixedShapeDetector, Aho-Corasick)로 바꿔서, 공통 + 나라 하나가 DFA chunk 1개에 들어가게 했습니다."
+  ],
+  "why": [
+    {
+      "text": "13개국으로 늘리면 모든 규칙이 늘 켜진 구조에서는 메모리·스캔 시간과 나라 간 형식 충돌(오탐)이 커집니다. 그래서 나라별 파일로 나누고 고른 나라만 엔진에 넣기로 했습니다(계획 파일, 2026-10-02 수정).",
+      "source": "~/.claude/plans/plan-1-tidy-newell.md:6"
+    },
+    {
+      "text": "나라마다 채택할 PII 항목·score·검증 방법은 13개국 근거 문서와 공통 문서에서 정했습니다.",
+      "source": "~/Works/shared/docs/multilanguage/20260915-argo-pii-common.md"
+    },
+    {
+      "text": "도구가 만든 UUID(cron·루틴 id)는 모델이 다음 도구 호출에 그대로 넘기므로 어느 부분도 가려지면 안 됩니다. 나라별 규칙에는 UUID 묶음과 모양이 같은 형식이 많아서, recognizer 마다 UUID 검사를 넣는 대신 엔진 단계에서 한 번에 버리게 했습니다.",
+      "source": "fad2c9cff0"
+    },
+    {
+      "text": "나라를 더할 때 고쳐야 하는 중앙 목록(종류 매핑, 검증기 dispatch, detector 표)은 하나를 빠뜨려도 조용히 통과했습니다. 그래서 각 목록을 나라별로 옮기고, 빠진 단계가 빌드 오류나 테스트 실패가 되게 했습니다.",
+      "source": "9d449d8d55"
+    },
+    {
+      "text": "공통 + 나라 하나의 regex 를 DFA chunk 하나(30개) 안에 두는 예산을 지키기 위해, 고정된 모양의 regex 를 hand-written detector 로 옮겼습니다(common + kr: 23 → 15).",
+      "source": "ebc0d1fc16"
+    },
+    {
+      "text": "사용자 결정: 런타임 설정으로 고르고(재컴파일 없음), 기존 `locale` 대신 PII 전용 설정을 두며, 엔진을 만들 때 고른 나라의 패턴만 넣습니다. 이후 기본 나라는 없애기로 했습니다.",
+      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-multilingual-support-dev-state.md"
+    }
+  ],
+  "structure": {
+    "before": {
+      "caption": "base: YAML 하나에 49개 recognizer 가 있고, 검증기와 종류 매핑은 엔진·detector 안의 전역 표입니다. CLI 는 나라를 넘기지 않습니다. 빨간 노드는 head 에서 없어지는 부분입니다.",
+      "identifiers": [
+        "run",
+        "PiiConfig",
+        "install_guardrails_from_config",
+        "engine_guard",
+        "shared_slot",
+        "compile_from_yaml",
+        "UNIFIED_CONFIG_YAML",
+        "pii_filter_config.yaml",
+        "from_yaml",
+        "extensions",
+        "build_handwritten_detectors",
+        "CardDetector",
+        "AhoCorasickDetector",
+        "VALIDATORS",
+        "PatternEngine",
+        "PiiSpanDetector",
+        "pii_type_to_kind",
+        "KNOWN_CREDENTIAL_TYPES"
+      ],
+      "mermaid": "flowchart TB\n  subgraph CLI[\"tinicli\"]\n    run[\"cli_entry::run\"]\n  end\n  subgraph INST[\"설치 (tinicore)\"]\n    cfg[\"PiiConfig { mode, tool_args, filter_labels }\"]\n    inst[\"install_guardrails_from_config\"]\n    eg[\"engine_guard\"]\n  end\n  subgraph BUILD[\"엔진 빌드\"]\n    slot[\"shared_slot → compile_from_yaml\"]\n    yaml[(\"UNIFIED_CONFIG_YAML<br>pii_filter_config.yaml · 49개\")]\n    fy[\"EngineConfig::from_yaml\"]\n    ext[\"extensions()<br>keyword_lookup · handwritten\"]\n    hw[\"build_handwritten_detectors<br>CardDetector · AhoCorasickDetector\"]\n    val[(\"engine/validator.rs VALIDATORS<br>luhn · card · kr_bank_account · rrn · phonenumber\")]\n    eng[\"PatternEngine\"]\n  end\n  subgraph DET[\"매치 → 종류\"]\n    det[\"PiiSpanDetector\"]\n    kind[\"pii_type_to_kind<br>+ KNOWN_CREDENTIAL_TYPES\"]\n  end\n  run --> cfg --> inst --> eg --> slot\n  yaml --> slot\n  slot --> fy --> eng\n  ext --> eng\n  ext --> hw\n  val -- 이름으로 조회 --> eng\n  eng --> det --> kind\n  class yaml,val,kind removed"
+    },
+    "after": {
+      "caption": "head: CLI 가 나라를 정해 넘기고, 설치가 목록을 고정합니다. 엔진은 공통 + 고른 나라의 규칙 파일과 그 나라들의 표만으로 만들어집니다. 초록은 새로 생긴 부분, 노랑은 바뀐 부분입니다.",
+      "identifiers": [
+        "run",
+        "resolve_pii_countries",
+        "device_locale",
+        "PiiConfig",
+        "countries",
+        "install_guardrails_from_config",
+        "select_countries",
+        "SELECTED_COUNTRIES",
+        "engine_guard",
+        "shared_slot",
+        "compile_for_countries",
+        "selected",
+        "COMMON",
+        "PiiCountry",
+        "RULES",
+        "rules.yaml",
+        "validators.rs",
+        "shaped.rs",
+        "anchored.rs",
+        "compile_rules",
+        "extensions_for",
+        "PiiTables",
+        "from_yamls",
+        "compile_config",
+        "check_labels",
+        "PatternEngine",
+        "reject_match",
+        "inside_uuid",
+        "build_handwritten_detectors",
+        "CardDetector",
+        "AhoCorasickDetector",
+        "FixedShapeDetector",
+        "PiiSpanDetector",
+        "analyze_with_meta",
+        "kind_of_meta"
+      ],
+      "mermaid": "flowchart TB\n  subgraph CLI[\"tinicli\"]\n    run[\"cli_entry::run\"]\n    rpc[\"resolve_pii_countries<br>[pii] locales 또는 device_locale\"]\n  end\n  subgraph INST[\"설치 (tinicore)\"]\n    cfg[\"PiiConfig { ..., countries }\"]\n    inst[\"install_guardrails_from_config\"]\n    sel[\"select_countries<br>SELECTED_COUNTRIES (OnceLock)\"]\n    eg[\"engine_guard\"]\n  end\n  subgraph RULESET[\"규칙 묶음\"]\n    common[(\"countries/common<br>COMMON · 40개\")]\n    ctry[(\"countries/&lt;code&gt;/ · 13개국<br>PiiCountry::rules() → RULES<br>rules.yaml · validators.rs<br>shaped.rs · anchored.rs\")]\n  end\n  subgraph BUILD[\"엔진 빌드\"]\n    slot[\"shared_slot → compile_for_countries<br>→ rules::selected\"]\n    cr[\"compile_rules\"]\n    ext[\"extensions_for → PiiTables<br>validators · handwritten · keyword · reject_match\"]\n    fy[\"EngineConfig::from_yamls\"]\n    cc[\"compile_config<br>check_labels\"]\n    eng[\"PatternEngine<br>reject_match = inside_uuid\"]\n    hw[\"build_handwritten_detectors<br>CardDetector · AhoCorasickDetector<br>FixedShapeDetector\"]\n  end\n  subgraph DET[\"매치 → 종류\"]\n    det[\"PiiSpanDetector\"]\n    kind[\"analyze_with_meta<br>→ kind_of_meta (label)\"]\n  end\n  run --> rpc --> cfg --> inst\n  inst -- 1 먼저 --> sel\n  inst -- 2 --> eg --> slot\n  sel --> slot\n  common --> slot\n  ctry --> slot\n  slot --> cr\n  cr --> ext\n  cr --> fy\n  fy --> cc --> eng\n  ext --> eng\n  ext --> hw\n  eng --> det --> kind\n  class rpc,sel,common,ctry,cr,fy,cc,kind new\n  class cfg,inst,slot,ext,eng,hw changed"
+    },
+    "changes": [
+      {
+        "kind": "new",
+        "text": "UUID 안에 통째로 든 매치는 모든 PII recognizer 에서 엔진이 검증기 다음에 버립니다(`reject_match` = `inside_uuid`). base 에서는 card·kr_bank_account 검증기만 UUID 를 피했습니다.",
+        "group": "uuid-reject"
+      },
+      {
+        "kind": "removed",
+        "text": "YAML 하나(`pii_filter_config.yaml`)가 없어지고, 공통 규칙과 13개국 규칙이 `pii/countries/<code>/rules.yaml` 로 나뉘었습니다.",
+        "group": "country-selection"
+      },
+      {
+        "kind": "new",
+        "text": "`PiiCountry`, `PiiConfig.countries`, `select_countries` 가 생겨서 설치가 나라 목록을 프로세스에 고정합니다. 목록이 없으면 설치가 실패합니다(`PiiCountriesUnset`).",
+        "group": "country-selection"
+      },
+      {
+        "kind": "new",
+        "text": "ARGO CLI 의 `[pii] locales` 와 `resolve_pii_countries` 가 나라를 정합니다. 설정이 없으면 기기 locale 의 지역을 씁니다.",
+        "group": "country-selection"
+      },
+      {
+        "kind": "changed",
+        "text": "엔진 빌드가 `rules::selected` → `compile_rules` 로 바뀌어, 고른 나라의 규칙 파일과 그 나라들의 표(`PiiTables`)만 씁니다.",
+        "group": "per-country-modules"
+      },
+      {
+        "kind": "removed",
+        "text": "전역 검증기 표(`engine/validator.rs` 의 `VALIDATORS`)와 종류 매핑(`pii_type_to_kind`, `KNOWN_CREDENTIAL_TYPES`)이 없어지고, 나라별 `VALIDATORS` 표와 규칙 파일의 `label:` 로 옮겨졌습니다.",
+        "group": "per-country-modules"
+      },
+      {
+        "kind": "changed",
+        "text": "엔진 빌드가 fail-closed 로 바뀌었습니다. 없는 키워드 파일, 펼치면 비는 template, 패턴 없는 recognizer, 문맥어 없이 threshold 미만인 score, 맡을 detector 가 없는 hand-written recognizer 는 이제 경고가 아니라 빌드 오류입니다.",
+        "group": "per-country-modules"
+      },
+      {
+        "kind": "new",
+        "text": "`FixedShapeDetector` 가 생겨 고정된 모양의 번호(미국 SSN·전화, 새 나라의 ID·IBAN·전화 등)를 바이트 단위로 훑습니다. 한국 주민번호와 한국·미국 여권은 regex 로 남았습니다. Aho-Corasick detector 는 겹친 anchor 도 놓치지 않게 바뀌었습니다.",
+        "group": "handwritten-detectors"
+      },
+      {
+        "kind": "new",
+        "text": "11개국(es mx gb pl it fr de in br vn th)의 규칙·검증기·모양 표가 나라마다 커밋 하나씩 추가되었습니다.",
+        "group": "countries"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "id": "country-selection",
+      "title": "나라별 규칙 파일과 국가 선택",
+      "one_line": "규칙을 공통과 나라별 파일로 나누고, 호스트가 고른 나라만 싣습니다. ARGO CLI 는 `[pii] locales` 나 기기 locale 로 나라를 정하며, 기본 나라는 없습니다.",
+      "why": [
+        "나라가 늘어도 한 사용자는 공통 + 자기 나라의 규칙만 싣게 해서, 엔진 크기와 나라 간 오탐을 줄이려는 것입니다.",
+        "기본 나라가 있으면 설정을 빠뜨린 호스트가 조용히 엉뚱한 나라만 검사하게 되므로, 목록이 없으면 설치가 실패하게 했습니다."
+      ],
+      "commits": [
+        "09a4c03cc3",
+        "a201ef6ac8",
+        "b37fa60e46"
+      ],
+      "flows": [
+        {
+          "title": "부팅: CLI 가 나라를 정하고 설치가 고정하는 흐름",
+          "before": {
+            "code": "fn run():\n    ...\n    install_guardrails_from_config(GuardrailsConfig {\n        pii: PiiConfig { mode, tool_args, filter_labels },\n        ... })\n\nfn install_guardrails_from_config(config):\n    if config.pin_engines: pin_for_process()\n    _engine = engine_guard()\n    ...  // 각 layer 설치",
+            "refs": [
+              {
+                "path": "tinicli/src/cli_entry.rs",
+                "lines": "426-444",
+                "must_contain": [
+                  "install_guardrails_from_config",
+                  "PiiConfig",
+                  "tool_args",
+                  "filter_labels"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/install.rs",
+                "lines": "190-206",
+                "must_contain": [
+                  "install_guardrails_from_config",
+                  "pin_for_process",
+                  "engine_guard"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn run():\n    ...\n+   device_locale = device_locale()\n+   pii_countries = resolve_pii_countries(\n+       cfg.pii.locales, device_locale, pii_mode != Off)\n+   // Err 이면 refuse_to_start 로 부팅을 멈춥니다\n    install_guardrails_from_config(GuardrailsConfig {\n        pii: PiiConfig { mode, tool_args, filter_labels,\n+                        countries: Some(pii_countries) },\n        ... })\n\nfn install_guardrails_from_config(config):\n    if config.pin_engines: pin_for_process()\n+   requested = config.pii.countries\n+       없으면 Err(PiiCountriesUnset)     // 모드와 상관없음\n+   select_countries(requested)\n+       다른 목록이 이미 고정되어 있으면 Err(PiiCountriesFixed)\n    _engine = engine_guard()\n    ...\n\n+fn select_countries(countries):\n+   wanted = PiiCountry::normalize(countries)\n+   fixed = SELECTED_COUNTRIES.get_or_init(wanted)\n+   if fixed == wanted: Ok  else: Err(fixed)",
+            "refs": [
+              {
+                "path": "tinicli/src/cli_entry.rs",
+                "lines": "432-461",
+                "must_contain": [
+                  "device_locale",
+                  "resolve_pii_countries",
+                  "refuse_to_start",
+                  "install_guardrails_from_config",
+                  "PiiConfig",
+                  "countries"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/install.rs",
+                "lines": "228-258",
+                "must_contain": [
+                  "install_guardrails_from_config",
+                  "pin_for_process",
+                  "PiiCountriesUnset",
+                  "select_countries",
+                  "PiiCountriesFixed",
+                  "engine_guard"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/shared.rs",
+                "lines": "109-117",
+                "must_contain": [
+                  "select_countries",
+                  "normalize",
+                  "SELECTED_COUNTRIES",
+                  "get_or_init"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "나라 목록은 엔진을 만들기 전에 `OnceLock` 에 한 번 고정됩니다. 같은 목록(순서·중복 무관)으로 다시 설치하면 통과하고, 다른 목록이면 거부됩니다.",
+            "설치 전에 엔진을 쓰는 코드(테스트, 벤치마크)는 `selected_countries()` 가 미국(`DEFAULT_COUNTRIES`)으로 고정합니다. 호스트가 쓰는 기본값은 아닙니다.",
+            "PII 가 꺼져 있어도 목록은 고정됩니다. 이때 CLI 는 기기 locale 을 못 읽으면 빈 목록(공통 규칙만)을 넘깁니다."
+          ]
+        },
+        {
+          "title": "설정값과 기기 locale 을 나라로 바꾸는 규칙",
+          "after": {
+            "code": "+fn resolve_pii_countries(configured, device_locale, pii_on):\n+   if configured 가 있으면:\n+       // 잘못된 값·빈 목록은 모든 모드에서 부팅 거부\n+       return parse_pii_countries(values) → (목록, Config)\n+   // ko_KR.UTF-8, de_DE@euro 의 codeset·modifier 는 버립니다\n+   tag = device_locale 의 앞부분\n+   resolved = PiiCountry::from_locale_tag(tag)\n+   if resolved 성공: return (vec![나라], Device)\n+   // 기기 locale 로 못 정하면: PII 가 꺼져 있을 때만 통과\n+   if !pii_on: return (빈 목록, Unused)\n+   return Err(\"pii.locales is unset and the device locale ...\")\n\n+fn PiiCountry::parse(value):\n+   // 알파벳 두 글자는 국가 코드입니다: kr, US\n+   if 두 글자: return supported(대문자 코드)\n+   return from_locale_tag(value)\n\n+fn from_locale_tag(tag):\n+   langid = LanguageIdentifier::from_str(tag 의 '_' 를 '-' 로)\n+   // 언어가 아니라 지역이 나라를 정합니다: es_MX → Mx\n+   region 이 없으면 Err(NoRegion)       // ko, C\n+   return supported(region)             // 미지원이면 Unsupported",
+            "refs": [
+              {
+                "path": "tinicli/src/guardrails/pii.rs",
+                "lines": "85-114",
+                "must_contain": [
+                  "resolve_pii_countries",
+                  "parse_pii_countries",
+                  "from_locale_tag",
+                  "pii_on"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/country.rs",
+                "lines": "131-166",
+                "must_contain": [
+                  "parse",
+                  "from_locale_tag",
+                  "LanguageIdentifier",
+                  "NoRegion",
+                  "supported"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "설정값에서 두 글자는 국가 코드입니다(`de` → 독일). 기기 locale 에서는 같은 `ko` 가 지역이 없는 태그라서 `NoRegion` 이 됩니다. 두 경로의 해석이 다른 점에 주의해야 합니다.",
+            "기기 locale 은 OS API(`sys_locale`), `LANG`, `LC_ALL` 순서로 읽고, `--locale` 이나 `config.toml` 의 `locale`(UI 언어)은 보지 않습니다.",
+            "guardrails feature 가 없는 빌드에서는 `[pii] locales` 를 무시한다고 경고만 하고, 값의 오류도 검사하지 않습니다."
+          ]
+        }
+      ],
+      "points": [
+        "`EngineConfig::from_yamls` 는 여러 규칙 파일을 합치고, 같은 recognizer 키가 두 파일에 있으면 거부합니다.",
+        "가이드와 README 는 YAML 하나 대신 공통 + 나라별 파일, 국가 선택 방법, 테스트가 모든 나라를 싣는 방법을 설명하도록 바뀌었습니다."
+      ],
+      "tests": [
+        {
+          "path": "tinicore/tests/guardrails/country_install_test.rs",
+          "must_contain": [
+            "the_install_fixes_the_country_list_for_the_process"
+          ],
+          "text": "첫 설치가 나라 목록을 고정하고, 다른 목록으로 다시 설치하면 거부됩니다."
+        },
+        {
+          "path": "tinicore/tests/guardrails/filter_test/countries.rs",
+          "must_contain": [
+            "test_shared_slot_loads_the_default_countries_without_an_install"
+          ],
+          "text": "설치 없이 쓰는 공유 엔진은 미국 규칙으로 만들어집니다."
+        }
+      ]
+    },
+    {
+      "id": "per-country-modules",
+      "title": "나라별 모듈과 표: label·검증기·detector 표를 나라에 두기",
+      "one_line": "종류 매핑·검증기·hand-written detector 표·키워드 파일을 모두 나라별 디렉터리로 옮기고, 엔진은 고른 나라의 표만 받습니다. 빠진 등록은 빌드 오류가 됩니다.",
+      "why": [
+        "나라를 하나 더할 때 고쳐야 하는 곳을 그 나라 디렉터리 하나로 모으려는 것입니다.",
+        "중앙 목록에서 하나를 빠뜨리면 예전에는 Credential 로 떨어지거나 경고만 남았습니다. 이제는 빌드가 실패하므로 실수가 바로 드러납니다."
+      ],
+      "commits": [
+        "9d449d8d55",
+        "65395de87f"
+      ],
+      "flows": [
+        {
+          "title": "턴마다 PII 엔진을 만드는 흐름",
+          "before": {
+            "code": "fn shared_slot():\n    TurnSlot::new(\"guardrails:pii:embedded\",\n        || compile_from_yaml(UNIFIED_CONFIG_YAML, ...))\n\nfn compile_from_yaml(yaml, layer, chunk_size, ext):\n    // ext = extensions(): keyword_lookup, handwritten\n    config = EngineConfig::from_yaml(yaml)\n    return PatternEngine::from_config_with_chunk_size(\n        config, layer, chunk_size, ext)",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/shared.rs",
+                "lines": "25-82",
+                "must_contain": [
+                  "shared_slot",
+                  "compile_from_yaml",
+                  "UNIFIED_CONFIG_YAML",
+                  "from_yaml",
+                  "from_config_with_chunk_size"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/mod.rs",
+                "lines": "40-67",
+                "must_contain": [
+                  "UNIFIED_CONFIG_YAML",
+                  "extensions",
+                  "keyword_lookup",
+                  "handwritten"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn shared_slot():\n+   countries = selected_countries()\n    TurnSlot::new(\"guardrails:pii:embedded\",\n+       || compile_for_countries(countries, DEFAULT_CHUNK_SIZE))\n\n+fn compile_for_countries(countries, chunk_size):\n+   // rules::selected = [COMMON] + 각 나라의 rules() → RULES\n+   compile_rules(rules::selected(countries), chunk_size)\n\n+fn compile_rules(rules, chunk_size):\n+   ext = extensions_for(rules)?\n+   config = EngineConfig::from_yamls(각 rules 의 yaml)\n+   compile_config(config, chunk_size, ext)\n\n+fn compile_config(config, chunk_size, ext):\n+   check_labels(config)?              // label 없거나 모르면 거부\n+   check_entity_types_unique(config)?\n    return PatternEngine::from_config_with_chunk_size(\n        config, None, chunk_size, ext)\n\n+fn extensions_for(rules):\n+   // 나라 표를 합침, 같은 이름이 두 번이면 \"registered twice\"\n+   tables = PiiTables::new(rules)?\n+   return EngineExtensions {\n+       keyword_lookup: tables.keyword_file,\n+       handwritten: build_handwritten_detectors(tables, ...),\n+       validators: tables.validator,\n+       reject_match: inside_uuid }",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/shared.rs",
+                "lines": "38-168",
+                "must_contain": [
+                  "shared_slot",
+                  "selected_countries",
+                  "compile_for_countries",
+                  "compile_rules",
+                  "extensions_for",
+                  "from_yamls",
+                  "compile_config",
+                  "check_labels",
+                  "check_entity_types_unique",
+                  "from_config_with_chunk_size",
+                  "DEFAULT_CHUNK_SIZE"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/mod.rs",
+                "lines": "74-92",
+                "must_contain": [
+                  "extensions_for",
+                  "PiiTables",
+                  "keyword_file",
+                  "build_handwritten_detectors",
+                  "validator",
+                  "inside_uuid"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/rules.rs",
+                "lines": "57-80",
+                "must_contain": [
+                  "COMMON",
+                  "rules",
+                  "RULES"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "엔진은 여전히 PII 를 모릅니다. 검증기 이름, hand-written 유형, 키워드 파일 경로는 모두 `extensions_for` 가 넘긴 closure 로 찾습니다. 싣지 않은 나라의 이름은 찾을 수 없으므로 빌드 오류가 됩니다.",
+            "나라 하나의 등록은 `countries/<code>/mod.rs` 의 `RULES`(규칙 파일 + 검증기·모양·anchor·키워드 표) 하나이고, `PiiCountry::rules()` 는 그 선언만 가리킵니다."
+          ]
+        },
+        {
+          "title": "매치의 종류(label)를 정하는 흐름",
+          "before": {
+            "code": "fn detect(text):\n    matches = filter.analyze(text)\n    return resolve_overlaps(matches)\n    // 겹침을 풀 때 매치마다 pii_type_to_kind(entity_type)\n\nfn pii_type_to_kind(pii_type):\n    match pii_type:\n        \"card_number\" → Pii(Card)\n        \"kr_resident_registration_number\" | ... → Pii(NationalId)\n        ...\n        KNOWN_CREDENTIAL_TYPES 에 있으면 → Credential\n        // 모르는 유형은 경고만 남기고 Credential\n        그 밖 → Credential",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/detector.rs",
+                "lines": "25-45",
+                "must_contain": [
+                  "pii_type_to_kind",
+                  "card_number",
+                  "KNOWN_CREDENTIAL_TYPES",
+                  "Credential"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/detector.rs",
+                "lines": "550-554",
+                "must_contain": [
+                  "detect",
+                  "analyze",
+                  "resolve_overlaps"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn detect(text):\n+   matches = filter.analyze_with_meta(text, kind_of_meta)\n    return resolve_overlaps(matches)\n\n+fn analyze_with_meta(text, read):\n+   (engine, matches) = scan_narrowed(text)\n+   // 매치를 만든 그 빌드의 메타에서 읽습니다(pid 는 빌드마다 다름)\n+   return matches 마다 (m, read(engine.pattern_meta()[m.pid]))\n\n+fn kind_of_meta(meta):\n+   // 규칙 파일의 label: \"credential\" 또는 PiiLabel 이름\n+   return kind_of_label(meta.label)",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/detector.rs",
+                "lines": "448-453",
+                "must_contain": [
+                  "analyze_with_meta",
+                  "kind_of_meta",
+                  "resolve_overlaps"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/engine/filter.rs",
+                "lines": "181-195",
+                "must_contain": [
+                  "analyze_with_meta",
+                  "scan_narrowed",
+                  "pattern_meta"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/labels.rs",
+                "lines": "21-113",
+                "must_contain": [
+                  "kind_of_meta",
+                  "kind_of_label",
+                  "label"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "종류는 이제 규칙 파일의 `label:` 필드가 정합니다. label 이 없거나 모르는 이름이면 엔진 빌드 전에 `check_labels` 가 거부하므로, 새 유형이 Credential 로 조용히 떨어지지 않습니다.",
+            "`filter_labels` 로 layer 를 좁힐 때는 label 로 고른 recognizer 들의 `entity_type` 목록으로 매치를 거릅니다. 그래서 두 recognizer 가 같은 `entity_type` 을 쓰면 다른 label 의 매치까지 섞이므로, 빌드가 거부합니다(`check_entity_types_unique`)."
+          ]
+        },
+        {
+          "title": "검증기 이름을 찾는 흐름",
+          "before": {
+            "code": "// engine/validator.rs: 엔진 전체에 하나뿐인 표\nVALIDATORS = [Luhn, Card, KrBankAccount, Rrn, PhoneNumber]\n\nfn lookup(name):\n    return VALIDATORS 에서 v.name() == name 인 것",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/engine/validator.rs",
+                "lines": "104-110",
+                "must_contain": [
+                  "VALIDATORS",
+                  "Card",
+                  "KrBankAccount",
+                  "lookup"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "+// 나라마다 자기 표를 둡니다 (예: countries/es/validators.rs)\n+VALIDATORS = [(\"es_dni\", es_dni), (\"es_naf\", es_naf),\n+              (\"es_bank_account\", es_bank_account)]\n\n+// 빌드할 때: tables.validator(name)\n+// 고른 나라의 표에 없는 이름은 빌드 오류입니다\n+// \"unknown validation method\"",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/countries/es/validators.rs",
+                "lines": "9-13",
+                "must_contain": [
+                  "VALIDATORS",
+                  "es_dni",
+                  "es_naf",
+                  "es_bank_account"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/engine/recognizer.rs",
+                "lines": "875-900",
+                "must_contain": [
+                  "unknown validation method"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "검증기는 `fn(&str) -> bool` 이고 매치 문자열만 받습니다. 주변 문맥이 필요하던 UUID 검사는 엔진의 `reject_match` 로 빠졌습니다.",
+            "IBAN·MRZ 처럼 여러 나라가 쓰는 계산은 `pii/validators/helpers.rs` 의 `iban_mod97`, `mrz_check` 를 함께 씁니다."
+          ]
+        }
+      ],
+      "points": [
+        "마지막 커밋(65395de87f)은 동작을 바꾸지 않고 파일만 옮겼습니다. 나라의 규칙 파일·검증기·모양 표·변환 전 regex 비교 자료가 모두 `pii/countries/<code>/` 에 모였습니다.",
+        "`pii/config/` 디렉터리는 없어졌고, 미국 키워드 파일은 `countries/us/ROUTING_NUMBER.txt` 로 옮겨졌습니다(키는 `us/ROUTING_NUMBER.txt`).",
+        "엔진 빌드는 모든 recognizer 를 먼저 검사합니다(fail-closed). 맡을 detector 가 없는 hand-written recognizer 처럼 예전에는 경고만 남기고 건너뛰던 경우도 빌드 오류입니다. argo-tizen 이 sync 할 때는 호스트 YAML 규칙도 이 검사를 통과해야 합니다."
+      ],
+      "tests": [
+        {
+          "path": "tinicore/src/guardrails/pii/country.rs",
+          "must_contain": [
+            "every_rule_file_has_a_country"
+          ],
+          "text": "`countries/*/rules.yaml` 디렉터리와 `PiiCountry::ALL` 이 정확히 일치합니다."
+        },
+        {
+          "path": "tinicore/src/guardrails/pii/handwritten/tests/mod.rs",
+          "must_contain": [
+            "every_handwritten_type_has_exactly_one_factory"
+          ],
+          "text": "공통과 각 나라에서 hand-written recognizer 마다 정확히 하나의 detector 가 맡습니다."
+        },
+        {
+          "path": "tinicore/tests/guardrails/filter_test/tables.rs",
+          "must_contain": [
+            "test_validator_of_a_country_left_out_fails_the_build"
+          ],
+          "text": "싣지 않은 나라의 검증기 이름을 쓰는 규칙은 빌드가 실패합니다."
+        },
+        {
+          "path": "tinicore/src/guardrails/pii/shared.rs",
+          "must_contain": [
+            "two_recognizers_sharing_an_entity_type_fail_the_build",
+            "every_country_compiles_alone"
+          ],
+          "text": "같은 `entity_type` 두 개는 거부되고, 모든 나라가 혼자서도 빌드됩니다."
+        }
+      ]
+    },
+    {
+      "id": "uuid-reject",
+      "title": "UUID 안의 매치를 엔진 단계에서 버림",
+      "one_line": "도구가 만든 UUID 의 일부가 PII 로 가려지지 않도록, 엔진이 검증기 다음에 UUID 안에 통째로 든 매치를 모든 PII recognizer 에서 버립니다.",
+      "why": [
+        "나라별 규칙에는 UUID 묶음과 모양이 같은 형식(첫 묶음의 여권, 마지막 묶음의 12자리 ID 등)이 많아서, recognizer 마다 검사를 넣으면 반복되고 다음 것을 놓칩니다."
+      ],
+      "commits": [
+        "fad2c9cff0"
+      ],
+      "flows": [
+        {
+          "title": "스캔 결과를 검증하고 정리하는 흐름",
+          "before": {
+            "code": "// 엔진은 검증기에 (text, span) 을 넘겼습니다\nfn validate_and_collapse(resolved, text):\n    for (pid, start, end) in resolved:\n        if !validators.all(v.validate(text, start..end)): continue\n        ...\n\n// UUID 를 피한 것은 두 검증기뿐이었습니다\nCard.validate          = luhn && !inside_uuid(text, span)\nKrBankAccount.validate = !inside_uuid(text, span)",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/engine/recognizer.rs",
+                "lines": "511-545",
+                "must_contain": [
+                  "validate_and_collapse",
+                  "validate"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/engine/validator.rs",
+                "lines": "45-73",
+                "must_contain": [
+                  "Card",
+                  "KrBankAccount",
+                  "inside_uuid",
+                  "luhn"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn validate_and_collapse(resolved, text):\n    for (pid, start, end) in resolved:\n        if boundary_check 실패: continue\n        if !validators.all(v.validate(text[start..end])): continue\n+       // 검증기 다음, 겹침 정리 전에 버립니다\n+       if reject_match(text, start..end): continue\n        validated.push(...)\n    // 같은 pattern 의 겹친 매치를 정리합니다\n    ...\n\n+fn inside_uuid(text, span):\n+   // span 이 8-4-4-4-12 hex 창 하나 안에 통째로 있으면 true\n+   return span 을 덮는 36바이트 창 중 is_uuid 인 것이 있는가",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/engine/recognizer.rs",
+                "lines": "583-655",
+                "must_contain": [
+                  "validate_and_collapse",
+                  "boundary_check",
+                  "validators",
+                  "reject_match"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/uuid.rs",
+                "lines": "21-39",
+                "must_contain": [
+                  "inside_uuid",
+                  "is_uuid"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "버린 매치가 같은 pattern 의 다음 매치를 가리지 않도록, 겹침 정리보다 먼저 버립니다.",
+            "자격 증명처럼 UUID 를 품은 매치는 label(`Bearer ` 등)에서 시작하므로 UUID 안에 통째로 들지 않아 버려지지 않습니다.",
+            "prompt injection 엔진에는 이 hook 을 걸지 않습니다. 호스트가 등록한 규칙이 UUID 안에서 조용히 매치를 잃으면 안 되기 때문입니다.",
+            "검증기 `card`·`kr_bank_account` 는 없어졌고, card_number 는 다시 `luhn` 을 씁니다."
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "tinicore/tests/guardrails/filter_test/uuid.rs",
+          "must_contain": [
+            "test_no_pii_type_masks_a_tool_generated_uuid",
+            "test_pii_engine_keeps_match_overlapping_uuid",
+            "test_prompt_injection_engine_keeps_match_inside_uuid"
+          ],
+          "text": "어떤 PII 유형도 도구가 만든 UUID 를 가리지 않고, UUID 에 걸치기만 한 매치는 남으며, prompt injection 엔진은 UUID 안의 매치를 그대로 둡니다."
+        }
+      ]
+    },
+    {
+      "id": "handwritten-detectors",
+      "title": "hand-written detector 확대와 한국·미국 규칙 개선",
+      "one_line": "고정된 모양의 번호를 regex 대신 hand-written detector 로 찾게 해서 DFA chunk 예산을 지키고, 한국·미국 PII 문서의 후속 항목을 반영했습니다.",
+      "why": [
+        "나라를 더할수록 regex 가 늘어나는데, 공통 + 나라 하나가 DFA chunk 하나에 들어가야 메모리와 속도를 유지할 수 있습니다.",
+        "regex 와 결과가 같고 속도가 비슷하면 hand-written 으로 옮긴다는 규칙을 `guardrails/AGENTS.md` 에 적었습니다."
+      ],
+      "commits": [
+        "ebc0d1fc16",
+        "fcf01545f1"
+      ],
+      "flows": [
+        {
+          "title": "Aho-Corasick detector 의 검색",
+          "before": {
+            "code": "fn scan_raw(text):\n    // automaton 하나, 겹치지 않는 검색\n    for m in ac.find_iter(bytes):\n        anchor_end = m.end()\n        for entry in anchor_to_entries[m.pattern()]:\n            entry.verifier(bytes, anchor_end) 이면 결과에 추가",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector.rs",
+                "lines": "66-90",
+                "must_contain": [
+                  "scan_raw",
+                  "find_iter",
+                  "anchor_end",
+                  "anchor_to_entries",
+                  "verifier"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn scan_raw(text):\n+   // 첫 바이트 종류별 automaton 최대 3개: 영문자·기호/숫자/비ASCII\n+   for (ac, globals) in automata:\n+       at = 0\n+       while m = ac.find(bytes[at..]):\n+           // 매치 시작 + 1 에서 다시 찾아 겹친 anchor 도 봅니다\n+           at = m.start() + 1\n+           longest = globals[m.pattern()]\n+           for a in [longest] + prefixes[longest]:\n+               verify_anchor(bytes, a, start)",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/handwritten/aho_corasick_detector/mod.rs",
+                "lines": "90-113",
+                "must_contain": [
+                  "scan_raw",
+                  "automata",
+                  "globals",
+                  "prefixes",
+                  "verify_anchor"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "예전 검색은 앞 anchor 와 겹친 anchor 를 건너뛰어, regex 는 찾는 매치를 놓쳤습니다(예: refresh token 의 `1/` 이 webhook 의 `/B` 를 가림).",
+            "겹침 검색(MatchKind::Standard)은 Teddy prefilter 를 만들지 않아 평문에서 느려지므로, leftmost-longest 를 유지하고 매치 시작 한 바이트 뒤에서 다시 찾습니다."
+          ]
+        },
+        {
+          "title": "FixedShapeDetector: 고정된 모양을 바이트 단위로 찾기",
+          "after": {
+            "code": "+fn scan_raw(text):\n+   for (pid, scan) in scans: scan(bytes, pid, out)\n+   scan_segments(bytes, segments, tables, out)\n\n+fn scan_segments(bytes, items, tables, out):\n+   for table in tables:          // 모양 64개씩 비트로\n+       for (start, b) in bytes:\n+           // 첫 두 바이트로 후보 모양을 비트마스크로 거릅니다\n+           candidates = table.first[b] & table.second[bytes[start+1]]\n+           for 각 후보 비트:\n+               // Run(pred, n) / Opt(pred) 를 따라 끝 위치를 모읍니다\n+               segment_ends(bytes, start, shape, ends)\n+               extra 검사 실패면 건너뜀\n+               found 에 (group, start, end) 추가\n+   // 같은 끝 위치마다 가장 왼쪽 시작만 남깁니다",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/handwritten/fixed_shape_detector/mod.rs",
+                "lines": "93-175",
+                "must_contain": [
+                  "scan_raw",
+                  "scans",
+                  "scan_segments",
+                  "first",
+                  "second",
+                  "segment_ends",
+                  "Run",
+                  "Opt",
+                  "extra"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "각 나라의 `shaped.rs` 가 regex 와 같은 모양을 `Seg::Run`·`Seg::Opt` 의 나열로 선언하고, 원래 regex 는 규칙 파일에 주석으로 남깁니다.",
+            "체크 디지트는 검증기가 맡고, 날짜 범위 같은 일부 모양 조건은 detector 안의 `extra` 검사가 맡습니다(예: 영국 운전면허, 폴란드 PESEL)."
+          ]
+        }
+      ],
+      "points": [
+        "한국: 주민번호 검증기가 생년월일의 존재를 확인하고, 유선·인터넷 전화를 kr_phonenumber 에 더했으며, 차량 번호판(score 0.3, `PiiLabel::VehiclePlate`)을 새로 찾습니다. 번호판 뒤가 금액(억·천·만+숫자·원)이면 매치하지 않습니다.",
+        "미국: 검증기 `ssn`·`aba_routing`·`nanp`·`dea` 를 더하고, ITIN·MBI·DEA·A-Number·운전면허를 새로 찾습니다. 구분자 없는 10자리 전화는 `us_phonenumber_weak`(score 0.3)로 분리했습니다.",
+        "score 0.3 인 recognizer 는 문맥 단어가 옆에 있을 때만 보고됩니다. 주문번호처럼 모양이 겹치는 형식에 씁니다.",
+        "엔진의 `boundary_check` 가 바뀌었습니다. `+` 나 `(` 로 시작하는 매치는 앞 글자 때문에 거부하지 않으므로 `Tel+1 212 555 0123`, `Phone(212)555-0123` 이 이제 매치됩니다. 모든 recognizer 에 적용됩니다."
+      ],
+      "tests": [
+        {
+          "path": "tinicore/tests/guardrails/filter_test/kr_rules.rs",
+          "must_contain": [
+            "kr_vehicle_plate"
+          ],
+          "text": "한국 규칙의 표(번호판·전화·주민번호 등)가 맞는 입력은 찾고, 금액 같은 입력은 찾지 않습니다."
+        },
+        {
+          "path": "tinicore/tests/guardrails/filter_test/us_rules.rs",
+          "must_contain": [
+            "us_phonenumber_weak"
+          ],
+          "text": "미국 규칙의 표가 새 유형과 weak 전화의 동작을 고정합니다."
+        }
+      ]
+    },
+    {
+      "id": "countries",
+      "title": "11개 나라 추가",
+      "one_line": "스페인·멕시코·영국·폴란드·이탈리아·프랑스·독일·인도·브라질·베트남·태국을 나라마다 커밋 하나로 더했습니다. 대부분 hand-written 이라 regex 가 거의 늘지 않습니다.",
+      "why": [
+        "13개국 PII 근거 문서에서 채택한 항목을 나라별로 구현하려는 것입니다."
+      ],
+      "commits": [
+        "535113f323",
+        "59b6fc4f29",
+        "279a4b0079",
+        "a1e0ad1777",
+        "fbf54146ae",
+        "ca4d038863",
+        "b0f5c38ebc",
+        "0039955710",
+        "bfec91e91b",
+        "9d9800ccf6",
+        "7c20a762f9"
+      ],
+      "flows": [
+        {
+          "title": "나라 하나를 더하는 방법 (스페인 예)",
+          "after": {
+            "code": "+enum PiiCountry { Br, De, Es, ... }         // 변형 하나\n+fn rules(Es) = countries::es::RULES\n\n+// countries/es/mod.rs\n+RULES = CountryRules {\n+    validators: validators::VALIDATORS,     // es_dni, es_naf, ...\n+    shaped: shaped::TYPES,                  // 모양 표\n+    ..CountryRules::new(include_str!(\"rules.yaml\")) }\n\n+// countries/es/shaped.rs: regex 와 같은 모양\n+SegType { entity_type: \"es_dni\",\n+          shapes: [[Run(digit, 8), Opt(dash_or_space), ...], ...] }\n\n+// countries/es/rules.yaml\n+es_dni: HandWrittenRecognizer, label, 검증기 es_dni, ...",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/pii/rules.rs",
+                "lines": "64-80",
+                "must_contain": [
+                  "rules",
+                  "Es",
+                  "RULES"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/countries/es/mod.rs",
+                "lines": "13-17",
+                "must_contain": [
+                  "RULES",
+                  "CountryRules",
+                  "VALIDATORS",
+                  "TYPES",
+                  "rules.yaml"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/countries/es/shaped.rs",
+                "lines": "12-30",
+                "must_contain": [
+                  "SegType",
+                  "es_dni",
+                  "Run",
+                  "Opt",
+                  "dash_or_space"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/pii/countries/es/rules.yaml",
+                "lines": "6-20",
+                "must_contain": [
+                  "es_dni",
+                  "HandWrittenRecognizer"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "나라를 더할 때 바뀌는 곳은 그 나라 디렉터리(`rules.yaml`, `validators.rs`, `shaped.rs` 또는 `anchored.rs`, `tests.rs`, `mod.rs`)와 몇 군데 등록입니다. `PiiCountry` 의 변형·`ALL`·`code()`, `rules()` 한 줄, `countries/mod.rs` 의 `mod` 줄, 테스트 쪽 `converted_of` 분기·`<code>_rules.rs`·`RULE_MODULES`, 벤치 문장(free_<code>)입니다. 전체 목록은 `guardrails/AGENTS.md` 의 \"Adding a country\" 표에 있습니다.",
+            "IBAN 은 공통 규칙이 아니라 나라마다 두고, 검사는 공용 `iban_mod97` 을 씁니다(es·gb·pl·it·fr·de·br)."
+          ]
+        }
+      ],
+      "points": [
+        "head 의 recognizer 수: 공통 40, kr 6, us 12, es 7, mx 9, gb 10, pl 7, it 8, fr 8, de 9, in 10, br 14, vn 7, th 7 입니다.",
+        "새 11개국의 recognizer 는 인도·태국의 1개씩을 빼면 모두 hand-written 입니다.",
+        "es_MX 처럼 지원하지 않는 언어-지역 조합이라도 지역이 지원되면(`MX`) 그 나라가 실립니다. 언어가 아니라 지역이 나라를 정합니다."
+      ],
+      "tests": [
+        {
+          "path": "tinicore/tests/guardrails/filter_test/layers.rs",
+          "must_contain": [
+            "rule_modules_cover_common_and_every_country"
+          ],
+          "text": "테스트 표 모듈 목록(`RULE_MODULES`)이 공통과 모든 나라를 정확히 한 번씩 담습니다."
+        },
+        {
+          "path": "tinicore/tests/guardrails/filter_test/es_rules.rs",
+          "must_contain": [
+            "es_dni"
+          ],
+          "text": "나라마다 `<code>_rules.rs` 의 표가 그 나라 유형의 매치와 비매치를 고정합니다(스페인 예)."
+        }
+      ]
+    },
+    {
+      "id": "test-tables",
+      "title": "PII 테스트를 표로 정리",
+      "one_line": "layer 마다 세 번 돌던 PII 규칙 테스트를 한 번만 돌리고, 같은 모양의 테스트를 recognizer 별 표로 접었습니다.",
+      "why": [
+        "나라를 더하기 전에 테스트 구조를 나라별 표로 바꿔 두어야, 나라마다 `<code>_rules.rs` 하나만 더하면 됩니다."
+      ],
+      "commits": [
+        "1f55d79495"
+      ],
+      "points": [
+        "layer 필터는 모든 layer 엔진 하나를 훑고 자기 recognizer 의 매치만 남기므로, layer 별 결과는 항상 전체 결과를 좁힌 것입니다. 그래서 세 번 돌릴 필요가 없습니다.",
+        "`filter_test.rs` 는 `filter_test/` 모듈로 나뉘었고, `layer_coverage_guard.rs` 는 `layers.rs` 의 검사로 대체되었습니다."
+      ],
+      "tests": [
+        {
+          "path": "tinicore/tests/guardrails/filter_test/layers.rs",
+          "must_contain": [
+            "membership_matches_the_yaml",
+            "every_layer_reports_the_all_layers_result_narrowed_to_its_members",
+            "every_recognizer_has_detection_rows"
+          ],
+          "text": "layer 마다 YAML 이 선언한 recognizer 만 돌고, layer 결과는 전체 결과를 그 layer 로 좁힌 것과 같으며, 모든 recognizer 가 찾는 행과 찾지 않는 행을 하나씩 가집니다."
+        }
+      ]
+    },
+    {
+      "id": "misc",
+      "title": "기타: 벤치마크의 나라 선택",
+      "one_line": "PII 벤치마크가 `--countries us,kr` 로 나라를 고를 수 있게 했습니다. 옵션이 없으면 모든 나라를 싣습니다.",
+      "commits": [
+        "ace26ec8ab"
+      ]
+    }
+  ],
+  "records": [
+    {
+      "text": "범위 전체 `/code-review` 13라운드로 리뷰 루프가 끝났습니다(13라운드의 수정은 테스트·문서뿐). 이 확인은 head 와 트리가 같은 리뷰 트리 T(`5ab526ea2c`)에서 했습니다: 리뷰 반영 전 head(`3e395a0ecd`) 대비 PII 비교 0 차이, 전체 테스트 기준선 대비 새 실패 0, e2e branch-multilingual-pii·guardrails-config 통과.",
+      "applies_to": "65395de87f",
+      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-multilingual-support-dev-state.md"
+    },
+    {
+      "text": "PR 전 검사(dev-cycle 9단계): fmt·clippy 4레인·Core 감사 통과, e2e scan-caches 6/6 통과, detector_vs_regex 13묶음 중 12개 0 차이(Aho-Corasick 묶음의 379건은 origin/main 에도 있는 알려진 차이). PR 은 아직 만들지 않았습니다.",
+      "applies_to": "65395de87f",
+      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-multilingual-support-dev-state.md"
+    }
+  ]
+}

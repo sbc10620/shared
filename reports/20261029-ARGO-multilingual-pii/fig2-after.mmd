@@ -1,0 +1,46 @@
+flowchart TB
+  subgraph CLI["tinicli"]
+    run["cli_entry::run"]
+    rpc["resolve_pii_countries<br>[pii] locales 또는 device_locale"]
+  end
+  subgraph INST["설치 (tinicore)"]
+    cfg["PiiConfig { ..., countries }"]
+    inst["install_guardrails_from_config"]
+    sel["select_countries<br>SELECTED_COUNTRIES (OnceLock)"]
+    eg["engine_guard"]
+  end
+  subgraph RULESET["규칙 묶음"]
+    common[("countries/common<br>COMMON · 40개")]
+    ctry[("countries/&lt;code&gt;/ · 13개국<br>PiiCountry::rules() → RULES<br>rules.yaml · validators.rs<br>shaped.rs · anchored.rs")]
+  end
+  subgraph BUILD["엔진 빌드"]
+    slot["shared_slot → compile_for_countries<br>→ rules::selected"]
+    cr["compile_rules"]
+    ext["extensions_for → PiiTables<br>validators · handwritten · keyword · reject_match"]
+    fy["EngineConfig::from_yamls"]
+    cc["compile_config<br>check_labels"]
+    eng["PatternEngine<br>reject_match = inside_uuid"]
+    hw["build_handwritten_detectors<br>CardDetector · AhoCorasickDetector<br>FixedShapeDetector"]
+  end
+  subgraph DET["매치 → 종류"]
+    det["PiiSpanDetector"]
+    kind["analyze_with_meta<br>→ kind_of_meta (label)"]
+  end
+  run --> rpc --> cfg --> inst
+  inst -- 1 먼저 --> sel
+  inst -- 2 --> eg --> slot
+  sel --> slot
+  common --> slot
+  ctry --> slot
+  slot --> cr
+  cr --> ext
+  cr --> fy
+  fy --> cc --> eng
+  ext --> eng
+  ext --> hw
+  eng --> det --> kind
+  class rpc,sel,common,ctry,cr,fy,cc,kind new
+  class cfg,inst,slot,ext,eng,hw changed
+  classDef new fill:#d3f5d3,stroke:#2f8132
+  classDef changed fill:#fff1a8,stroke:#9a6700
+  classDef removed fill:#ffd7d5,stroke:#b42318,stroke-dasharray:4 3

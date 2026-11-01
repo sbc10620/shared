@@ -1,0 +1,33 @@
+flowchart TB
+  subgraph CLI["tinicli"]
+    run["cli_entry::run"]
+  end
+  subgraph INST["설치 (tinicore)"]
+    cfg["PiiConfig { mode, tool_args, filter_labels }"]
+    inst["install_guardrails_from_config"]
+    eg["engine_guard"]
+  end
+  subgraph BUILD["엔진 빌드"]
+    slot["shared_slot → compile_from_yaml"]
+    yaml[("UNIFIED_CONFIG_YAML<br>pii_filter_config.yaml · 49개")]
+    fy["EngineConfig::from_yaml"]
+    ext["extensions()<br>keyword_lookup · handwritten"]
+    hw["build_handwritten_detectors<br>CardDetector · AhoCorasickDetector"]
+    val[("engine/validator.rs VALIDATORS<br>luhn · card · kr_bank_account · rrn · phonenumber")]
+    eng["PatternEngine"]
+  end
+  subgraph DET["매치 → 종류"]
+    det["PiiSpanDetector"]
+    kind["pii_type_to_kind<br>+ KNOWN_CREDENTIAL_TYPES"]
+  end
+  run --> cfg --> inst --> eg --> slot
+  yaml --> slot
+  slot --> fy --> eng
+  ext --> eng
+  ext --> hw
+  val -- 이름으로 조회 --> eng
+  eng --> det --> kind
+  class yaml,val,kind removed
+  classDef new fill:#d3f5d3,stroke:#2f8132
+  classDef changed fill:#fff1a8,stroke:#9a6700
+  classDef removed fill:#ffd7d5,stroke:#b42318,stroke-dasharray:4 3
