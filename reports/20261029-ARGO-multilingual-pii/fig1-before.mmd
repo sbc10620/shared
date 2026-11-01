@@ -1,10 +1,22 @@
 flowchart TB
   p_cli["<div class='pk '><div class='tab'>tinicli <span class='path'>(tinicli/src)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>부팅 때 PII 설정(모드, 도구 인자, 숨길 종류)을 설치에 넘김</div><div class='fn'>(run)</div></div></div></div></div>"]
-  p_inst["<div class='pk '><div class='tab'>tinicore · 가드레일 설치 <span class='path'>(tinicore/src/guardrails/install.rs)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>가드레일을 프로세스에 한 번 설치함</div><div class='fn'>(install_guardrails_from_config)</div></div></div></div></div>"]
-  p_pii["<div class='pk '><div class='tab'>tinicore · PII 규칙 <span class='path'>(tinicore/src/guardrails/pii)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>설치하는 동안 엔진을 한 번만 만들도록 붙잡아 둠</div><div class='fn'>(engine_guard)</div></div></div><div class='it removed'><span class='mk'>−</span><div><div class='role'><span class='st'>«data»</span> 모든 나라의 규칙 49개가 든 YAML 하나</div><div class='fn'>(UNIFIED_CONFIG_YAML)</div></div></div><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>턴마다 규칙 YAML 하나로 PII 엔진을 만듦</div><div class='fn'>(shared_slot, compile_from_yaml)</div></div></div><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>카드 번호와 API 키를 손으로 짠 탐지기로 찾음</div><div class='fn'>(CardDetector, AhoCorasickDetector)</div></div></div><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>턴의 텍스트에서 PII 를 찾고 겹친 매치를 정리함</div><div class='fn'>(detect)</div></div></div><div class='it removed'><span class='mk'>−</span><div><div class='role'>매치의 종류를 유형 이름 표에서 찾음 (표에 없으면 자격 증명으로 봄)</div><div class='fn'>(pii_type_to_kind)</div></div></div></div></div>"]
-  p_eng["<div class='pk '><div class='tab'>tinicore · 패턴 엔진 <span class='path'>(tinicore/src/guardrails/engine)</span></div><div class='body'><div class='it removed'><span class='mk'>−</span><div><div class='role'><span class='st'>«data»</span> 엔진 전체에 하나뿐인 검증기 표 (UUID 검사는 카드·계좌 검증기 안에만)</div><div class='fn'>(VALIDATORS, inside_uuid)</div></div></div><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>규칙을 DFA 로 컴파일하고 텍스트를 스캔함</div><div class='fn'>(PatternEngine)</div></div></div></div></div>"]
+  p_inst["<div class='pk '><div class='tab'>가드레일 설치 <span class='path'>(tinicore/src/guardrails/install.rs)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>가드레일을 프로세스에 한 번 설치함</div><div class='fn'>(install_guardrails_from_config)</div></div></div></div></div>"]
+  subgraph g_pii["tinicore · PII 규칙 <span class='path'>(tinicore/src/guardrails/pii)</span>"]
+    p_conf["<div class='pk '><div class='tab'>규칙 파일 <span class='path'>(mod.rs)</span></div><div class='body'><div class='it removed'><span class='mk'>−</span><div><div class='role'><span class='st'>«data»</span> 모든 나라의 규칙 49개가 든 YAML 하나</div><div class='fn'>(UNIFIED_CONFIG_YAML)</div></div></div></div></div>"]
+    p_shared["<div class='pk '><div class='tab'>공유 엔진 <span class='path'>(shared.rs)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>설치하는 동안 엔진을 한 번만 만들도록 붙잡아 둠</div><div class='fn'>(engine_guard)</div></div></div><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>턴마다 규칙 YAML 하나로 PII 엔진을 만듦</div><div class='fn'>(shared_slot, compile_from_yaml)</div></div></div></div></div>"]
+    p_hw["<div class='pk '><div class='tab'>손으로 짠 탐지기 <span class='path'>(handwritten)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>카드 번호와 API 키를 찾음</div><div class='fn'>(CardDetector, AhoCorasickDetector)</div></div></div></div></div>"]
+    p_det["<div class='pk '><div class='tab'>탐지 <span class='path'>(detector.rs)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>턴의 텍스트에서 PII 를 찾고 겹친 매치를 정리함</div><div class='fn'>(detect)</div></div></div><div class='it removed'><span class='mk'>−</span><div><div class='role'>매치의 종류를 유형 이름 표에서 찾음 (표에 없으면 자격 증명으로 봄)</div><div class='fn'>(pii_type_to_kind)</div></div></div></div></div>"]
+  end
+  subgraph g_eng["tinicore · 패턴 엔진 <span class='path'>(tinicore/src/guardrails/engine)</span>"]
+    p_val["<div class='pk '><div class='tab'>검증기 <span class='path'>(validator.rs)</span></div><div class='body'><div class='it removed'><span class='mk'>−</span><div><div class='role'><span class='st'>«data»</span> 엔진 전체에 하나뿐인 검증기 표 (UUID 검사는 카드·계좌 검증기 안에만)</div><div class='fn'>(VALIDATORS, inside_uuid)</div></div></div></div></div>"]
+    p_rec["<div class='pk '><div class='tab'>엔진 <span class='path'>(recognizer.rs)</span></div><div class='body'><div class='it '><span class='mk'>&nbsp;</span><div><div class='role'>규칙을 DFA 로 컴파일하고 텍스트를 스캔함</div><div class='fn'>(PatternEngine)</div></div></div></div></div>"]
+  end
   p_cli -. "«use»" .-> p_inst
-  p_inst -. "«use»" .-> p_pii
-  p_pii -. "«use»" .-> p_eng
+  p_inst -. "«use»" .-> p_shared
+  p_conf -. "«use»" .-> p_shared
+  p_shared -. "«use»" .-> p_rec
+  p_shared -. "«use»" .-> p_hw
+  p_det -. "«use»" .-> p_rec
+  p_rec -. "«use»" .-> p_val
   classDef pkg fill:none,stroke:none
-  class p_cli,p_inst,p_pii,p_eng pkg
+  class p_cli,p_inst,p_conf,p_shared,p_hw,p_det,p_val,p_rec pkg

@@ -43,8 +43,10 @@ TOP_KEYS = {"repo_dir", "base", "head", "topic", "title", "summary", "why",
 TOP_REQUIRED = TOP_KEYS - {"records"}
 WHY_KEYS = {"text", "source", "inferred_from"}
 STRUCT_KEYS = {"before", "after", "changes"}
-FIG_KEYS = {"caption", "direction", "packages", "edges"}
-PKG_KEYS = {"id", "name", "path", "nodes", "mark"}
+FIG_KEYS = {"caption", "direction", "groups", "packages", "edges"}
+AREA_KEYS = {"id", "name", "path"}
+PKG_KEYS = {"id", "name", "path", "nodes", "mark", "group"}
+PKG_ROWS_MAX = 4
 NODE_KEYS = {"id", "role", "fns", "kind", "mark"}
 EDGE_KEYS = {"from", "to", "label", "dashed"}
 MARKS = {"new", "changed", "removed"}
@@ -356,9 +358,16 @@ def check_figure(p, fw, repo, sha, at, fig):
     if fig.get("direction", "TB") not in ("TB", "LR"):
         p.err(fw, "direction must be TB or LR")
     ids, pkg_ids, count = set(), set(), 0
+    areas = {}
+    for ai, area in enumerate(fig.get("groups", [])):
+        aw = f"{fw}.groups[{ai}]"
+        if keys_ok(p, aw, area, AREA_KEYS, AREA_KEYS):
+            areas[area["id"]] = area
+            if git(repo, "cat-file", "-e", f"{sha}:{area['path']}", check=False).returncode != 0:
+                p.err(aw, f"path '{area['path']}' does not exist at {at} ({sha[:10]})")
     for pi, pkg in enumerate(fig.get("packages", [])):
         pw = f"{fw}.packages[{pi}]"
-        if not keys_ok(p, pw, pkg, PKG_KEYS, PKG_KEYS - {"mark"}):
+        if not keys_ok(p, pw, pkg, PKG_KEYS, {"id", "name", "path", "nodes"}):
             continue
         if pkg["id"] in pkg_ids:
             p.err(pw, f"duplicate package id '{pkg['id']}'")
@@ -388,6 +397,15 @@ def check_figure(p, fw, repo, sha, at, fig):
                     p.err(nw, f"function '{f}' is not in {pkg['path']} at {at} ({sha[:10]})")
         if pkg.get("mark") is not None and pkg["mark"] not in MARKS:
             p.err(pw, f"mark must be one of {sorted(MARKS)}")
+        if pkg.get("group") is not None:
+            area = areas.get(pkg["group"])
+            if area is None:
+                p.err(pw, f"group '{pkg['group']}' is not one of this figure's groups")
+            elif not pkg["path"].startswith(area["path"].rstrip("/") + "/") and pkg["path"] != area["path"]:
+                p.warn(pw, f"path '{pkg['path']}' is not inside its group's '{area['path']}'")
+        if len(pkg["nodes"]) > PKG_ROWS_MAX:
+            p.warn(pw, f"{len(pkg['nodes'])} rows; split it into smaller packages "
+                   f"(a file or sub-module each, at most {PKG_ROWS_MAX} rows) inside a group")
     if count > FIG_NODES_MAX:
         p.warn(fw, f"{count} items; keep a figure to about {FIG_NODES_MAX}")
     for ei, e in enumerate(fig.get("edges", [])):
@@ -405,7 +423,7 @@ def mermaid_label(text):
 MARK_SIGN = {"new": "+", "changed": "~", "removed": "−"}
 
 
-def package_html(pkg):
+def package_html(pkg, within=""):
     """One UML package: a tab with the name and (path), a body listing the
     jobs, each with its functions in parentheses and its change mark."""
     rows = ""
@@ -417,8 +435,12 @@ def package_html(pkg):
         rows += (f"<div class='it {mark}'><span class='mk'>{MARK_SIGN.get(mark, '&nbsp;')}</span>"
                  f"<div><div class='role'>{stereo}{mermaid_label(node['role'])}</div>{fns}</div></div>")
     pmark = pkg.get("mark", "")
+    # Inside a group, the tab shows the path relative to the group's.
+    path = pkg["path"]
+    if within and path.startswith(within.rstrip("/") + "/"):
+        path = path[len(within.rstrip("/")) + 1:]
     return (f"<div class='pk {pmark}'><div class='tab'>{mermaid_label(pkg['name'])} "
-            f"<span class='path'>({mermaid_label(pkg['path'])})</span></div>"
+            f"<span class='path'>({mermaid_label(path)})</span></div>"
             f"<div class='body'>{rows}</div></div>")
 
 
@@ -427,8 +449,17 @@ def figure_mermaid(fig):
     listed inside, dashed «use» dependencies between packages. Mermaid only
     lays it out; the package look comes from PACKAGE_CSS."""
     lines = [f"flowchart {fig.get('direction', 'TB')}"]
+    areas = {a["id"]: a for a in fig.get("groups", [])}
     for pkg in fig["packages"]:
-        lines.append(f'  p_{pkg["id"]}["{package_html(pkg)}"]')
+        if pkg.get("group") not in areas:
+            lines.append(f'  p_{pkg["id"]}["{package_html(pkg)}"]')
+    for aid, area in areas.items():
+        lines.append(f'  subgraph g_{aid}["{mermaid_label(area["name"])} '
+                     f'<span class=\'path\'>({mermaid_label(area["path"])})</span>"]')
+        for pkg in fig["packages"]:
+            if pkg.get("group") == aid:
+                lines.append(f'    p_{pkg["id"]}["{package_html(pkg, area["path"])}"]')
+        lines.append("  end")
     for e in fig.get("edges", []):
         label = mermaid_label(e.get("label") or "«use»")
         lines.append(f'  p_{e["from"]} -. "{label}" .-> p_{e["to"]}')
