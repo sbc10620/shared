@@ -942,10 +942,12 @@ def page(spec, facts, svgs, name, seq_svgs):
                            for c in called if c in calls)
             calls_html = (f'<div class="sub-h">이 흐름에서 부르는 함수</div><table class="calls">{rows}</table>'
                           if rows else "")
-            flows += (f'<details class="flow" open><summary>{inline(fl["title"])}</summary>{seq}'
+            # Pseudocode and its call table first: the sequence uses the
+            # functions they explain.
+            flows += (f'<details class="flow" open><summary>{inline(fl["title"])}</summary>'
                       f'<div class="sub-h">유사 코드</div>'
                       f'<div class="pair">{code_block("전", fl.get("before"), base)}{code_block("후", fl["after"], head)}</div>'
-                      f'{calls_html}'
+                      f'{calls_html}{seq}'
                       f'<ul>{"".join("<li>" + inline(e) + "</li>" for e in fl["explain"])}</ul></details>')
         points = "".join(f"<li>{inline(x)}</li>" for x in g.get("points", []))
         tests = "".join(f'<li><code>{html.escape(t["path"])}</code> — {inline(t["text"])}</li>' for t in g.get("tests", []))

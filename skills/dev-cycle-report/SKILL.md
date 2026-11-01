@@ -231,6 +231,9 @@ Writing rules:
     (`name(` or `obj.name(`) that is not a `def` of the same flow; the
     script refuses a flow with an unexplained call. The page lists them
     under the code as "이 흐름에서 부르는 함수".
+  - The page shows a flow in this order: pseudocode, the called functions,
+    the call sequence, then `explain`. The sequence has no explanations of
+    its own; it relies on the two above it.
 - **Tests**: name the tests that pin the group's behaviour, with what
   each guarantees in one sentence.
 
