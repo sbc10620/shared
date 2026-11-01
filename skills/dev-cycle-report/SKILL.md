@@ -163,7 +163,8 @@ Writing rules:
     or a directory with its `mod.rs`), a Java/Kotlin or Go package, a
     Python module or package. Give its `path`; the script derives its
     module name (`tinicore/src/guardrails/pii/shared.rs` →
-    `tinicore::guardrails::pii::shared`; the crate is the directory above
+    `tinicore::guardrails::pii::shared`, `…/pii/mod.rs` and `…/pii/` →
+    `tinicore::guardrails::pii`; the crate is the directory above
     `src/`; `mod`, `lib`, `main`, `__init__`, `index` stand for their
     directory; `::` in a Cargo workspace, `.` elsewhere). Set `module` only
     when that rule names it wrongly. `path` must exist at that side.
@@ -185,8 +186,11 @@ Writing rules:
     file or table («data»). `mark` (`new` / `changed` in `after`,
     `removed` in `before`) colours the row and prefixes `+` / `~` / `−`.
   - `edges` join packages (by id): a dashed «use» dependency, from the
-    user to the used. The script refuses an edge unless the code under
-    `from` names `to`'s module or one of the functions in `to`'s rows.
+    user to the used, drawn without text (the legend says what a dashed
+    arrow means; give `label` only for another relation). The script
+    refuses an edge unless a file under `from`'s `path`, at that side,
+    contains `to`'s last module name or one of the functions in `to`'s
+    rows as a whole word.
   - Keep each figure to about 15 rows. Use the same package and node ids in
     `before` and `after` for the same thing, so the two can be compared.
     The page explains the colours and boxes in a legend under the figures.
@@ -274,7 +278,15 @@ directory name is derived: `<YYYYMMDD of head>-<origin repo name, else the
 checkout's directory name>-<topic>`.
 
 Every check always runs and the script names each failure; fix the spec,
-never the script. A source that is a path is looked up in the repository
+never the script. Errors stop the build; warnings are printed and the
+build goes on, but fix them unless there is a reason not to. The
+warnings are: a `lines` hint that misses, a pseudocode line over 80
+columns, a block with assignments but no `# ` note, code-like words in a
+`role` or a change's `text`, more than two `fns` in a row, more than four
+rows in a package, more than about 15 rows in a figure, a `calls` entry
+never called, a flow without `example`, and a glossary term the report
+never uses. Everything else this document calls required or refused is
+an error. A source that is a path is looked up in the repository
 at head first, then on disk; a SHA must resolve; `#n`, `repo#n` and URLs
 are not checked. Mermaid syntax is checked only by the build: the figures
 are rendered there, by headless Chrome with a pinned Mermaid, and inlined

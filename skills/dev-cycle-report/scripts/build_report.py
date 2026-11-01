@@ -488,7 +488,7 @@ def package_html(pkg, name, own=False):
         stereo = "<span class='st'>«data»</span> " if node.get("kind") == "data" else ""
         fns = (f"<div class='fn'>({', '.join(mermaid_label(f) for f in node['fns'])})</div>"
                if node.get("fns") else "")
-        rows += (f"<div class='it {mark}'><span class='mk'>{MARK_SIGN.get(mark, '&nbsp;')}</span>"
+        rows += (f"<div class='it {mark}'><span class='mk'>{MARK_SIGN.get(mark, '\u00a0')}</span>"
                  f"<div><div class='role'>{stereo}{mermaid_label(node['role'])}</div>{fns}</div></div>")
     note = mermaid_label(pkg.get("note", ""))
     own_tag = " <span class='st'>(이 모듈 자신)</span>" if own else ""
@@ -534,20 +534,24 @@ def figure_mermaid(fig, sep="::"):
     for root, children in tree.items():
         emit([], root, children, 0)
     for e in fig.get("edges", []):
-        label = mermaid_label(e.get("label") or "«use»")
-        lines.append(f'  p_{e["from"]} -. "{label}" .-> p_{e["to"]}')
+        # A dashed arrow is «use» (the legend says so); text only when the
+        # spec names something else, so the arrows add no label rows.
+        if e.get("label"):
+            lines.append(f'  p_{e["from"]} -. "{mermaid_label(e["label"])}" .-> p_{e["to"]}')
+        else:
+            lines.append(f'  p_{e["from"]} -.-> p_{e["to"]}')
     lines.append("  classDef pkg fill:none,stroke:none")
     lines.append("  class " + ",".join(f"p_{pkg['id']}" for pkg in fig["packages"]) + " pkg")
     return "\n".join(lines)
 
 
 PACKAGE_CSS = (
-    ".pk{text-align:left;font-size:13px;line-height:1.45}"
+    ".pk{text-align:left;font-size:12px;line-height:1.35}"
     " .tab{display:inline-block;border:1.5px solid #57606a;border-bottom:none;background:#eaeef2;"
     "padding:2px 8px;border-radius:3px 3px 0 0;font-weight:600}"
-    " .body{border:1.5px solid #57606a;background:#fff;padding:4px 0;min-width:240px}"
+    " .body{border:1.5px solid #57606a;background:#fff;padding:2px 0;min-width:200px}"
     " .pk.new .tab{background:#d3f5d3} .pk.changed .tab{background:#fff1a8} .pk.removed .tab{background:#ffd7d5}"
-    " .it{display:flex;gap:6px;padding:3px 10px} .it.new{background:#d3f5d3}"
+    " .it{display:flex;gap:6px;padding:2px 8px} .it.new{background:#d3f5d3}"
     " .it.changed{background:#fff1a8} .it.removed{background:#ffd7d5;text-decoration:line-through}"
     " .it .mk{font-family:ui-monospace,Menlo,monospace;width:10px;color:#57606a;flex:none}"
     " .role{word-break:keep-all} .st{color:#57606a;font-size:11px}"
@@ -824,7 +828,8 @@ try {{
   const mermaid = (await import('{MERMAID_URL}')).default;
   mermaid.initialize({{startOnLoad:false, theme:'default', securityLevel:'strict',
     themeVariables:{{clusterBkg:'#f6f8fa', clusterBorder:'#d0d7de'}},
-    htmlLabels:true, flowchart:{{htmlLabels:true, wrappingWidth:420, padding:2}},
+    htmlLabels:true, flowchart:{{htmlLabels:true, wrappingWidth:420, padding:2,
+      nodeSpacing:18, rankSpacing:28}},
     themeCSS:{json.dumps('foreignObject{overflow:visible} .nodeLabel,.cluster-label{word-break:keep-all} .fn,.path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#57606a;font-weight:normal} ' + PACKAGE_CSS)},
     fontFamily:'-apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'}});
   const srcs = JSON.parse(document.getElementById('src').textContent);
@@ -864,12 +869,18 @@ out.dataset.done = '1';
 
 def natural_size(svg):
     """Mermaid sizes an SVG to its container (width 100%, max-width = its
-    real width). Give it its real width instead, so a wide figure keeps
-    readable text and its box scrolls."""
+    real width). Give it its real width instead, for the standalone file
+    that "크게 보기" opens; on the page it follows the window."""
     m = re.search(r'max-width:\s*([\d.]+)px', svg)
     if not m:
         return svg
     return re.sub(r'width="100%"', f'width="{m.group(1)}"', svg, count=1)
+
+
+def xml_safe(svg):
+    """Mermaid serialises HTML labels the HTML way; a standalone .svg is XML."""
+    svg = svg.replace("&nbsp;", "&#160;")
+    return re.sub(r"<(br|hr|img)(\s[^<>]*?)?(?<!/)>", r"<\1\2/>", svg)
 
 
 def inline(text):
@@ -918,6 +929,17 @@ def code_block(side_label, s, sha):
 # explanation; click to jump to where it is explained. The explanations are
 # read from the page itself: `## name:` rows, the call tables, the glossary.
 TERMS_JS = r"""
+// The table of contents folds away; the choice is remembered.
+(function () {
+  const key = 'dev-cycle-report:nav-hidden';
+  const set = hidden => document.body.classList.toggle('nav-hidden', hidden);
+  try { const v = localStorage.getItem(key); if (v !== null) set(v === '1'); } catch (e) {}
+  document.getElementById('navtoggle').addEventListener('click', () => {
+    const hidden = !document.body.classList.contains('nav-hidden');
+    set(hidden);
+    try { localStorage.setItem(key, hidden ? '1' : '0'); } catch (e) {}
+  });
+})();
 (function () {
   const tip = document.getElementById('tip');
   const defs = new Map();
@@ -1156,6 +1178,12 @@ nav {{ position:fixed; top:0; left:0; bottom:0; width:240px; overflow:auto; padd
 nav a, nav .toc-h {{ display:block; padding:3px 0; color:var(--fg); text-decoration:none; }}
 nav a.sub {{ padding-left:12px; color:var(--muted); }} nav a:hover {{ color:var(--accent); }}
 nav .toc-h {{ color:var(--muted); margin-top:6px; }}
+nav {{ padding-top:52px; }}
+#navtoggle {{ position:fixed; top:12px; left:12px; z-index:20; width:32px; height:32px; border:1px solid var(--line);
+  border-radius:6px; background:var(--panel); color:var(--fg); font-size:16px; cursor:pointer; }}
+#navtoggle:hover {{ border-color:var(--accent); }}
+body.nav-hidden nav {{ display:none; }}
+body.nav-hidden main {{ margin-left:0; padding-left:56px; }}
 main {{ margin-left:240px; padding:24px 32px 80px; max-width:1400px; }}
 @media (max-width:900px) {{ nav {{ position:static; width:auto; border-right:0; border-bottom:1px solid var(--line); }} main {{ margin-left:0; padding:16px; }} }}
 h1 {{ font-size:24px; margin:0 0 4px; }}
@@ -1167,12 +1195,12 @@ code {{ font:13px ui-monospace, SFMono-Regular, Menlo, monospace; background:var
 .cards {{ display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; margin-top:12px; }}
 .card {{ display:flex; flex-direction:column; gap:4px; padding:12px 14px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--fg); text-decoration:none; }}
 .card:hover {{ border-color:var(--accent); }}
-.figs {{ display:grid; grid-template-columns:1fr; gap:20px; }}
+.figs {{ display:grid; grid-template-columns:1fr; gap:20px; }} .figs > * {{ min-width:0; }}
 figure {{ margin:0; }} .fig-h, .code-h {{ font-weight:600; margin-bottom:4px; }}
 .svg {{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:8px; overflow:auto; }}
 .svg foreignObject {{ overflow:visible; }}
 .svg svg {{ display:block; margin:0 auto; max-width:100%; height:auto; }}
-.figs .svg svg {{ max-width:none; }}
+.figs .svg svg {{ width:100%; height:auto; }}
 figcaption {{ color:var(--muted); font-size:13px; margin-top:4px; }}
 .kind {{ display:inline-block; font-size:12px; padding:0 6px; border-radius:10px; border:1px solid var(--line); margin-right:4px; }}
 .k-new {{ background:var(--add); }} .k-removed {{ background:var(--del); }}
@@ -1210,6 +1238,7 @@ td.num {{ text-align:right; }}
 ul.impact pre.snippet {{ margin:4px 0 8px; padding:6px 10px; background:var(--panel); border:1px solid var(--line); border-radius:6px; font:13px ui-monospace, Menlo, monospace; }}
 dl.glossary dt {{ font-weight:600; margin-top:6px; }} dl.glossary dd {{ margin:0 0 0 16px; }}
 </style></head><body>
+<button id="navtoggle" type="button" title="목차 접기/펴기" aria-label="목차 접기/펴기">☰</button>
 <nav>{''.join(toc)}</nav>
 <main>
 <h1>{inline(spec['title'])}</h1>
@@ -1285,7 +1314,7 @@ def main(argv):
                         seq_keys.append((g["id"], fi, side))
                         sources.append(sequence_mermaid(fl["sequence"][side]))
         rendered = render_mermaid(sources)
-        svgs = [natural_size(x) for x in rendered[:2]]
+        svgs = [xml_safe(x) for x in rendered[:2]]
         seq_svgs = dict(zip(seq_keys, rendered[2:]))
     except Exception as e:  # noqa: BLE001 - report any render failure as one line
         print("error:", e, file=sys.stderr)
@@ -1303,7 +1332,7 @@ def main(argv):
         with open(os.path.join(dest, f"fig{n}-{key}.mmd"), "w", encoding="utf-8") as f:
             f.write(figure_mermaid(st[key], seps[key]) + "\n")
         with open(os.path.join(dest, f"fig{n}-{key}.svg"), "w", encoding="utf-8") as f:
-            f.write(svg)
+            f.write(natural_size(svg))  # "크게 보기" opens it at its real size
     with open(os.path.join(dest, "index.html"), "w", encoding="utf-8") as f:
         f.write(page(spec, facts, svgs, name, seq_svgs))
     with open(os.path.join(dest, "report.json"), "w", encoding="utf-8") as f:

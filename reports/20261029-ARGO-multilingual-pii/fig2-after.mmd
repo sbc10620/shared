@@ -22,18 +22,18 @@ flowchart TB
       end
     end
   end
-  p_entry -. "«use»" .-> p_clipii
-  p_entry -. "«use»" .-> p_inst
-  p_clipii -. "«use»" .-> p_country
-  p_inst -. "«use»" .-> p_shared
-  p_shared -. "«use»" .-> p_rules
-  p_shared -. "«use»" .-> p_pii
-  p_shared -. "«use»" .-> p_labels
-  p_pii -. "«use»" .-> p_hw
-  p_pii -. "«use»" .-> p_uuid
-  p_shared -. "«use»" .-> p_rec
-  p_det -. "«use»" .-> p_labels
-  p_det -. "«use»" .-> p_filter
-  p_filter -. "«use»" .-> p_rec
+  p_entry -.-> p_clipii
+  p_entry -.-> p_inst
+  p_clipii -.-> p_country
+  p_inst -.-> p_shared
+  p_shared -.-> p_rules
+  p_shared -.-> p_pii
+  p_shared -.-> p_labels
+  p_pii -.-> p_hw
+  p_pii -.-> p_uuid
+  p_shared -.-> p_rec
+  p_det -.-> p_labels
+  p_det -.-> p_filter
+  p_filter -.-> p_rec
   classDef pkg fill:none,stroke:none
   class p_entry,p_clipii,p_inst,p_pii,p_country,p_rules,p_shared,p_labels,p_uuid,p_hw,p_det,p_filter,p_rec pkg
