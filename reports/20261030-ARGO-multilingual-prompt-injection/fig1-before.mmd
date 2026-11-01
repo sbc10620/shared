@@ -1,0 +1,37 @@
+flowchart TB
+  subgraph CLI["tinicli"]
+    run["cli_entry::run"]
+    tcc["to_core_config"]
+    rpc["resolve_pii_countries"]
+    pgc["build_context → prompt_guard_config<br>→ builtin_rules"]
+  end
+  subgraph CORE["tinicore guardrails"]
+    inst["install_guardrails_from_config"]
+    selc["select_countries"]
+    yaml[("config/rules.yaml<br>RULES_YAML · 영어 13개")]
+    rules["parse_rules ← rules()"]
+    ui["builtin_user_input_prompt_injection_rules"]
+    guard["compile_cached → register"]
+    toe["ToolOutputEngine::new"]
+    be["build_engine → EngineConfig::from_yaml"]
+    hw["build_handwritten_detectors"]
+    cdd["CommentDirectiveDetector<br>영어 trigger"]
+  end
+  run --> tcc
+  run --> rpc
+  run -- "1 설치" --> inst
+  run -- "2 설치 뒤" --> pgc
+  inst --> selc
+  inst --> toe
+  pgc --> ui
+  pgc --> guard
+  yaml --> rules
+  rules --> ui
+  rules --> guard
+  rules --> toe
+  yaml --> be --> hw --> cdd
+  guard -. 같은 엔진 .-> be
+  toe -. 같은 엔진 .-> be
+  classDef new fill:#d3f5d3,stroke:#2f8132
+  classDef changed fill:#fff1a8,stroke:#9a6700
+  classDef removed fill:#ffd7d5,stroke:#b42318,stroke-dasharray:4 3

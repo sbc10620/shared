@@ -1,0 +1,592 @@
+{
+  "repo_dir": "/Users/byungchulso/Works/ARGO-multilingual-pi",
+  "base": "65395de87f",
+  "head": "ab5666e9cb",
+  "topic": "multilingual-prompt-injection",
+  "title": "ARGO prompt injection 규칙의 언어별 번역과 언어 선택",
+  "summary": [
+    "지금까지 prompt injection 내장 규칙은 영어뿐이라서, \"이전 지시를 무시해\" 같은 한국어 문장이나 독일어로 쓰인 웹 페이지의 injection 은 두 검사 지점(사용자 입력, 도구 결과)을 모두 통과했습니다.",
+    "이 범위는 9개 언어(ko de fr es it pt pl vi th)의 번역 규칙 파일을 `languages/<code>/rules.yaml` 로 추가하고, 프로세스가 고른 언어의 파일만 영어 규칙 뒤에 덧붙여 싣습니다.",
+    "어떤 언어를 실을지는 설치(`install_guardrails_from_config`)가 맨 앞에서 한 번 고정하고, ARGO CLI 는 PII 국가와 같은 입력(`[pii] locales`, 없으면 기기 locale)에서 그 언어를 정합니다.",
+    "번역 규칙은 영어 규칙과 id 접두사만 다르고 layer·action·label 이 똑같아야 하며, 이 조건은 규칙 파일을 읽을 때 검사됩니다. 언어를 하나도 고르지 않으면 규칙 13개와 엔진은 이전과 같습니다."
+  ],
+  "why": [
+    {
+      "text": "내장 규칙이 영어뿐이라 비영어 injection 문장이 사용자 입력과 도구 결과 검사를 모두 통과했습니다.",
+      "source": "69f1a1da0b"
+    },
+    {
+      "text": "번역 규칙을 그냥 더하면 모든 사용자에게 모든 언어의 규칙이 실립니다. 그래서 locale 값에 따라 골라 싣는 장치가 필요하다고 다국어 문서 지침 11절에 정리되어 있었습니다.",
+      "source": "~/Works/shared/docs/multilanguage_pi/20261015-argo-pi-guide.md:193"
+    },
+    {
+      "text": "regex 는 30개 단위 DFA chunk 로 컴파일되므로 PII 처럼 메모리 예산을 두는 것이 좋다고 지침에 적혀 있었습니다.",
+      "source": "~/Works/shared/docs/multilanguage_pi/20261015-argo-pi-guide.md:194"
+    },
+    {
+      "text": "이 구현에서 언어 하나를 실은 엔진은 DFA chunk 1개(정규식 11 + 7개)에 머뭅니다. 두 언어는 25개, 세 언어부터 chunk 가 2개가 됩니다.",
+      "source": "69f1a1da0b"
+    },
+    {
+      "text": "사용자 결정: 언어별 파일은 core 의 `prompt_injection/languages/<code>/rules.yaml` 에 두고, 언어는 PII 국가와 같은 입력에서 정하며, 새 설정 키는 만들지 않고, 언어 선택 때문에 부팅이 멈추는 일은 없게 합니다.",
+      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-pi-multilingual-impl-state.md"
+    },
+    {
+      "text": "번역 규칙은 영어 규칙을 대체하지 않고 추가합니다. 비영어권 사용자도 영어 jailbreak 문장을 그대로 붙여 넣기 때문입니다.",
+      "source": "~/Works/shared/docs/multilanguage_pi/20261015-argo-pi-guide.md:200"
+    }
+  ],
+  "structure": {
+    "before": {
+      "caption": "base: 규칙 파일은 영어 `config/rules.yaml` 하나이고, 사용자 입력 검사(왼쪽 경로)와 도구 결과 검사(설치 경로)가 모두 이 파일에서 규칙을 읽습니다.",
+      "identifiers": [
+        "run",
+        "build_context",
+        "prompt_guard_config",
+        "builtin_rules",
+        "to_core_config",
+        "resolve_pii_countries",
+        "install_guardrails_from_config",
+        "select_countries",
+        "RULES_YAML",
+        "parse_rules",
+        "rules()",
+        "builtin_user_input_prompt_injection_rules",
+        "compile_cached",
+        "register",
+        "ToolOutputEngine",
+        "build_engine",
+        "from_yaml",
+        "build_handwritten_detectors",
+        "CommentDirectiveDetector"
+      ],
+      "mermaid": "flowchart TB\n  subgraph CLI[\"tinicli\"]\n    run[\"cli_entry::run\"]\n    tcc[\"to_core_config\"]\n    rpc[\"resolve_pii_countries\"]\n    pgc[\"build_context → prompt_guard_config<br>→ builtin_rules\"]\n  end\n  subgraph CORE[\"tinicore guardrails\"]\n    inst[\"install_guardrails_from_config\"]\n    selc[\"select_countries\"]\n    yaml[(\"config/rules.yaml<br>RULES_YAML · 영어 13개\")]\n    rules[\"parse_rules ← rules()\"]\n    ui[\"builtin_user_input_prompt_injection_rules\"]\n    guard[\"compile_cached → register\"]\n    toe[\"ToolOutputEngine::new\"]\n    be[\"build_engine → EngineConfig::from_yaml\"]\n    hw[\"build_handwritten_detectors\"]\n    cdd[\"CommentDirectiveDetector<br>영어 trigger\"]\n  end\n  run --> tcc\n  run --> rpc\n  run -- \"1 설치\" --> inst\n  run -- \"2 설치 뒤\" --> pgc\n  inst --> selc\n  inst --> toe\n  pgc --> ui\n  pgc --> guard\n  yaml --> rules\n  rules --> ui\n  rules --> guard\n  rules --> toe\n  yaml --> be --> hw --> cdd\n  guard -. 같은 엔진 .-> be\n  toe -. 같은 엔진 .-> be"
+    },
+    "after": {
+      "caption": "head: 설치가 언어 목록을 고정하고, 규칙을 읽는 모든 경로가 `selected_languages()` 로 영어 파일 + 고른 언어의 파일을 읽습니다. 초록 노드는 새로 생긴 부분, 노란 노드는 바뀐 부분입니다.",
+      "identifiers": [
+        "run",
+        "build_context",
+        "prompt_guard_config",
+        "builtin_rules",
+        "to_core_config",
+        "resolve_pi_languages",
+        "resolve_pii_countries",
+        "install_guardrails_from_config",
+        "select_countries",
+        "select_languages",
+        "SELECTED_LANGUAGES",
+        "selected_languages",
+        "RULES_YAML",
+        "PiLanguage",
+        "rules_yaml",
+        "rules_for",
+        "check_translation",
+        "rules()",
+        "builtin_user_input_prompt_injection_rules",
+        "compile_cached",
+        "register",
+        "is_translation_id",
+        "ToolOutputEngine",
+        "build_engine_for",
+        "rule_yamls",
+        "from_yamls",
+        "build_handwritten_detectors",
+        "translated_comment_directive",
+        "CommentDirectiveDetector"
+      ],
+      "mermaid": "flowchart TB\n  subgraph CLI[\"tinicli\"]\n    run[\"cli_entry::run\"]\n    tcc[\"to_core_config\"]\n    rpc[\"resolve_pii_countries\"]\n    rpl[\"resolve_pi_languages<br>[pii] locales 또는 기기 locale\"]\n    pgc[\"build_context → prompt_guard_config<br>→ builtin_rules\"]\n  end\n  subgraph CORE[\"tinicore guardrails\"]\n    inst[\"install_guardrails_from_config\"]\n    selc[\"select_countries\"]\n    sell[\"select_languages<br>SELECTED_LANGUAGES (OnceLock)\"]\n    yaml[(\"config/rules.yaml<br>RULES_YAML · 영어 13개\")]\n    lang[(\"languages/&lt;code&gt;/rules.yaml<br>PiLanguage::rules_yaml · 언어마다 8개\")]\n    rf[\"rules_for(selected_languages)<br>+ check_translation<br>← rules()\"]\n    ui[\"builtin_user_input_prompt_injection_rules\"]\n    guard[\"compile_cached → register<br>+ is_translation_id\"]\n    toe[\"ToolOutputEngine::new<br>+ is_translation_id\"]\n    be[\"build_engine_for → rule_yamls<br>→ EngineConfig::from_yamls\"]\n    hw[\"build_handwritten_detectors\"]\n    tcd[\"translated_comment_directive\"]\n    cdd[\"CommentDirectiveDetector<br>영어 trigger 또는 번역 trigger regex\"]\n  end\n  run --> tcc\n  run --> rpc\n  run --> rpl\n  rpl -- languages --> inst\n  run -- \"2 설치 뒤\" --> pgc\n  inst --> selc\n  inst -- \"1 먼저\" --> sell\n  inst --> toe\n  pgc --> ui\n  pgc --> guard\n  sell --> rf\n  sell --> be\n  yaml --> rf\n  lang --> rf\n  rf --> ui\n  rf --> guard\n  rf --> toe\n  yaml --> be\n  lang --> be\n  be --> hw\n  hw -- 영어 --> cdd\n  hw -- 번역 --> tcd --> cdd\n  guard -. 같은 엔진 .-> be\n  toe -. 같은 엔진 .-> be\n  class rpl,sell,lang,tcd new\n  class rf,guard,toe,be,cdd,inst changed"
+    },
+    "changes": [
+      {
+        "kind": "new",
+        "text": "`PiLanguage` 와 언어별 규칙 파일 `languages/<code>/rules.yaml`(9개)이 생겼습니다. 영어 파일은 그대로 기본으로 실립니다.",
+        "group": "language-mechanism"
+      },
+      {
+        "kind": "new",
+        "text": "프로세스가 싣는 언어 목록 `SELECTED_LANGUAGES` 가 생겼고, 설치의 `select_languages` 가 처음에 고정합니다.",
+        "group": "language-mechanism"
+      },
+      {
+        "kind": "changed",
+        "text": "`rules()` 와 엔진 빌드가 영어 파일 하나 대신 영어 + 고른 언어의 파일을 읽습니다(`rules_for`, `rule_yamls`).",
+        "group": "language-mechanism"
+      },
+      {
+        "kind": "changed",
+        "text": "`CommentDirectiveDetector` 가 영어 trigger 외에 번역 trigger regex 로도 동작합니다.",
+        "group": "language-mechanism"
+      },
+      {
+        "kind": "changed",
+        "text": "호스트 규칙(두 검사 지점 모두)은 번역 규칙의 id(`ko_ignore_prior` 등)를 쓸 수 없습니다. 그 언어를 싣지 않았어도 마찬가지입니다. 단, 실린 내장 규칙과 id·패턴이 모두 같으면 그 내장 규칙 자체로 받아들입니다(CLI 가 내장 규칙을 넘기는 경로).",
+        "group": "language-mechanism"
+      },
+      {
+        "kind": "new",
+        "text": "fr es it pt pl vi th 7개 언어의 번역 규칙 파일과 시험 사례 파일이 생겼습니다.",
+        "group": "translations"
+      },
+      {
+        "kind": "new",
+        "text": "ARGO CLI 에 `resolve_pi_languages` 가 생겨서 `[pii] locales` 나 기기 locale 로 언어를 정하고 설치에 넘깁니다.",
+        "group": "cli-language-selection"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "id": "language-mechanism",
+      "title": "언어별 규칙을 골라 싣는 장치",
+      "one_line": "번역 규칙 파일을 언어별로 두고, 설치가 고정한 언어의 파일만 영어 규칙 뒤에 덧붙여 싣습니다. 한국어와 독일어 규칙도 여기서 함께 들어왔습니다.",
+      "why": [
+        "모든 언어를 늘 싣지 않고, 한 사용자는 영어 + 자기 언어 하나의 비용만 내게 하려는 것입니다.",
+        "두 검사 지점이 한 엔진을 함께 스캔하므로, 언어 목록은 프로세스 전체에 하나여야 하고 엔진을 만든 뒤에 바뀌면 안 됩니다."
+      ],
+      "commits": [
+        "69f1a1da0b"
+      ],
+      "flows": [
+        {
+          "title": "부팅: 설치가 언어 목록을 프로세스에 고정하는 흐름",
+          "before": {
+            "code": "fn install_guardrails_from_config(config):\n    ...\n    // PII 국가 목록을 프로세스에 고정합니다\n    select_countries(requested)  // 이미 다른 목록이면 PiiCountriesFixed 오류\n    _engine = engine_guard()\n    ...  // 각 layer 설치",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/install.rs",
+                "lines": "228-260",
+                "must_contain": [
+                  "install_guardrails_from_config",
+                  "select_countries",
+                  "engine_guard"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn install_guardrails_from_config(config):\n    ...\n    select_countries(requested)\n+   // 어떤 layer 가 켜져 있든, 엔진을 만들기 전에 언어 목록도 고정합니다\n+   languages = PiLanguage::normalize(config.prompt_injection.languages)\n+   select_languages(languages)\n+       // 이미 다른 목록이 고정되어 있으면 PromptInjectionLanguagesFixed 오류\n    _engine = engine_guard()\n    ...\n\n+fn select_languages(languages):\n+   wanted = normalize(languages)   // 중복 제거, PiLanguage::ALL 순서\n+   fixed = SELECTED_LANGUAGES.get_or_init(wanted)\n+   if fixed == wanted: Ok  else: Err(fixed)\n\n+fn selected_languages():\n+   // 설치 전에 누가 규칙을 먼저 읽으면 영어만으로 고정됩니다\n+   return SELECTED_LANGUAGES.get_or_init(빈 목록)",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/install.rs",
+                "lines": "256-296",
+                "must_contain": [
+                  "install_guardrails_from_config",
+                  "select_countries",
+                  "select_languages",
+                  "PromptInjectionLanguagesFixed",
+                  "engine_guard"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/shared.rs",
+                "lines": "90-114",
+                "must_contain": [
+                  "select_languages",
+                  "selected_languages",
+                  "SELECTED_LANGUAGES",
+                  "get_or_init"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "언어 목록은 PII 국가 목록과 같은 방식으로 `OnceLock` 에 한 번만 고정됩니다. 같은 목록(순서·중복 무관)으로 다시 설치하면 통과하고, 다른 목록이면 거부됩니다.",
+            "설치보다 먼저 규칙을 읽는 코드(테스트, bench, 설치 전에 읽는 호스트)는 영어만으로 고정합니다. 그 뒤 언어를 지정한 설치는 `PromptInjectionLanguagesFixed` 로 실패하므로, 호스트는 설치를 먼저 해야 합니다."
+          ]
+        },
+        {
+          "title": "규칙을 읽고 엔진을 만드는 흐름",
+          "before": {
+            "code": "fn rules():\n    return parse_rules(RULES_YAML)   // 영어 13개, 파일 순서\n\nfn build_engine(host):\n    config = EngineConfig::from_yaml(RULES_YAML)\n    config += host 규칙\n    return PatternEngine(config)",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/mod.rs",
+                "lines": "359-365",
+                "must_contain": [
+                  "rules",
+                  "parse_rules",
+                  "RULES_YAML"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/shared.rs",
+                "lines": "93-100",
+                "must_contain": [
+                  "build_engine",
+                  "from_yaml",
+                  "RULES_YAML"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn rules():\n+   return rules_for(selected_languages())\n\n+fn rules_for(languages):\n+   english = parse_rules(RULES_YAML)\n+   // PiLanguage::ALL 순서\n+   for lang in normalize(languages):\n+       for rule in parse_rules(lang.rules_yaml()):\n+           // id 는 <code>_<영어 id>, kind·layer·action·label 은 영어와 같음\n+           // 어긋나면 엔진을 만들기 전에 거부합니다\n+           check_translation(lang, rule, english)?\n+           translations.push(rule)\n+   return english + translations   // 영어가 먼저 평가됩니다\n\nfn build_engine(host):\n+   build_engine_for(selected_languages(), host)\n\n+fn build_engine_for(languages, host):\n+   // rule_yamls = [RULES_YAML, 고른 언어의 파일...]\n+   config = EngineConfig::from_yamls(rule_yamls(languages))\n    config += host 규칙\n    return PatternEngine(config)\n\nfn builtin_user_input_prompt_injection_rules():\n+   return builtin_user_input_prompt_injection_rules_for(selected_languages())\n+   // 내부에서 rules_for(languages) 중 prompt_guard layer 규칙만 고릅니다",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/mod.rs",
+                "lines": "374-470",
+                "must_contain": [
+                  "rules",
+                  "rules_for",
+                  "selected_languages",
+                  "parse_rules",
+                  "RULES_YAML",
+                  "rules_yaml",
+                  "check_translation",
+                  "rule_yamls",
+                  "builtin_user_input_prompt_injection_rules",
+                  "builtin_user_input_prompt_injection_rules_for"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/shared.rs",
+                "lines": "119-134",
+                "must_contain": [
+                  "build_engine",
+                  "build_engine_for",
+                  "from_yamls",
+                  "rule_yamls"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/language.rs",
+                "lines": "128-170",
+                "must_contain": [
+                  "check_translation"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "규칙을 읽는 경로(`rules()`, 사용자 입력 규칙, 엔진 빌드)는 모두 같은 `selected_languages()` 를 봅니다. 그래서 사용자 입력 검사와 도구 결과 검사가 같은 언어 집합을 씁니다. 예외는 `is_translation_id` 하나로, 선택과 상관없이 영어 파일만 읽어 id 모양을 판정합니다.",
+            "번역 규칙의 모양은 문서가 아니라 `check_translation` 이 보장합니다. 영어 규칙과 layer 가 다르거나 없는 영어 id 를 번역한 규칙은 파일을 읽는 순간 거부됩니다.",
+            "평가 순서는 영어 파일의 규칙, 그다음 언어별 규칙입니다. 그래서 영어 규칙과 번역 규칙이 같은 텍스트를 막으면 영어 규칙이 보고됩니다.",
+            "사용자 입력 검사의 규칙(`builtin_user_input_prompt_injection_rules`)은 `builtin_user_input_prompt_injection_rules_for(selected_languages())` 를 거쳐 같은 `rules_for` 를 부르므로, 영어 7개 뒤에 언어마다 Block 규칙 5개가 붙습니다."
+          ]
+        },
+        {
+          "title": "번역 comment_directive: 손으로 짠 검출기에 번역 trigger 끼우기",
+          "before": {
+            "code": "fn build_handwritten_detectors(configs):\n    for cfg in configs:\n        if cfg.entity_type == \"base64_decoded_to_shell\":\n            Base64ShellDetector\n        else if cfg.entity_type == COMMENT_DIRECTIVE_RULE_ID:\n            CommentDirectiveDetector::new(pid)\n        else: continue\n\nfn raw_matches(text):\n    for pos in text:\n        opener_at(pos)  → openers   // <!--, /* 같은 주석 시작\n        trigger_at(pos) → triggers  // 영어 지시 문구, 손으로 비교\n    // opener 끝에서 WINDOW(800자) 안의 trigger 만 보고",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/handwritten/mod.rs",
+                "lines": "30-45",
+                "must_contain": [
+                  "build_handwritten_detectors",
+                  "COMMENT_DIRECTIVE_RULE_ID",
+                  "CommentDirectiveDetector"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs",
+                "lines": "153-190",
+                "must_contain": [
+                  "raw_matches",
+                  "opener_at",
+                  "trigger_at",
+                  "WINDOW"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn build_handwritten_detectors(configs):\n    for cfg in configs:\n        ...\n        else if cfg.entity_type == COMMENT_DIRECTIVE_RULE_ID:\n            CommentDirectiveDetector::new(pid)\n+       // <code>_comment_directive 이고 패턴이 정확히 1개(trigger)일 때\n+       else if translated_comment_directive(cfg, pid):\n+           CommentDirectiveDetector::translated(pid, trigger)\n+       // trigger 가 컴파일되지 않으면 None 이 되고,\n+       // 엔진 빌드가 그 규칙을 거부합니다(fail closed)\n\nfn raw_matches(text, triggers):\n    openers = 모든 opener_at 위치\n    if openers 가 없으면: 빈 결과\n    match triggers:\n        Triggers::English → 모든 위치에서 trigger_at\n+       Triggers::Regex →\n+           // 첫 opener 끝 ~ 마지막 opener 끝 + WINDOW 글자 범위만\n+           위치마다 lazy DFA 로 anchored 검색(try_search_fwd)\n    // 이후 800자 창 판정은 영어와 같습니다",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/handwritten/mod.rs",
+                "lines": "33-86",
+                "must_contain": [
+                  "build_handwritten_detectors",
+                  "COMMENT_DIRECTIVE_RULE_ID",
+                  "translated_comment_directive",
+                  "CommentDirectiveDetector"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/handwritten/comment_directive_detector.rs",
+                "lines": "207-312",
+                "must_contain": [
+                  "raw_matches",
+                  "opener_at",
+                  "trigger_at",
+                  "Triggers::English",
+                  "Triggers::Regex",
+                  "WINDOW",
+                  "try_search_fwd",
+                  "translated"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "언어 파일의 `<code>_comment_directive` 패턴은 원래 regex 에서 trigger 부분만 담습니다. opener 와 800자 창은 영어 검출기의 것을 그대로 씁니다.",
+            "엔진은 손으로 짠 규칙의 패턴을 자기 DFA 에 넣지 않으므로, 800자 창이 DFA chunk 를 늘리지 않습니다. trigger 는 검출기 안의 작은 lazy DFA 로 따로 컴파일됩니다.",
+            "검색 범위를 opener 가 있는 구간으로 줄여서, 앞에 `<!--` 하나만 있는 큰 HTML 페이지를 끝까지 바이트 단위로 훑지 않습니다."
+          ]
+        },
+        {
+          "title": "호스트 규칙의 id 예약",
+          "before": {
+            "code": "fn register(layer, embedded, new_rules):\n    for (id, pattern) in new_rules:\n        if embedded 에 같은 id 가 있으면:\n            패턴도 같으면 continue   // 내장 규칙 그대로 받아들임\n            아니면 Err(clash(id))\n        ...",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/shared.rs",
+                "lines": "157-175",
+                "must_contain": [
+                  "register",
+                  "clash"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn register(layer, embedded, new_rules):\n    for (id, pattern) in new_rules:\n        if embedded 에 같은 id 가 있으면:\n            패턴도 같으면 continue   // 내장 규칙 그대로 받아들임\n            아니면 Err(clash(id))\n+       // 싣지 않은 언어의 번역 id 라도 거부합니다\n+       if is_translation_id(id): Err(clash(id))\n        ...\n\n// 도구 결과 검사 쪽\nfn check_added_rules(embedded, added):\n    ...\n+   if is_translation_id(rule.id):\n+       Err(\"reserved for a built-in translated rule\")\n\n+fn is_translation_id(id):\n+   // 어떤 언어든 <code>_<영어 id> 모양이면 true (선택 여부와 무관)",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/shared.rs",
+                "lines": "192-215",
+                "must_contain": [
+                  "register",
+                  "clash",
+                  "is_translation_id"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/tool_output.rs",
+                "lines": "30-60",
+                "must_contain": [
+                  "check_added_rules",
+                  "is_translation_id"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/language.rs",
+                "lines": "179-187",
+                "must_contain": [
+                  "is_translation_id"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "호스트 규칙이 `ko_ignore_prior` 를 쓸 수 있는지가 기기 locale 에 따라 달라지면, 같은 설정이 어떤 기기에서는 부팅되고 어떤 기기에서는 거부됩니다. 그래서 번역 id 는 언어를 싣지 않았어도 늘 예약됩니다.",
+            "CLI 는 내장 규칙(실린 번역 규칙 포함)을 `CoreConfig.prompt_guard` 로 넘깁니다. 이 규칙들은 같은 id·같은 패턴이라서 `continue` 분기로 통과하고, 예약에 걸리지 않습니다."
+          ]
+        }
+      ],
+      "points": [
+        "언어를 하나도 고르지 않으면 규칙 13개, 엔진, 동작이 base 와 같습니다.",
+        "언어 하나를 실어도 엔진은 DFA chunk 1개(정규식 11 + 7개)입니다. 두 언어는 25개로 여전히 1개이고, 세 언어부터 chunk 가 2개가 됩니다.",
+        "외부에서 쓰는 테스트용 진입점 `prompt_injection_rules_for`, `prompt_injection_engine_for`, `builtin_user_input_prompt_injection_rules_for` 는 프로세스 선택과 상관없이 지정한 언어로 만듭니다(`#[doc(hidden)]`).",
+        "`PiiCountry::language()` 가 생겨서 국가 코드를 그 나라의 주 언어로 바꿀 수 있습니다(CLI 가 사용)."
+      ],
+      "tests": [
+        {
+          "path": "tinicore/tests/prompt_injection_language_install_test.rs",
+          "must_contain": [
+            "the_install_fixes_the_language_list_for_the_process"
+          ],
+          "text": "첫 설치가 목록을 고정하고, 같은 목록은 다시 통과하며, 다른 목록은 두 목록을 담은 `PromptInjectionLanguagesFixed` 로 거부됩니다."
+        },
+        {
+          "path": "tinicore/tests/prompt_injection_languages.rs",
+          "must_contain": [
+            "korean_appends_its_eight_rules_after_the_english_ones",
+            "korean_engine_is_one_dfa_chunk",
+            "two_languages_ignore_the_input_order",
+            "korean_comment_window_stops_past_eight_hundred_characters",
+            "korean_comment_window_reaches_eight_hundred_characters"
+          ],
+          "text": "한국어는 영어 13개 뒤에 8개를 붙이고, 엔진은 chunk 1개이며, 언어 순서는 입력 순서와 무관합니다. 번역 comment_directive 는 opener 뒤 800자 간격까지 걸리고 801자부터는 걸리지 않습니다."
+        },
+        {
+          "path": "tinicore/src/guardrails/prompt_injection/shared.rs",
+          "must_contain": [
+            "a_guard_rule_cannot_take_a_translated_id_of_an_unloaded_language"
+          ],
+          "text": "싣지 않은 언어의 번역 id 도 사용자 입력 검사의 호스트 규칙으로 쓸 수 없습니다."
+        },
+        {
+          "path": "tinicore/src/guardrails/prompt_injection/language.rs",
+          "must_contain": [
+            "a_translation_must_keep_its_english_rule"
+          ],
+          "text": "모르는 영어 id, 다른 언어 접두사, 접두사 없음, 또는 layer·action·kind 가 영어 규칙과 다른 번역 규칙은 거부됩니다(label 은 `each_translated_rule_has_the_english_layers_action_and_label` 이 언어마다 확인합니다)."
+        }
+      ]
+    },
+    {
+      "id": "translations",
+      "title": "나머지 7개 언어의 번역 규칙",
+      "one_line": "프랑스어·스페인어·이탈리아어·포르투갈어·폴란드어·베트남어·태국어 규칙을 언어마다 커밋 하나씩 같은 방식으로 더했습니다.",
+      "why": [
+        "검토가 끝난 언어별 문서(shared/docs/multilanguage_pi)의 패턴을 규칙 파일로 옮기고, 문서의 사례를 테스트로 고정하려는 것입니다."
+      ],
+      "commits": [
+        "660c8d54fe",
+        "e76fb2d6ed",
+        "078508aba6",
+        "f5a145961e",
+        "9c72940ee6",
+        "16d78a22ab",
+        "0118f085bc"
+      ],
+      "flows": [
+        {
+          "title": "언어 하나를 더하는 방법 (프랑스어 예)",
+          "after": {
+            "code": "+enum PiLanguage { Ko, De, Fr, ... }            // 변형 하나 추가\n+PiLanguage::ALL = [Ko, De, Fr, ...]           // 싣는 순서\n+fn code(Fr) = \"fr\"                            // id 접두사이자 디렉터리 이름\n+fn three_letter_codes(Fr) = [\"fra\", \"fre\"]    // ISO 639-2 도 읽음\n+fn rules_yaml(Fr) = include_str!(\"languages/fr/rules.yaml\")\n\n+// languages/fr/rules.yaml: 영어 규칙 8개의 번역\n+fr_ignore_prior:      layers·action·label 은 영어 ignore_prior 와 같음\n+...\n+fr_comment_directive: HandWrittenRecognizer, 패턴 1개 = 프랑스어 trigger",
+            "refs": [
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/language.rs",
+                "lines": "19-105",
+                "must_contain": [
+                  "PiLanguage",
+                  "Fr",
+                  "three_letter_codes",
+                  "rules_yaml",
+                  "languages/fr/rules.yaml"
+                ]
+              },
+              {
+                "path": "tinicore/src/guardrails/prompt_injection/languages/fr/rules.yaml",
+                "must_contain": [
+                  "fr_ignore_prior",
+                  "fr_comment_directive",
+                  "HandWrittenRecognizer"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "언어마다 바뀌는 것은 `language.rs` 의 match 몇 줄, 규칙 파일 하나, 시험 사례 파일 하나, 그리고 두 테스트 파일의 언어 목록(`prompt_injection_language_cases.rs` 의 `files()`, `prompt_injection_languages.rs`)입니다. 장치는 첫 그룹에서 이미 완성되어 있습니다.",
+            "스페인어 규칙은 멕시코 스페인어 어휘도 함께 덮고(사례 파일의 `# es_MX` 블록), 태국어 규칙은 공백과 U+200B 를 단어 구분으로 봅니다."
+          ]
+        }
+      ],
+      "points": [
+        "모든 언어 파일은 영어 규칙 8개(정규식 7개 + comment_directive)를 정확히 번역합니다. 이는 테스트가 언어마다 검사합니다.",
+        "시험 사례는 문서의 rxprobe 사례를 `tinicore/tests/prompt_injection_languages/<code>.txt` 로 복사한 것입니다. 단, 한국어·태국어의 창 사례 2개는 문서 regex 의 800바이트 창이 아니라 검출기의 800글자 창 밖에 있도록 고쳐 썼습니다(69f1a1da0b)."
+      ],
+      "tests": [
+        {
+          "path": "tinicore/tests/prompt_injection_language_cases.rs",
+          "must_contain": [
+            "every_case_holds_on_its_language_engine",
+            "the_case_files_carry_the_rule_patterns"
+          ],
+          "text": "문서의 모든 사례가 그 언어 엔진에서 규칙 id 별로 맞게 걸리거나 안 걸리고, 규칙 파일이 문서의 패턴을 그대로 담고 있습니다."
+        },
+        {
+          "path": "tinicore/tests/prompt_injection_languages.rs",
+          "must_contain": [
+            "each_language_translates_exactly_the_eight_rules",
+            "each_translated_rule_has_the_english_layers_action_and_label",
+            "each_language_engine_builds_as_one_dfa_chunk"
+          ],
+          "text": "언어마다 규칙 8개, 영어와 같은 layer·action·label, 엔진 chunk 1개를 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "cli-language-selection",
+      "title": "ARGO CLI 가 언어를 고르는 방법",
+      "one_line": "ARGO 는 PII 국가와 같은 입력(`[pii] locales`, 없으면 기기 locale)에서 언어를 정해 설치에 넘깁니다. 새 설정 키는 없습니다.",
+      "why": [
+        "사용자가 한 번 정한 locale 이 PII 국가와 prompt injection 언어를 함께 정하게 해서, 설정 하나로 두 동작이 어긋나지 않게 하려는 것입니다.",
+        "영어는 늘 실리므로, 언어를 찾지 못해도 부팅을 멈출 이유가 없습니다."
+      ],
+      "commits": [
+        "ab5666e9cb"
+      ],
+      "flows": [
+        {
+          "title": "부팅 때 CLI 가 언어를 정해 넘기는 흐름",
+          "before": {
+            "code": "fn run():\n    ...\n    // tool_output 설정만 담습니다\n    prompt_injection = to_core_config(cfg)\n    pii_countries = resolve_pii_countries(cfg.pii.locales, device_locale)\n    install_guardrails_from_config(GuardrailsConfig {\n        pii, prompt_injection, ... })",
+            "refs": [
+              {
+                "path": "tinicli/src/cli_entry.rs",
+                "lines": "429-455",
+                "must_contain": [
+                  "to_core_config",
+                  "resolve_pii_countries",
+                  "install_guardrails_from_config",
+                  "device_locale"
+                ]
+              }
+            ]
+          },
+          "after": {
+            "code": "fn run():\n    ...\n    // 언어는 정하지 않고 빈 languages 만 채웁니다\n    prompt_injection = to_core_config(cfg)\n    pii_countries = resolve_pii_countries(cfg.pii.locales, device_locale)\n+   // 어떤 layer·PII mode 든 설정합니다\n+   // 영어는 늘 실리므로 부팅을 멈추지 않습니다\n+   prompt_injection.languages =\n+       resolve_pi_languages(cfg.pii.locales, device_locale)\n+   log \"[guardrails] prompt-injection languages ...\"\n    install_guardrails_from_config(GuardrailsConfig {\n        pii, prompt_injection, ... })\n\n+fn resolve_pi_languages(configured, device_locale):\n+   if configured 가 있으면:\n+       for value in configured:\n+           // 두 글자는 국가로 읽습니다: kr → ko, br → pt\n+           if 두 글자: PiiCountry::parse(value).language()\n+           // ko_KR, pt-BR, kor_KR\n+           else:       language_part(value)\n+           → PiLanguage::from_language_code\n+   else:\n+       // ko_KR.UTF-8, de_DE@euro 의 codeset·modifier 는 버립니다\n+       device_locale → locale_tag → language_part\n+                     → from_language_code\n+   // 번역이 없는 언어(영어 포함)는 빠집니다\n+   return PiLanguage::normalize(결과)",
+            "refs": [
+              {
+                "path": "tinicli/src/cli_entry.rs",
+                "lines": "429-470",
+                "must_contain": [
+                  "to_core_config",
+                  "resolve_pii_countries",
+                  "resolve_pi_languages",
+                  "install_guardrails_from_config",
+                  "device_locale"
+                ]
+              },
+              {
+                "path": "tinicli/src/guardrails/prompt_injection.rs",
+                "lines": "83-118",
+                "must_contain": [
+                  "resolve_pi_languages",
+                  "PiiCountry::parse",
+                  "language_part",
+                  "locale_tag",
+                  "from_language_code",
+                  "normalize"
+                ]
+              }
+            ]
+          },
+          "explain": [
+            "설정값은 PII 가 읽는 방식 그대로 읽습니다. 두 글자는 국가(`kr`)이고, 그 나라의 주 언어(`PiiCountry::language()`)가 됩니다. 그래서 두 글자 `ko` 는 언어가 아니라 없는 국가로 읽히며, 그런 값은 PII 쪽에서 이미 부팅을 멈춥니다.",
+            "기기 locale 에서는 두 글자가 언어입니다(`ko` → 한국어). 설정값과 기기 값의 해석이 다른 점에 주의해야 합니다.",
+            "`to_core_config` 는 언어를 정하지 않고 빈 `languages` 만 채웁니다. 언어는 `cli_entry` 에서 설치 직전에 넣으므로 `[prompt_guard]` 만 켜고 도구 결과 검사를 꺼도 언어가 적용됩니다."
+          ]
+        }
+      ],
+      "points": [
+        "`[pii] locales` 문서 주석에 이 키가 prompt injection 언어도 정한다는 설명이 추가되었습니다.",
+        "기존 tinicli 테스트의 호스트 규칙 id `ko_ignore_prior` 는 이제 예약된 번역 id 이므로 `host_ignore_prior` 로 바뀌었습니다.",
+        "기기 locale 에서 codeset·modifier 를 떼는 코드는 `locale_tag` 로 빼서 PII 와 함께 씁니다."
+      ],
+      "tests": [
+        {
+          "path": "tinicli/src/guardrails/prompt_injection.rs",
+          "must_contain": [
+            "configured_values_name_countries_or_tags",
+            "the_device_locale_gives_its_language",
+            "a_configured_list_wins_over_the_device"
+          ],
+          "text": "설정값 표(국가·태그·영어·중복·대소문자), 기기 locale 표(C·POSIX·codeset 포함), 설정값이 기기 값보다 우선함을 확인합니다."
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "text": "범위 전체 리뷰 3라운드(high, medium, medium). 3라운드의 수정은 테스트·문서뿐이어서 리뷰 루프가 끝났습니다. 커밋으로 나누기 전의 WIP 트리를 리뷰했고, 그 트리는 head 와 같습니다(`git diff --quiet 02d6cdd009 ab5666e9cb`).",
+      "applies_to": "02d6cdd009",
+      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-pi-multilingual-impl-state.md"
+    },
+    {
+      "text": "argo-e2e 49/49 와 guardrails-config 모두 PASS. 리뷰 수정 전 바이너리에서 잰 결과라서 head 의 결과는 아닙니다.",
+      "applies_to": "96e6aa8d2f",
+      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-pi-multilingual-impl-state.md"
+    },
+    {
+      "text": "PR 전 검사(전체 스위트, 언어별 메모리 측정)와 head 에서의 e2e 재실행은 아직 하지 않았습니다.",
+      "applies_to": "ab5666e9cb",
+      "source": "~/.claude/projects/-Users-byungchulso-Works/memory/argo-pi-multilingual-impl-state.md"
+    }
+  ]
+}

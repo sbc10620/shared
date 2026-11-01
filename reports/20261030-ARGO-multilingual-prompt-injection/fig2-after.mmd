@@ -1,0 +1,52 @@
+flowchart TB
+  subgraph CLI["tinicli"]
+    run["cli_entry::run"]
+    tcc["to_core_config"]
+    rpc["resolve_pii_countries"]
+    rpl["resolve_pi_languages<br>[pii] locales 또는 기기 locale"]
+    pgc["build_context → prompt_guard_config<br>→ builtin_rules"]
+  end
+  subgraph CORE["tinicore guardrails"]
+    inst["install_guardrails_from_config"]
+    selc["select_countries"]
+    sell["select_languages<br>SELECTED_LANGUAGES (OnceLock)"]
+    yaml[("config/rules.yaml<br>RULES_YAML · 영어 13개")]
+    lang[("languages/&lt;code&gt;/rules.yaml<br>PiLanguage::rules_yaml · 언어마다 8개")]
+    rf["rules_for(selected_languages)<br>+ check_translation<br>← rules()"]
+    ui["builtin_user_input_prompt_injection_rules"]
+    guard["compile_cached → register<br>+ is_translation_id"]
+    toe["ToolOutputEngine::new<br>+ is_translation_id"]
+    be["build_engine_for → rule_yamls<br>→ EngineConfig::from_yamls"]
+    hw["build_handwritten_detectors"]
+    tcd["translated_comment_directive"]
+    cdd["CommentDirectiveDetector<br>영어 trigger 또는 번역 trigger regex"]
+  end
+  run --> tcc
+  run --> rpc
+  run --> rpl
+  rpl -- languages --> inst
+  run -- "2 설치 뒤" --> pgc
+  inst --> selc
+  inst -- "1 먼저" --> sell
+  inst --> toe
+  pgc --> ui
+  pgc --> guard
+  sell --> rf
+  sell --> be
+  yaml --> rf
+  lang --> rf
+  rf --> ui
+  rf --> guard
+  rf --> toe
+  yaml --> be
+  lang --> be
+  be --> hw
+  hw -- 영어 --> cdd
+  hw -- 번역 --> tcd --> cdd
+  guard -. 같은 엔진 .-> be
+  toe -. 같은 엔진 .-> be
+  class rpl,sell,lang,tcd new
+  class rf,guard,toe,be,cdd,inst changed
+  classDef new fill:#d3f5d3,stroke:#2f8132
+  classDef changed fill:#fff1a8,stroke:#9a6700
+  classDef removed fill:#ffd7d5,stroke:#b42318,stroke-dasharray:4 3
