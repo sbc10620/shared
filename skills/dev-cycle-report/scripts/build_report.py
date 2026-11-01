@@ -38,9 +38,9 @@ CHROMES = [
     "google-chrome", "chromium", "chromium-browser",
 ]
 
-TOP_KEYS = {"repo_dir", "base", "head", "topic", "title", "summary", "why",
+TOP_KEYS = {"repo_dir", "base", "head", "topic", "title", "summary", "why", "impact", "glossary",
             "structure", "groups", "records"}
-TOP_REQUIRED = TOP_KEYS - {"records"}
+TOP_REQUIRED = TOP_KEYS - {"records", "impact", "glossary"}
 WHY_KEYS = {"text", "source", "inferred_from"}
 STRUCT_KEYS = {"before", "after", "changes"}
 FIG_KEYS = {"caption", "direction", "packages", "edges"}
@@ -57,7 +57,11 @@ CHANGE_KINDS = {"new": "새로 생김", "changed": "바뀜", "moved": "옮겨짐
 GROUP_KEYS = {"id", "title", "one_line", "why", "commits", "commit_notes",
               "flows", "points", "tests"}
 GROUP_REQUIRED = {"id", "title", "one_line", "commits"}
-FLOW_KEYS = {"title", "before", "after", "explain", "calls", "sequence"}
+FLOW_KEYS = {"title", "before", "after", "explain", "calls", "sequence", "example"}
+EXAMPLE_KEYS = {"test", "steps"}
+EXAMPLE_TEST_KEYS = {"path", "must_contain"}
+IMPACT_KEYS = {"kind", "text", "fns", "snippet", "source"}
+IMPACT_KINDS = {"config": "설정", "boot": "부팅", "api": "API", "behavior": "동작", "sync": "연동"}
 SEQ_SIDES = {"before", "after"}
 SEQ_KEYS = {"layers", "steps"}
 LAYER_KEYS = {"name", "path", "participants"}
@@ -328,6 +332,32 @@ def check(spec, p):
                     if f not in found:
                         p.err(cw, f"function '{f}' is not found at "
                               f"{'base' if sha == base else 'head'} ({sha[:10]})")
+
+    for ii, item in enumerate(spec.get("impact", [])):
+        iw = f"impact[{ii}]"
+        if not keys_ok(p, iw, item, IMPACT_KEYS, {"kind", "text"}):
+            continue
+        if item["kind"] not in IMPACT_KINDS:
+            p.err(iw, f"kind must be one of {sorted(IMPACT_KINDS)}")
+        fns = str_list(p, f"{iw}.fns", item.get("fns", []), 0, CHANGE_FNS_MAX)
+        found = grep_words(repo, head, fns, scope)
+        if scope and len(found) < len(fns):
+            found |= grep_words(repo, head, [f for f in fns if f not in found], [])
+        for f in fns:
+            if f not in found:
+                p.err(iw, f"function '{f}' is not found at head ({head[:10]})")
+        if item.get("source"):
+            check_source(p, iw, repo, head, item["source"])
+    glossary = spec.get("glossary", {})
+    if not isinstance(glossary, dict):
+        p.err("glossary", "must map each term to a one-line explanation")
+        glossary = {}
+    rest = json.dumps({k: v for k, v in spec.items() if k != "glossary"}, ensure_ascii=False)
+    for term, text in glossary.items():
+        if not str(text).strip():
+            p.err(f"glossary[{term}]", "is empty")
+        if term not in rest:
+            p.warn(f"glossary[{term}]", "the term does not occur anywhere in the report")
 
     for ri, r in enumerate(spec.get("records", [])):
         rw = f"records[{ri}]"
@@ -709,6 +739,21 @@ def check_flow(p, where, repo, base, head, fl):
             if seq.get(side) is not None:
                 check_sequence(p, f"{where}.sequence.{side}", repo, sha,
                                "base" if side == "before" else "head", seq[side])
+    ex = fl.get("example")
+    ew = f"{where}.example"
+    if ex is None:
+        p.warn(ew, "no example; walk one real input from a test through the flow")
+    elif keys_ok(p, ew, ex, EXAMPLE_KEYS, EXAMPLE_KEYS):
+        str_list(p, f"{ew}.steps", ex["steps"], 2, 6)
+        t = ex["test"]
+        if keys_ok(p, f"{ew}.test", t, EXAMPLE_TEST_KEYS, EXAMPLE_TEST_KEYS):
+            lines = file_at(repo, head, t["path"])
+            if lines is None:
+                p.err(f"{ew}.test", f"'{t['path']}' does not exist at head")
+            else:
+                for tok in str_list(p, f"{ew}.test.must_contain", t["must_contain"], 1):
+                    if not any(token_re(tok).search(l) for l in lines):
+                        p.err(f"{ew}.test", f"'{tok}' is not in {t['path']} at head")
 
 
 def columns(line):
@@ -845,8 +890,10 @@ def pseudo_line(line):
         indent = len(body) - len(stripped)
         text = inline(stripped[3:])
         text = re.sub(r"^(입력|출력):", r"<b>\1</b>:", text)
+        m = re.match(r"^([A-Za-z_]\w*):", stripped[3:])
         text = re.sub(r"^([A-Za-z_]\w*):", r'<code class="fnname">\1</code>:', text)
-        return (f'<span class="ln note {cls}" style="padding-left:calc(12px + {indent + 1}ch)">'
+        attr = f' data-def="{html.escape(m.group(1))}"' if m else ""
+        return (f'<span class="ln note {cls}"{attr} style="padding-left:calc(12px + {indent + 1}ch)">'
                 f'{text}</span>')
     parts = re.split(r"((?:^|\s)#\s.*)$", body, maxsplit=1)
     code = html.escape(parts[0])
@@ -865,6 +912,95 @@ def code_block(side_label, s, sha):
         for r in s["refs"])
     return (f'<div class="code"><div class="code-h">{side_label} <span class="muted">@ {sha[:10]}</span></div>'
             f'<pre>{"".join(rows)}</pre><div class="refs">실제 코드: {refs}</div></div>')
+
+
+# Hover a function name or a glossary term anywhere for its one-line
+# explanation; click to jump to where it is explained. The explanations are
+# read from the page itself: `## name:` rows, the call tables, the glossary.
+TERMS_JS = r"""
+(function () {
+  const tip = document.getElementById('tip');
+  const defs = new Map();
+  const add = (name, text, el) => { if (name && !defs.has(name)) defs.set(name, {text: text, el: el}); };
+  document.querySelectorAll('[data-def]').forEach(el => {
+    add(el.dataset.def, el.textContent.replace(/^\s*[\w]+:\s*/, ''), el);
+  });
+  document.querySelectorAll('tr[data-call]').forEach(el => {
+    add(el.dataset.call, el.cells[1].textContent, el);
+  });
+  const terms = new Map();
+  document.querySelectorAll('dt[data-term]').forEach(el => {
+    terms.set(el.dataset.term, {text: el.nextElementSibling.textContent, el: el});
+  });
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Only names that read as identifiers (with `_`, `.` or a capital):
+  // a plain word such as `rules` or `run` is also an ordinary variable.
+  const names = [...defs.keys()].filter(n => /[_.A-Z]/.test(n)).sort((a, b) => b.length - a.length);
+  const tnames = [...terms.keys()].sort((a, b) => b.length - a.length);
+  const nameRe = names.length ? new RegExp('(?<![\\w.])(' + names.map(esc).join('|') + ')(?![\\w])', 'g') : null;
+  const termRe = tnames.length ? new RegExp('(?<![\\w])(' + tnames.map(esc).join('|') + ')(?![\\w])', 'g') : null;
+  function wrap(root, re, table, skipSelf) {
+    if (!re) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      if (node.parentElement.closest('.term, nav, #tip, dt[data-term], code.fnname, script, style')) return;
+      if (table === terms && node.parentElement.closest('code, .fn')) return;
+      const text = node.nodeValue;
+      re.lastIndex = 0;
+      if (!re.test(text)) return;
+      re.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let last = 0, m;
+      while ((m = re.exec(text))) {
+        if (table === terms) {
+          // A glossary term is marked once per section or flow.
+          const area = node.parentElement.closest('section, details.flow') || document.body;
+          area._seen = area._seen || new Set();
+          if (area._seen.has(m[1])) continue;
+          area._seen.add(m[1]);
+        }
+        frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        const entry = table.get(m[1]);
+        const span = document.createElement('span');
+        span.className = 'term';
+        span.textContent = m[1];
+        span._entry = entry;
+        frag.appendChild(span);
+        last = m.index + m[1].length;
+      }
+      frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+  // Function names: in code, in the figures' function lines, in pseudocode.
+  document.querySelectorAll('main code, .fn, .ln:not(.note), .calls td:first-child').forEach(el => wrap(el, nameRe, defs));
+  // Glossary terms: in prose.
+  document.querySelectorAll('main p, main li, main td, main dd, .role, .ln.note').forEach(el => wrap(el, termRe, terms));
+  document.addEventListener('mouseover', e => {
+    const t = e.target.closest('.term');
+    if (!t || !t._entry) return;
+    tip.textContent = t._entry.text;
+    tip.style.display = 'block';
+  });
+  document.addEventListener('mousemove', e => {
+    tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 440) + 'px';
+    tip.style.top = (e.clientY + 16) + 'px';
+  });
+  document.addEventListener('mouseout', e => { if (e.target.closest('.term')) tip.style.display = 'none'; });
+  document.addEventListener('click', e => {
+    const t = e.target.closest('.term');
+    if (!t || !t._entry) return;
+    const el = t._entry.el;
+    const det = el.closest('details');
+    if (det) det.open = true;
+    el.scrollIntoView({behavior: 'smooth', block: 'center'});
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 1500);
+  });
+})();
+"""
 
 
 FIG_LEGEND = """<div class="legend"><b>그림 읽는 법</b>
@@ -897,7 +1033,27 @@ def page(spec, facts, svgs, name, seq_svgs):
     toc = ['<a href="#overview">한눈에 보기</a>', '<a href="#why">왜 바꿨나</a>',
            '<a href="#structure">전체 구조: 전 → 후</a>', '<span class="toc-h">주제별 상세</span>']
     toc += [f'<a class="sub" href="#g-{g["id"]}">{inline(g["title"])}</a>' for g in groups]
+    if spec.get("impact"):
+        toc.insert(3, '<a href="#impact">쓰는 쪽에서 달라지는 점</a>')
+    if spec.get("glossary"):
+        toc += ['<a href="#glossary">용어</a>']
     toc += ['<a href="#appendix">부록</a>']
+    impact = "".join(
+        f'<li><span class="kind">{IMPACT_KINDS[i["kind"]]}</span> {inline(i["text"])}'
+        + (' <span class="fnref">담당: ' + ", ".join(f"<code>{html.escape(f)}</code>" for f in i["fns"]) + "</span>"
+           if i.get("fns") else "")
+        + (f' <span class="src">— 출처: {inline(i["source"])}</span>' if i.get("source") else "")
+        + (f'<pre class="snippet">{html.escape(i["snippet"])}</pre>' if i.get("snippet") else "")
+        + "</li>"
+        for i in spec.get("impact", []))
+    impact_html = (f'<h2 id="impact">쓰는 쪽에서 달라지는 점</h2><ul class="impact">{impact}</ul>'
+                   if impact else "")
+    glossary_html = ""
+    if spec.get("glossary"):
+        glossary_html = ('<h2 id="glossary">용어</h2><dl class="glossary">'
+                         + "".join(f'<dt data-term="{html.escape(t)}">{html.escape(t)}</dt><dd>{inline(d)}</dd>'
+                                   for t, d in spec["glossary"].items())
+                         + "</dl>")
 
     cards = "".join(
         f'<a class="card" href="#g-{g["id"]}"><b>{inline(g["title"])}</b><span>{inline(g["one_line"])}</span>'
@@ -938,16 +1094,23 @@ def page(spec, facts, svgs, name, seq_svgs):
                 if fl.get(side):
                     called += [c for c in code_calls(fl[side]["code"])[0] if c not in called]
             calls = fl.get("calls", {})
-            rows = "".join(f'<tr><td><code>{html.escape(c)}</code></td><td>{inline(calls[c])}</td></tr>'
+            rows = "".join(f'<tr data-call="{html.escape(c)}"><td><code>{html.escape(c)}</code></td><td>{inline(calls[c])}</td></tr>'
                            for c in called if c in calls)
             calls_html = (f'<div class="sub-h">이 흐름에서 부르는 함수</div><table class="calls">{rows}</table>'
                           if rows else "")
-            # Pseudocode and its call table first: the sequence uses the
-            # functions they explain.
+            ex = fl.get("example")
+            ex_html = ""
+            if ex:
+                ex_html = (f'<div class="sub-h">예시로 따라가기</div><div class="example">'
+                           f'<ol>{"".join("<li>" + inline(x) + "</li>" for x in ex["steps"])}</ol>'
+                           f'<div class="src">값의 출처: 테스트 <code>{html.escape(", ".join(ex["test"]["must_contain"]))}</code>'
+                           f' (<code>{html.escape(ex["test"]["path"])}</code>)</div></div>')
+            # Pseudocode and its call table first: the example and the
+            # sequence use the functions they explain.
             flows += (f'<details class="flow" open><summary>{inline(fl["title"])}</summary>'
                       f'<div class="sub-h">유사 코드</div>'
                       f'<div class="pair">{code_block("전", fl.get("before"), base)}{code_block("후", fl["after"], head)}</div>'
-                      f'{calls_html}{seq}'
+                      f'{calls_html}{ex_html}{seq}'
                       f'<ul>{"".join("<li>" + inline(e) + "</li>" for e in fl["explain"])}</ul></details>')
         points = "".join(f"<li>{inline(x)}</li>" for x in g.get("points", []))
         tests = "".join(f'<li><code>{html.escape(t["path"])}</code> — {inline(t["text"])}</li>' for t in g.get("tests", []))
@@ -1038,6 +1201,14 @@ code.fnname {{ font-weight:600; background:transparent; padding:0; }}
 ul.files {{ columns:2; font-size:13px; }}
 table {{ border-collapse:collapse; font-size:14px; }} td, th {{ border:1px solid var(--line); padding:4px 8px; text-align:left; }}
 td.num {{ text-align:right; }}
+.term {{ border-bottom:1px dotted var(--accent); cursor:help; }}
+#tip {{ position:fixed; z-index:10; max-width:420px; display:none; padding:6px 10px; border-radius:6px;
+  background:var(--fg); color:var(--bg); font:13px/1.5 -apple-system, "Apple SD Gothic Neo", sans-serif; pointer-events:none; }}
+.flash {{ outline:2px solid var(--accent); outline-offset:2px; }}
+.example {{ border:1px solid var(--line); border-left:3px solid #2da44e; border-radius:6px; padding:6px 12px; background:var(--panel); }}
+.example ol {{ margin:4px 0; }}
+ul.impact pre.snippet {{ margin:4px 0 8px; padding:6px 10px; background:var(--panel); border:1px solid var(--line); border-radius:6px; font:13px ui-monospace, Menlo, monospace; }}
+dl.glossary dt {{ font-weight:600; margin-top:6px; }} dl.glossary dd {{ margin:0 0 0 16px; }}
 </style></head><body>
 <nav>{''.join(toc)}</nav>
 <main>
@@ -1057,9 +1228,13 @@ td.num {{ text-align:right; }}
 {FIG_LEGEND}
 <h4>무엇이 달라졌나</h4><ul>{changes}</ul>
 
+{impact_html}
+
 <h2 id="groups">주제별 상세</h2>
 {LEGEND}
 {gsec}
+
+{glossary_html}
 
 <h2 id="appendix">부록</h2>
 <h4>진행 기록</h4>{rec}
@@ -1069,7 +1244,10 @@ td.num {{ text-align:right; }}
 <h4>더 깊이 보기</h4>
 <ul><li>파일별 실제 전후 코드: <code>commit-explain</code> 스킬에 <code>{base[:10]}..{head[:10]}</code> 를 주면 됩니다.</li>
 <li>main 에서 시작하는 호출 흐름 그림: <code>commit-flow-diagram</code> 스킬에 같은 범위를 주면 됩니다.</li></ul>
-</main></body></html>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>{TERMS_JS}</script>
+</body></html>
 """
 
 

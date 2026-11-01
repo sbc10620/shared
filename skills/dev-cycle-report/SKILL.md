@@ -100,6 +100,9 @@ Rules:
     {"text": "문제·목표·결정 한 문장", "source": "<file path | path:line | commit SHA | PR #n | repo#n | URL>"},
     {"text": "...", "inferred_from": "<path at head>:<line>"}
   ],
+  "impact": [{"kind": "config|boot|api|behavior|sync", "text": "쓰는 쪽에서 달라지는 점",
+              "fns": ["resolve_pii_countries"], "snippet": "[pii]\nlocales = [\"ko_KR\"]", "source": "..."}],
+  "glossary": {"DFA chunk": "한 줄 설명", "anchor": "..."},
   "structure": {
     "before": {"caption": "...", "packages": [...], "edges": [...]},
     "after": {
@@ -138,6 +141,8 @@ Rules:
       "before": {"code": "pseudocode", "refs": [{"path": "...", "lines": "120-160", "must_contain": ["fn_name"]}]},
       "after":  {"code": "pseudocode", "refs": [{"path": "...", "lines": "88-140", "must_contain": ["fn_name"]}]},
       "calls": {"called_fn": "그 함수가 하는 일, 한 줄"},
+      "example": {"test": {"path": "tests/x.rs", "must_contain": ["test_fn"]},
+                  "steps": ["실제 입력이 흐름의 한 단계를 지나는 모습", "..."]},
       "explain": ["이 흐름에서 읽어야 할 점, 한 문장씩"]
     }],
     "points": ["핵심 포인트"],
@@ -231,9 +236,27 @@ Writing rules:
     (`name(` or `obj.name(`) that is not a `def` of the same flow; the
     script refuses a flow with an unexplained call. The page lists them
     under the code as "이 흐름에서 부르는 함수".
+  - `example` walks one real input through the flow in 2 to 6 steps
+    ("`locales = [\"ko_KR\"]` → `[Kr]` → 공통 + 한국 규칙 → 주민번호는 찾고 SSN
+    은 찾지 않음"). Take the input and the outcome from a test, never
+    invent them, and name that test: the script checks it exists at head,
+    and warns about a flow with no example.
   - The page shows a flow in this order: pseudocode, the called functions,
-    the call sequence, then `explain`. The sequence has no explanations of
-    its own; it relies on the two above it.
+    the example, the call sequence, then `explain`. The sequence has no
+    explanations of its own; it relies on the parts above it.
+- **Impact** (`impact`): what changes for whoever uses the code, apart
+  from its structure — a new config key (with a `snippet`), a new reason
+  the program refuses to start, a changed public API, a behaviour a user
+  sees, what another repository must do when it takes the change. `kind`
+  is one of config, boot, api, behavior, sync; `fns` are checked at head.
+- **Glossary** (`glossary`): every term a reader may not know that the
+  report uses more than once (DFA chunk, anchor, layer, …), one line each.
+  The script warns about a term the report never uses.
+- On the page, hovering a function name shows its one-line explanation
+  (from its `## name:` row or its `calls` line) and clicking jumps there;
+  glossary terms work the same, marked once per section. Only names that
+  read as identifiers (with `_`, `.` or a capital) are linked, so give a
+  plain-word function an explanation where it matters anyway.
 - **Tests**: name the tests that pin the group's behaviour, with what
   each guarantees in one sentence.
 
