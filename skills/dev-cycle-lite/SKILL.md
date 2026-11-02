@@ -170,7 +170,9 @@ ordering claim from the written-out statement sequence; tone is not
 evidence.
 
 **The review ends** after a round with nothing to fix, or whose fixes
-touched only docs and tests. "Docs" include doc comments and comments in
+touched only docs and tests. "Nothing to fix" means the user picked
+nothing, or the round had no findings at all. If any finding is listed,
+wait for the user's pick even when 고칠 결함 is 0. "Docs" include doc comments and comments in
 production files. "Tests" = code built or run only for tests
 (test files and directories, test-only blocks such as Rust `#[cfg(test)]`);
 code in the normal build is the implementation, even if only tests call it.
